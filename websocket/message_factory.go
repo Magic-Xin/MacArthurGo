@@ -27,11 +27,8 @@ func MessageFactory(message []byte, c *Client) {
 		}
 
 		words := strings.Fields(msg["raw_message"].(string))
-
-		if int(msg["user_id"].(float64)) == 649362775 {
-			if msg["raw_message"] == "测试" || msg["raw_message"] == "/test" {
-				tempMessage = "活着呢"
-			}
+		if len(words) < 1 {
+			return
 		}
 
 		switch words[0] {
