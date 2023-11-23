@@ -62,7 +62,9 @@ func main() {
 			}
 			if conn != nil {
 				client.Conn = conn
+				disconnect <- false
 				go client.ReadPump(disconnect)
+				go client.WritePump(disconnect)
 			}
 		}
 	}

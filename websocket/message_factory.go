@@ -2,48 +2,82 @@ package websocket
 
 import (
 	_struct "MacArthurGo/struct"
+	"MacArthurGo/struct/cqcode"
 	"MacArthurGo/websocket/plugins"
 	"encoding/json"
 	"log"
 	"strings"
 )
 
-func MessageFactory(message []byte, c *Client) {
-	var i interface{}
-	err := json.Unmarshal(message, &i)
+func MessageFactory(message *[]byte, c *Client) {
+	var i any
+	err := json.Unmarshal(*message, &i)
 	if err != nil {
 		return
 	}
-	msg := i.(map[string]interface{})
-	if msg["post_type"] == "message" {
-		messageType := msg["message_type"].(string)
-		groupId := -1
-		userId := -1
-		tempMessage := ""
-		if msg["group_id"] == nil {
-			userId = int(msg["user_id"].(float64))
-		} else {
-			groupId = int(msg["group_id"].(float64))
-		}
 
-		words := strings.Fields(msg["raw_message"].(string))
+	ctx := i.(map[string]any)
+	if ctx["post_type"] == "message" {
+		var message *[]byte
+		words := strings.Fields(ctx["raw_message"].(string))
 		if len(words) < 1 {
 			return
 		}
 
 		switch words[0] {
 		case "/test":
-			tempMessage = "活着呢"
+			message = sendMsg(&ctx, "活着呢", false, true)
+		case "/poke":
+			message = sendPoke(&ctx, plugins.Poke(&ctx, &words))
 		case "/roll":
-			tempMessage = plugins.Roll(words)
+			message = sendMsg(&ctx, plugins.Roll(&words), false, true)
 		}
 
-		if tempMessage != "" {
-			sendMsg := _struct.Message{MessageType: messageType, UserId: userId, GroupId: groupId, Message: tempMessage}
-			act := _struct.Action{Action: "send_msg", Params: sendMsg}
-			jsonMsg, _ := json.Marshal(act)
-			log.Println(string(jsonMsg))
-			c.Send <- jsonMsg
+		if message != nil {
+			c.Send <- *message
 		}
 	}
+}
+
+func sendMsg(ctx *map[string]any, message string, at bool, reply bool) *[]byte {
+	if message == "" || ctx == nil {
+		return nil
+	}
+
+	messageArray := []string{message}
+
+	if at && (*ctx)["message_type"] == "group" {
+		uid := int((*ctx)["user_id"].(float64))
+		messageArray = append([]string{cqcode.At(uid)}, messageArray...)
+	}
+
+	if reply {
+		msgId := int((*ctx)["message_id"].(float64))
+		messageArray = append([]string{cqcode.Reply(msgId)}, messageArray...)
+	}
+
+	return constructMessage(ctx, strings.Join(messageArray, ""))
+}
+
+func sendPoke(ctx *map[string]any, uid int) *[]byte {
+	message := cqcode.Poke(uid)
+
+	return constructMessage(ctx, message)
+}
+
+func constructMessage(ctx *map[string]any, message string) *[]byte {
+	messageType := (*ctx)["message_type"].(string)
+	groupId := -1
+	userId := -1
+	if (*ctx)["group_id"] == nil {
+		userId = int((*ctx)["user_id"].(float64))
+	} else {
+		groupId = int((*ctx)["group_id"].(float64))
+	}
+
+	msg := _struct.Message{MessageType: messageType, UserId: userId, GroupId: groupId, Message: message}
+	act := _struct.Action{Action: "send_msg", Params: msg}
+	jsonMsg, _ := json.Marshal(act)
+	log.Println(string(jsonMsg))
+	return &jsonMsg
 }

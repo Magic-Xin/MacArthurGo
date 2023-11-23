@@ -41,7 +41,7 @@ func (c *Client) ReadPump(disconnect chan bool) {
 			}
 			break
 		}
-		go MessageFactory(message, c)
+		go MessageFactory(&message, c)
 	}
 
 	disconnect <- true
