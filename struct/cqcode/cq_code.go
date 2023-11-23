@@ -21,7 +21,7 @@ func (cq *CQCode) toString() string {
 
 func FromStr(str string) *[]CQCode {
 	var result []CQCode
-	cqCodeRegex := regexp.MustCompile(`\[CQ:([^,[\]]+)((?:,[^,=[\]]+=[^,[\]]*)*)\]`)
+	cqCodeRegex := regexp.MustCompile(`\[CQ:([^,[\]]+)((?:,[^,=[\]]+=[^,[\]]*)*)]`)
 	splitFn := func(c rune) bool {
 		return c == ','
 	}
