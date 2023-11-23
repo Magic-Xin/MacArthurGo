@@ -22,9 +22,12 @@ func (cq *CQCode) toString() string {
 func FromStr(str string) *[]CQCode {
 	var result []CQCode
 	cqCodeRegex := regexp.MustCompile(`\[CQ:([^,[\]]+)((?:,[^,=[\]]+=[^,[\]]*)*)\]`)
+	splitFn := func(c rune) bool {
+		return c == ','
+	}
 	for _, match := range cqCodeRegex.FindAllStringSubmatch(str, -1) {
 		data := make(map[string]any)
-		for _, kv := range strings.Split(match[2], ",") {
+		for _, kv := range strings.FieldsFunc(match[2], splitFn) {
 			parts := strings.SplitN(kv, "=", 2)
 			key := Unescape(parts[0])
 			value := Unescape(parts[1])
