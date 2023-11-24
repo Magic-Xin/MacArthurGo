@@ -1,10 +1,11 @@
 package websocket
 
 import (
-	_struct "MacArthurGo/struct"
+	"MacArthurGo/struct"
 	"MacArthurGo/struct/cqcode"
 	"MacArthurGo/websocket/plugins"
 	"encoding/json"
+	"github.com/gookit/config/v2"
 	"log"
 	"strings"
 )
@@ -28,15 +29,21 @@ func MessageFactory(message *[]byte, c *Client) {
 		case "/test":
 			message = sendMsg(&ctx, "活着呢", false, true)
 		case "/poke":
-			message = sendPoke(&ctx, plugins.Poke(&ctx, &words))
-		case "/roll":
-			message = sendMsg(&ctx, plugins.Roll(&words), false, true)
-		case "/chatgpt":
-			res, err := plugins.ChatGPT(&words)
-			if err != nil {
-				break
+			if config.Bool("plugins.poke.enable") {
+				message = sendPoke(&ctx, plugins.Poke(&ctx, &words))
 			}
-			message = sendMsg(&ctx, res, false, true)
+		case "/roll":
+			if config.Bool("plugins.roll.enable") {
+				message = sendMsg(&ctx, plugins.Roll(&words), false, true)
+			}
+		case "/chatgpt":
+			if config.Bool("plugins.chatGPT.enable") {
+				res, err := plugins.ChatGPT(&words)
+				if err != nil {
+					break
+				}
+				message = sendMsg(&ctx, res, false, true)
+			}
 		}
 
 		if message != nil {

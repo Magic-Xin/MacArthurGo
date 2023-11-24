@@ -10,20 +10,17 @@ import (
 )
 
 func ChatGPT(words *[]string) (string, error) {
-	if !config.Bool("chatGPT.enable") {
-		return "", errors.New("chatGPT not enabled")
-	}
 	if len(*words) < 2 {
 		return "", errors.New("not enough arguments")
 	}
 
-	client := openai.NewClient(config.String("chatGPT.apiKey"))
+	client := openai.NewClient(config.String("plugins.chatGPT.apiKey"))
 	str := strings.Join((*words)[1:], " ")
 
 	resp, err := client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			Model: config.String("chatGPT.model"),
+			Model: config.String("plugins.chatGPT.model"),
 			Messages: []openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleUser,
