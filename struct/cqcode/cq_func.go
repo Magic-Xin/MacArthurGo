@@ -23,3 +23,12 @@ func Poke(qq int64) string {
 	cq := CQCode{Type: "poke", Data: data}
 	return cq.toString()
 }
+
+func Music(urlType string, id int64) string {
+	data := map[string]any{
+		"type": urlType,
+		"id":   id,
+	}
+	cq := CQCode{Type: "music", Data: data}
+	return cq.toString()
+}

@@ -10,6 +10,9 @@
     "roll": {
       "enable": true
     },
+    "music": {
+      "enable": true
+    },
     "chatGPT": {
       "enable": true,
       "model": "",

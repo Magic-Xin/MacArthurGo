@@ -46,6 +46,13 @@ func MessageFactory(message *[]byte, c *Client) {
 			}
 		}
 
+		if message == nil && config.Bool("plugins.music.enable") {
+			urlType, id, ok := plugins.Music(ctx["raw_message"].(string))
+			if ok {
+				message = sendMusic(&ctx, urlType, id)
+			}
+		}
+
 		if message != nil {
 			c.Send <- *message
 		}
@@ -74,6 +81,12 @@ func sendMsg(ctx *map[string]any, message string, at bool, reply bool) *[]byte {
 
 func sendPoke(ctx *map[string]any, uid int64) *[]byte {
 	message := cqcode.Poke(uid)
+
+	return constructMessage(ctx, message)
+}
+
+func sendMusic(ctx *map[string]any, urlType string, id int64) *[]byte {
+	message := cqcode.Music(urlType, id)
 
 	return constructMessage(ctx, message)
 }
