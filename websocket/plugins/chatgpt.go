@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/gookit/config/v2"
 	"github.com/sashabaranov/go-openai"
+	"github.com/vinta/pangu"
 	"log"
 	"strings"
 )
@@ -35,5 +36,10 @@ func ChatGPT(words *[]string) (string, error) {
 		return "", err
 	}
 
-	return resp.Choices[0].Message.Content, nil
+	reply := resp.Choices[0].Message.Content
+	if config.Bool("plugins.chatGPT.pangu") {
+		reply = pangu.SpacingText(reply)
+	}
+
+	return reply, nil
 }

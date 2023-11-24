@@ -15,6 +15,7 @@
     },
     "chatGPT": {
       "enable": true,
+      "pangu": true,
       "model": "",
       "apiKey": ""
     }
