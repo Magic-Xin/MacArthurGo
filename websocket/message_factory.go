@@ -31,6 +31,12 @@ func MessageFactory(message *[]byte, c *Client) {
 			message = sendPoke(&ctx, plugins.Poke(&ctx, &words))
 		case "/roll":
 			message = sendMsg(&ctx, plugins.Roll(&words), false, true)
+		case "/chatgpt":
+			res, err := plugins.ChatGPT(&words)
+			if err != nil {
+				break
+			}
+			message = sendMsg(&ctx, res, false, true)
 		}
 
 		if message != nil {
