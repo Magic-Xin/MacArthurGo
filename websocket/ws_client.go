@@ -12,7 +12,7 @@ type Client struct {
 	Send chan []byte
 }
 
-func InitWebsocketConnection(addr string, at string) *websocket.Conn {
+func InitWebsocketConnection(addr string, at string) (*websocket.Conn, error) {
 	header := http.Header{}
 	if at != "" {
 		header = http.Header{"AUTHORIZATION": []string{fmt.Sprintf("Bearer %s", at)}}
@@ -20,16 +20,16 @@ func InitWebsocketConnection(addr string, at string) *websocket.Conn {
 	c, _, err := websocket.DefaultDialer.Dial(addr, header)
 	if err != nil {
 		log.Printf("Dial error: %v", err)
-		return nil
+		return nil, err
 	}
-	return c
+	return c, nil
 }
 
-func (c *Client) ReadPump(disconnect chan bool) {
+func (c *Client) ReadPump() {
 	defer func(conn *websocket.Conn) {
 		err := conn.Close()
 		if err != nil {
-			log.Printf("Close error: %v", err)
+			log.Fatalf("Close error: %v", err)
 		}
 	}(c.Conn)
 
@@ -37,21 +37,19 @@ func (c *Client) ReadPump(disconnect chan bool) {
 		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("Unexpected close error: %v", err)
+				log.Fatalf("Unexpected close error: %v", err)
 			}
 			break
 		}
 		go MessageFactory(&message, c)
 	}
-
-	disconnect <- true
 }
 
-func (c *Client) WritePump(disconnect chan bool) {
+func (c *Client) WritePump() {
 	defer func(conn *websocket.Conn) {
 		err := conn.Close()
 		if err != nil {
-			log.Printf("Close error: %v", err)
+			log.Fatalf("Close error: %v", err)
 		}
 	}(c.Conn)
 
@@ -61,28 +59,24 @@ func (c *Client) WritePump(disconnect chan bool) {
 			if !ok {
 				err := c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				if err != nil {
-					log.Printf("Client channel error: %v", err)
+					log.Fatalf("Client channel error: %v", err)
 				}
-				disconnect <- true
 				return
 			}
 
 			w, err := c.Conn.NextWriter(websocket.TextMessage)
 			if err != nil {
-				log.Printf("Next writer error: %v", err)
-				break
+				log.Fatalf("Next writer error: %v", err)
 			}
 
 			_, err = w.Write(message)
 			if err != nil {
-				log.Printf("Write message error: %v", err)
-				break
+				log.Fatalf("Write message error: %v", err)
 			}
 
 			err = w.Close()
 			if err != nil {
-				log.Printf("Writer close error: %v", err)
-				break
+				log.Fatalf("Writer close error: %v", err)
 			}
 		}
 	}
