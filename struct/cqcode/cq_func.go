@@ -1,6 +1,6 @@
 package cqcode
 
-func At(qq int) string {
+func At(qq int64) string {
 	data := map[string]any{
 		"qq": qq,
 	}
@@ -8,7 +8,7 @@ func At(qq int) string {
 	return cq.toString()
 }
 
-func Reply(msgId int) string {
+func Reply(msgId int64) string {
 	data := map[string]any{
 		"id": msgId,
 	}
@@ -16,7 +16,7 @@ func Reply(msgId int) string {
 	return cq.toString()
 }
 
-func Poke(qq int) string {
+func Poke(qq int64) string {
 	data := map[string]any{
 		"qq": qq,
 	}

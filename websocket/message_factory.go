@@ -47,19 +47,19 @@ func sendMsg(ctx *map[string]any, message string, at bool, reply bool) *[]byte {
 	messageArray := []string{message}
 
 	if at && (*ctx)["message_type"] == "group" {
-		uid := int((*ctx)["user_id"].(float64))
+		uid := int64((*ctx)["user_id"].(float64))
 		messageArray = append([]string{cqcode.At(uid)}, messageArray...)
 	}
 
 	if reply {
-		msgId := int((*ctx)["message_id"].(float64))
+		msgId := int64((*ctx)["message_id"].(float64))
 		messageArray = append([]string{cqcode.Reply(msgId)}, messageArray...)
 	}
 
 	return constructMessage(ctx, strings.Join(messageArray, ""))
 }
 
-func sendPoke(ctx *map[string]any, uid int) *[]byte {
+func sendPoke(ctx *map[string]any, uid int64) *[]byte {
 	message := cqcode.Poke(uid)
 
 	return constructMessage(ctx, message)
