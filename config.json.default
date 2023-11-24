@@ -1,0 +1,19 @@
+{
+  "address": "",
+  "authToken": "",
+  "retryTimes": 0,
+  "waitingSeconds": 30,
+  "plugins": {
+    "poke": {
+      "enable": true
+    },
+    "roll": {
+      "enable": true
+    },
+    "chatGPT": {
+      "enable": true,
+      "model": "",
+      "apiKey": ""
+    }
+  }
+}
