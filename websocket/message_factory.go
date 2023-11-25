@@ -23,10 +23,6 @@ func MessageFactory(msg *[]byte, c *Client) {
 
 	ctx := i.(map[string]any)
 	if ctx["post_type"] == "message" {
-		var (
-			message  *[]byte
-			messages []*[]byte
-		)
 		words := strings.Fields(ctx["raw_message"].(string))
 		if len(words) < 1 {
 			return
