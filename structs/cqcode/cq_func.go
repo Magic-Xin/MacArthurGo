@@ -1,26 +1,54 @@
 package cqcode
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
+	"time"
 )
 
-type CQCode struct {
-	Type string
-	Data map[string]any
+func At(qq int64) string {
+	data := map[string]any{
+		"qq": qq,
+	}
+	cq := CQCode{Type: "at", Data: data}
+	return cq.toString()
 }
 
-func (cq *CQCode) toString() string {
-	res := fmt.Sprintf("CQ:%s", cq.Type)
-	for k, v := range cq.Data {
-		switch v.(type) {
-		case string:
-			v = EscapeInsideCQ(v.(string))
-		}
-		res += fmt.Sprintf(",%s=%v", k, v)
+func Reply(msgId int64, text string, qq int64, seq int64) string {
+	data := map[string]any{
+		"id":   msgId,
+		"text": text,
+		"qq":   qq,
+		"time": time.Now().Unix(),
+		"seq":  seq,
 	}
-	return fmt.Sprintf("[%s]", res)
+	cq := CQCode{Type: "reply", Data: data}
+	return cq.toString()
+}
+
+func Poke(qq int64) string {
+	data := map[string]any{
+		"qq": qq,
+	}
+	cq := CQCode{Type: "poke", Data: data}
+	return cq.toString()
+}
+
+func Music(urlType string, id int64) string {
+	data := map[string]any{
+		"type": urlType,
+		"id":   id,
+	}
+	cq := CQCode{Type: "music", Data: data}
+	return cq.toString()
+}
+
+func Image(file string) string {
+	data := map[string]any{
+		"file": file,
+	}
+	cq := CQCode{Type: "image", Data: data}
+	return cq.toString()
 }
 
 func FromStr(str string) *[]CQCode {
