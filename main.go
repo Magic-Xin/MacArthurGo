@@ -2,15 +2,34 @@ package main
 
 import (
 	"MacArthurGo/websocket"
+	"fmt"
 	"github.com/gookit/config/v2"
+	"io"
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 )
 
 func main() {
-	err := config.LoadFiles("config.json")
+	tz, _ := time.LoadLocation("Asia/Shanghai")
+	fileName := fmt.Sprintf(time.Now().In(tz).Format("20060102150405"))
+	logPath := filepath.Join(".", "log")
+	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+		err := os.Mkdir(logPath, os.ModeDir|0755)
+		if err != nil {
+			log.Fatalf("Can not create log folder error: %v", err)
+		}
+	}
+	logFile, err := os.OpenFile(filepath.Join(".", "log", fileName), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if err != nil {
+		log.Fatalf("Can not open or create logfile error: %v", err)
+	}
+	mw := io.MultiWriter(os.Stdout, logFile)
+	log.SetOutput(mw)
+
+	err = config.LoadFiles("config.json")
 	if err != nil {
 		log.Fatalf("Can not find config error: %v", err)
 	}
