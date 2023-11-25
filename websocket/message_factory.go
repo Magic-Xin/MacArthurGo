@@ -10,16 +10,23 @@ import (
 	"strings"
 )
 
-func MessageFactory(message *[]byte, c *Client) {
-	var i any
-	err := json.Unmarshal(*message, &i)
+func MessageFactory(msg *[]byte, c *Client) {
+	var (
+		i        any
+		message  *[]byte
+		messages []*[]byte
+	)
+	err := json.Unmarshal(*msg, &i)
 	if err != nil {
 		return
 	}
 
 	ctx := i.(map[string]any)
 	if ctx["post_type"] == "message" {
-		var message *[]byte
+		var (
+			message  *[]byte
+			messages []*[]byte
+		)
 		words := strings.Fields(ctx["raw_message"].(string))
 		if len(words) < 1 {
 			return
@@ -53,8 +60,49 @@ func MessageFactory(message *[]byte, c *Client) {
 			}
 		}
 
-		if message != nil {
-			c.Send <- *message
+		if config.Bool("plugins.picSearch.enable") {
+			var (
+				str *[]string
+				btr *[]byte
+			)
+			str, btr = plugins.PicSearch(ctx["raw_message"].(string), false)
+
+			if str != nil {
+				for _, s := range *str {
+					messages = append(messages, sendMsg(&ctx, s, false, false))
+				}
+			}
+			if btr != nil {
+				c.Send <- *btr
+			}
+		}
+	}
+
+	if ctx["echo"] != nil {
+		switch ctx["echo"].(string) {
+		case "picSearch":
+			if ctx["data"].(map[string]any) != nil {
+				ctx = ctx["data"].(map[string]any)
+				if ctx["message"] != nil {
+					str, _ := plugins.PicSearch(ctx["message"].(string), true)
+					if str != nil {
+						for _, s := range *str {
+							messages = append(messages, sendMsg(&ctx, s, false, false))
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if message != nil {
+		log.Println(string(*message))
+		c.Send <- *message
+	}
+	if len(messages) > 0 {
+		for _, m := range messages {
+			log.Println(string(*m))
+			c.Send <- *m
 		}
 	}
 }
@@ -96,7 +144,7 @@ func constructMessage(ctx *map[string]any, message string) *[]byte {
 	groupId := -1
 	userId := -1
 	if (*ctx)["group_id"] == nil {
-		userId = int((*ctx)["user_id"].(float64))
+		userId = int((*ctx)["sender"].(map[string]any)["user_id"].(float64))
 	} else {
 		groupId = int((*ctx)["group_id"].(float64))
 	}
@@ -104,6 +152,5 @@ func constructMessage(ctx *map[string]any, message string) *[]byte {
 	msg := _struct.Message{MessageType: messageType, UserId: userId, GroupId: groupId, Message: message}
 	act := _struct.Action{Action: "send_msg", Params: msg}
 	jsonMsg, _ := json.Marshal(act)
-	log.Println(string(jsonMsg))
 	return &jsonMsg
 }

@@ -13,6 +13,9 @@
     "music": {
       "enable": true
     },
+    "picSearch":{
+      "enable": true
+    },
     "chatGPT": {
       "enable": true,
       "pangu": true,
