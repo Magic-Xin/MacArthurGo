@@ -21,6 +21,9 @@ import (
 )
 
 func PicSearch(ctx *map[string]any, send *chan []byte) {
+	if !config.Bool("plugins.picSearch.enable") {
+		return
+	}
 	var (
 		msg     string
 		isEcho  bool
@@ -41,8 +44,10 @@ func PicSearch(ctx *map[string]any, send *chan []byte) {
 		}
 	}
 
-	if !(isEcho || strings.Contains(msg, config.String("plugins.picSearch.args")) ||
-		(!isGroup && config.Bool("plugins.picSearch.allowPrivate")) || !config.Bool("plugins.picSearch.enable")) {
+	if !isGroup && !config.Bool("plugins.picSearch.allowPrivate") {
+		return
+	}
+	if !isEcho && !strings.Contains(msg, config.String("plugins.picSearch.args")) {
 		return
 	}
 
