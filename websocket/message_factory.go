@@ -117,7 +117,9 @@ func sendMsg(ctx *map[string]any, message string, at bool, reply bool) *[]byte {
 
 	if reply {
 		msgId := int64((*ctx)["message_id"].(float64))
-		messageArray = append([]string{cqcode.Reply(msgId)}, messageArray...)
+		qq := int64((*ctx)["user_id"].(float64))
+		seq := int64((*ctx)["message_seq"].(float64))
+		messageArray = append([]string{cqcode.Reply(msgId, message, qq, seq)}, messageArray...)
 	}
 
 	return constructMessage(ctx, strings.Join(messageArray, ""))
