@@ -1,5 +1,7 @@
 package cqcode
 
+import "time"
+
 func At(qq int64) string {
 	data := map[string]any{
 		"qq": qq,
@@ -8,9 +10,13 @@ func At(qq int64) string {
 	return cq.toString()
 }
 
-func Reply(msgId int64) string {
+func Reply(msgId int64, text string, qq int64, seq int64) string {
 	data := map[string]any{
-		"id": msgId,
+		"id":   msgId,
+		"text": text,
+		"qq":   qq,
+		"time": time.Now().Unix(),
+		"seq":  seq,
 	}
 	cq := CQCode{Type: "reply", Data: data}
 	return cq.toString()
