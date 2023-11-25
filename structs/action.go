@@ -1,4 +1,4 @@
-package _struct
+package structs
 
 type Action struct {
 	Action string `json:"action"`
@@ -6,9 +6,8 @@ type Action struct {
 }
 
 type EchoAction struct {
-	Action string `json:"action"`
-	Params any    `json:"params"`
-	Echo   string `json:"echo"`
+	Action
+	Echo string `json:"echo"`
 }
 
 type GetMsg struct {
