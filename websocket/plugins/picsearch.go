@@ -8,12 +8,15 @@ import (
 	"fmt"
 	"github.com/FloatTech/floatbox/web"
 	xpath "github.com/antchfx/htmlquery"
+	"github.com/gookit/config/v2"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 func PicSearch(msg string, isEcho bool) (s *[]string, b *[]byte) {
@@ -21,21 +24,39 @@ func PicSearch(msg string, isEcho bool) (s *[]string, b *[]byte) {
 		return
 	}
 
-	var res []string
+	var result []string
 	cc := cqcode.FromStr(msg)
 	for _, c := range *cc {
 		if c.Type == "image" {
 			fileUrl := c.Data["url"].(string)
 			fileUrl = getUniversalImgURL(fileUrl)
-			r, err := ascii2d(fileUrl)
-			if err != nil {
-				res = append(res, fmt.Sprintf("%v", err))
-			} else {
-				res = append(res, fmt.Sprintf("ascii2d 色合検索\n%s\n%s %s\n「%s」/「%s」\n%s\nArthor:%s",
-					cqcode.Image(r[0].Thumb), r[0].Info, r[0].Type, r[0].Name, r[0].AuthNm, r[0].Link, r[0].Author))
-				res = append(res, fmt.Sprintf("ascii2d 特徴検索\n%s\n%s %s\n「%s」/「%s」\n%s\nArthor:%s",
-					cqcode.Image(r[1].Thumb), r[1].Info, r[1].Type, r[1].Name, r[1].AuthNm, r[1].Link, r[1].Author))
+
+			wg := &sync.WaitGroup{}
+			wgResponse := &sync.WaitGroup{}
+			limiter := make(chan bool, 10)
+			response := make(chan string, 200)
+
+			go func() {
+				wgResponse.Add(1)
+				for rc := range response {
+					result = append(result, rc)
+				}
+				wgResponse.Done()
+			}()
+
+			for i := 0; i < 2; i++ {
+				wg.Add(1)
+				limiter <- true
+				switch i {
+				case 0:
+					go sauceNAO(fileUrl, response, limiter, wg)
+				case 1:
+					go ascii2d(fileUrl, response, limiter, wg)
+				}
 			}
+			wg.Wait()
+			close(response)
+			wgResponse.Wait()
 		}
 		if c.Type == "reply" {
 			cqMid := c.Data["id"].(string)
@@ -49,7 +70,8 @@ func PicSearch(msg string, isEcho bool) (s *[]string, b *[]byte) {
 			b = &jsonMsg
 		}
 	}
-	return &res, b
+
+	return &result, b
 }
 
 func getUniversalImgURL(url string) string {
@@ -62,7 +84,74 @@ func getUniversalImgURL(url string) string {
 	return url
 }
 
-func ascii2d(img string) (r []*_struct.Ascii2d, err error) {
+func sauceNAO(img string, response chan string, limiter chan bool, wg *sync.WaitGroup) {
+	defer wg.Done()
+	const api = "https://saucenao.com/search.php?db=999&output_type=2&testmode=1&numres=1"
+	token := config.String("plugins.picSearch.sauceNAO_token")
+
+	reqUrl := api + "&api_key=" + token + "&url=" + img
+	client := web.NewTLS12Client()
+	req, _ := http.NewRequest("GET", reqUrl, nil)
+	resp, _ := client.Do(req)
+	body, _ := io.ReadAll(resp.Body)
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("SauceNAO response close error: %v", err)
+		}
+	}(resp.Body)
+
+	var i any
+	err := json.Unmarshal(body, &i)
+	if err != nil {
+		response <- fmt.Sprintf("%v", err)
+		return
+	}
+
+	ctx := i.(map[string]any)
+	var (
+		similarity float64
+		thumbNail  string
+		author     string
+		title      string
+		sourceUrl  string
+	)
+	if ctx["results"] != nil {
+		results := ctx["results"].([]any)[0]
+		header := results.(map[string]any)["header"].(map[string]any)
+		data := results.(map[string]any)["data"].(map[string]any)
+		similarity, _ = strconv.ParseFloat(header["similarity"].(string), 64)
+		thumbNail = header["thumbnail"].(string)
+		if data["member_name"] != nil {
+			author = data["member_name"].(string)
+		} else if data["author_name"] != nil {
+			author = data["author_name"].(string)
+		}
+		if data["title"] != nil {
+			title = data["title"].(string)
+		}
+		if data["source"] != nil {
+			sourceUrl = data["source"].(string)
+		} else {
+			sourceUrl = data["ext_urls"].([]any)[0].(string)
+		}
+	}
+
+	r := fmt.Sprintf("SauceNAO\n%s\n相似度: %.2f\n", cqcode.Image(thumbNail), similarity)
+	if title != "" {
+		r += "「" + author + "」"
+		if author != "" {
+			r += "/「" + author + "」"
+		}
+		r += "\n"
+	}
+	r += sourceUrl
+	response <- r
+	<-limiter
+}
+
+func ascii2d(img string, response chan string, limiter chan bool, wg *sync.WaitGroup) {
+	defer wg.Done()
 	const api = "https://ascii2d.net/search/uri"
 	client := web.NewTLS12Client()
 	data := url.Values{}
@@ -74,7 +163,8 @@ func ascii2d(img string) (r []*_struct.Ascii2d, err error) {
 	reqC.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:6.0) Gecko/20100101 Firefox/6.0")
 	respC, err := client.Do(reqC)
 	if err != nil {
-		return nil, err
+		response <- fmt.Sprintf("%v", err)
+		return
 	}
 
 	urlB := strings.ReplaceAll(respC.Request.URL.String(), "color", "bovw")
@@ -82,52 +172,57 @@ func ascii2d(img string) (r []*_struct.Ascii2d, err error) {
 	reqB.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:6.0) Gecko/20100101 Firefox/6.0")
 	respB, err := client.Do(reqB)
 	if err != nil {
-		return nil, err
+		response <- fmt.Sprintf("%v", err)
+		return
 	}
 
 	defer func() {
 		err := respB.Body.Close()
 		if err != nil {
-			log.Printf("Picsearch respawn close error: %v", err)
+			log.Printf("Picsearch response close error: %v", err)
 			return
 		}
 		err = respC.Body.Close()
 		if err != nil {
-			log.Printf("Picsearch respawn close error: %v", err)
+			log.Printf("Picsearch response close error: %v", err)
 			return
 		}
 	}()
 
-	r = make([]*_struct.Ascii2d, 0, 2)
+	checkType := []string{"色合検索", "特徴検索"}
 
 	for _, resp := range []*http.Response{respC, respB} {
 		doc, err := xpath.Parse(resp.Body)
 		if err != nil {
-			return nil, err
+			return
 		}
 		// 取出每个返回的结果
 		list := xpath.Find(doc, `//div[@class="row item-box"]`)
 		if len(list) == 0 {
-			return nil, errors.New("ascii2d not found")
+			err := errors.New("ascii2d not found")
+			response <- fmt.Sprintf("%v", err)
+			return
 		}
-		for _, n := range list {
+		for i, n := range list {
 			linkPath := xpath.FindOne(n, `//div[2]/div[3]/h6/a[1]`)
 			authPath := xpath.FindOne(n, `//div[2]/div[3]/h6/a[2]`)
 			picPath := xpath.FindOne(n, `//div[1]/img`)
 			typePath := xpath.FindOne(n, `//div[2]/div[3]/h6/small`)
+
 			if linkPath != nil && authPath != nil && picPath != nil && typePath != nil {
-				r = append(r, &_struct.Ascii2d{
-					Info:   xpath.InnerText(xpath.FindOne(list[0], `//div[2]/small`)),
-					Link:   xpath.SelectAttr(linkPath, "href"),
-					Name:   xpath.InnerText(linkPath),
-					Author: xpath.SelectAttr(authPath, "href"),
-					AuthNm: xpath.InnerText(authPath),
-					Thumb:  "https://ascii2d.net" + xpath.SelectAttr(picPath, "src"),
-					Type:   strings.Trim(xpath.InnerText(typePath), "\n"),
-				})
+				Info := xpath.InnerText(xpath.FindOne(list[0], `//div[2]/small`))
+				Link := xpath.SelectAttr(linkPath, "href")
+				Name := xpath.InnerText(linkPath)
+				Author := xpath.SelectAttr(authPath, "href")
+				AuthNm := xpath.InnerText(authPath)
+				Thumb := "https://ascii2d.net" + xpath.SelectAttr(picPath, "src")
+				Type := strings.Trim(xpath.InnerText(typePath), "\n")
+
+				response <- fmt.Sprintf("ascii2d %s\n%s\n%s %s\n「%s」/「%s」\n%s\nArthor:%s",
+					checkType[i], cqcode.Image(Thumb), Info, Type, Name, AuthNm, Link, Author)
 				break
 			}
 		}
 	}
-	return
+	<-limiter
 }
