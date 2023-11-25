@@ -1,13 +1,19 @@
 package plugins
 
 import (
+	"github.com/gookit/config/v2"
 	"regexp"
 	"strconv"
 	"strings"
 )
 
-func Music(str string) (string, int64, bool) {
-	urlType := ""
+func Music(ctx *map[string]any, send *chan []byte) {
+	if !config.Bool("plugins.music.enable") {
+		return
+	}
+
+	var urlType string
+	str := (*ctx)["raw_message"].(string)
 	if strings.Contains(str, "music.163.com") {
 		urlType = "163"
 	} else if strings.Contains(str, "i.y.qq.com") {
@@ -20,10 +26,8 @@ func Music(str string) (string, int64, bool) {
 		if len(match) > 0 {
 			id, err := strconv.ParseInt(match[0][1], 10, 64)
 			if err == nil {
-				return urlType, id, true
+				*send <- *SendMusic(ctx, urlType, id)
 			}
 		}
 	}
-
-	return "", -1, false
 }

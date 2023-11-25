@@ -2,23 +2,33 @@ package plugins
 
 import (
 	"fmt"
+	"github.com/gookit/config/v2"
 	"math/rand"
 	"strconv"
 	"time"
 )
 
-func Roll(words *[]string) string {
-	if len(*words) == 1 {
-		return getRoll(-1)
+func Roll(ctx *map[string]any, words *[]string, send *chan []byte) {
+	if (*words)[0] != config.String("plugins.roll.args") || !config.Bool("plugins.roll.enable") {
+		return
 	}
-	if len(*words) == 2 {
+
+	var result string
+	if len(*words) == 1 {
+		result = getRoll(-1)
+	} else if len(*words) == 2 {
 		n, err := strconv.Atoi((*words)[1])
 		if err != nil {
-			return getRoll(-1)
+			result = getRoll(-1)
+		} else {
+			result = getRoll(n)
 		}
-		return getRoll(n)
+	} else {
+		result = getRollContent((*words)[1:])
 	}
-	return getRollContent((*words)[1:])
+
+	msg := SendMsg(ctx, result, false, true)
+	*send <- *msg
 }
 
 func getRoll(n int) string {

@@ -1,8 +1,8 @@
 package plugins
 
 import (
-	_struct "MacArthurGo/struct"
-	"MacArthurGo/struct/cqcode"
+	_struct "MacArthurGo/structs"
+	"MacArthurGo/structs/cqcode"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,17 +17,44 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
-func PicSearch(msg string, isEcho bool) (s *[]string, b *[]byte) {
-	if !(isEcho || strings.Contains(msg, "/search")) {
+func PicSearch(ctx *map[string]any, send *chan []byte) {
+	var (
+		msg     string
+		isEcho  bool
+		isGroup bool
+		isStart bool
+	)
+	if (*ctx)["echo"] != nil {
+		if (*ctx)["data"].(map[string]any)["message"] != nil && (*ctx)["echo"].(string) == "picSearch" {
+			isEcho = true
+			*ctx = (*ctx)["data"].(map[string]any)
+			msg = (*ctx)["message"].(string)
+			isGroup = (*ctx)["group"].(bool)
+		}
+	} else {
+		msg = (*ctx)["raw_message"].(string)
+		if (*ctx)["message_type"].(string) == "group" {
+			isGroup = true
+		}
+	}
+
+	if !(isEcho || strings.Contains(msg, config.String("plugins.picSearch.args")) ||
+		(!isGroup && config.Bool("plugins.picSearch.allowPrivate")) || !config.Bool("plugins.picSearch.enable")) {
 		return
 	}
 
 	var result []string
 	cc := cqcode.FromStr(msg)
+	start := time.Now()
 	for _, c := range *cc {
 		if c.Type == "image" {
+			if !isStart {
+				*send <- *SendMsg(ctx, config.String("plugins.picSearch.searchFeedback"), false, false)
+				isStart = true
+			}
 			fileUrl := c.Data["url"].(string)
 			fileUrl = getUniversalImgURL(fileUrl)
 
@@ -64,14 +91,33 @@ func PicSearch(msg string, isEcho bool) (s *[]string, b *[]byte) {
 			if err != nil {
 				continue
 			}
-			params := _struct.GetMsg{Id: mid}
-			act := _struct.EchoAction{Action: "get_msg", Params: params, Echo: "picSearch"}
-			jsonMsg, _ := json.Marshal(act)
-			b = &jsonMsg
+			jsonMsg, _ := json.Marshal(_struct.EchoAction{Action: _struct.Action{
+				Action: "get_msg",
+				Params: _struct.GetMsg{
+					Id: mid,
+				},
+			}, Echo: "picSearch"})
+			*send <- jsonMsg
+			return
 		}
 	}
-
-	return &result, b
+	end := time.Since(start)
+	if result != nil {
+		result = append(result, fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))
+		if isGroup {
+			var data []_struct.ForwardNode
+			for _, r := range result {
+				data = append(data, *ConstructForwardNode(&r, info.NickName, info.UserId))
+			}
+			msg := *SendGroupForward(ctx, &data)
+			log.Println(string(msg))
+			*send <- msg
+		} else {
+			for _, r := range result {
+				*send <- *SendMsg(ctx, r, false, false)
+			}
+		}
+	}
 }
 
 func getUniversalImgURL(url string) string {
@@ -87,7 +133,7 @@ func getUniversalImgURL(url string) string {
 func sauceNAO(img string, response chan string, limiter chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	const api = "https://saucenao.com/search.php?db=999&output_type=2&testmode=1&numres=1"
-	token := config.String("plugins.picSearch.sauceNAO_token")
+	token := config.String("plugins.picSearch.sauceNAOToken")
 
 	reqUrl := api + "&api_key=" + token + "&url=" + img
 	client := web.NewTLS12Client()
@@ -115,6 +161,7 @@ func sauceNAO(img string, response chan string, limiter chan bool, wg *sync.Wait
 		author     string
 		title      string
 		sourceUrl  string
+		extUrl     string
 	)
 	if ctx["results"] != nil {
 		results := ctx["results"].([]any)[0]
@@ -132,9 +179,8 @@ func sauceNAO(img string, response chan string, limiter chan bool, wg *sync.Wait
 		}
 		if data["source"] != nil {
 			sourceUrl = data["source"].(string)
-		} else {
-			sourceUrl = data["ext_urls"].([]any)[0].(string)
 		}
+		extUrl = data["ext_urls"].([]any)[0].(string)
 	}
 
 	r := fmt.Sprintf("SauceNAO\n%s\n相似度: %.2f\n", cqcode.Image(thumbNail), similarity)
@@ -145,7 +191,10 @@ func sauceNAO(img string, response chan string, limiter chan bool, wg *sync.Wait
 		}
 		r += "\n"
 	}
-	r += sourceUrl
+	if sourceUrl != "" {
+		r += sourceUrl + "\n"
+	}
+	r += extUrl
 	response <- r
 	<-limiter
 }
