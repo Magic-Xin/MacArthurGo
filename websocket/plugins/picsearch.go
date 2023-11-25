@@ -16,16 +16,6 @@ import (
 	"strings"
 )
 
-type Result struct {
-	Info   string
-	Link   string
-	Name   string
-	Author string
-	AuthNm string
-	Thumb  string
-	Type   string
-}
-
 func PicSearch(msg string, isEcho bool) (s *[]string, b *[]byte) {
 	if !(isEcho || strings.Contains(msg, "/search")) {
 		return
@@ -72,7 +62,7 @@ func getUniversalImgURL(url string) string {
 	return url
 }
 
-func ascii2d(img string) (r []*Result, err error) {
+func ascii2d(img string) (r []*_struct.Ascii2d, err error) {
 	const api = "https://ascii2d.net/search/uri"
 	client := web.NewTLS12Client()
 	data := url.Values{}
@@ -108,7 +98,7 @@ func ascii2d(img string) (r []*Result, err error) {
 		}
 	}()
 
-	r = make([]*Result, 0, 2)
+	r = make([]*_struct.Ascii2d, 0, 2)
 
 	for _, resp := range []*http.Response{respC, respB} {
 		doc, err := xpath.Parse(resp.Body)
@@ -126,7 +116,7 @@ func ascii2d(img string) (r []*Result, err error) {
 			picPath := xpath.FindOne(n, `//div[1]/img`)
 			typePath := xpath.FindOne(n, `//div[2]/div[3]/h6/small`)
 			if linkPath != nil && authPath != nil && picPath != nil && typePath != nil {
-				r = append(r, &Result{
+				r = append(r, &_struct.Ascii2d{
 					Info:   xpath.InnerText(xpath.FindOne(list[0], `//div[2]/small`)),
 					Link:   xpath.SelectAttr(linkPath, "href"),
 					Name:   xpath.InnerText(linkPath),
