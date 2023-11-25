@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/FloatTech/floatbox/web"
 	xpath "github.com/antchfx/htmlquery"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -95,8 +96,16 @@ func ascii2d(img string) (r []*Result, err error) {
 	}
 
 	defer func() {
-		respB.Body.Close()
-		respC.Body.Close()
+		err := respB.Body.Close()
+		if err != nil {
+			log.Printf("Picsearch respawn close error: %v", err)
+			return
+		}
+		err = respC.Body.Close()
+		if err != nil {
+			log.Printf("Picsearch respawn close error: %v", err)
+			return
+		}
 	}()
 
 	r = make([]*Result, 0, 2)
