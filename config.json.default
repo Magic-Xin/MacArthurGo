@@ -3,23 +3,31 @@
   "authToken": "",
   "retryTimes": 0,
   "waitingSeconds": 30,
+  "admin": 0,
   "plugins": {
     "poke": {
-      "enable": true
+      "enable": true,
+      "args": "/poke"
     },
     "roll": {
-      "enable": true
+      "enable": true,
+      "args": "/roll"
     },
     "music": {
       "enable": true
     },
     "picSearch":{
-      "enable": true
+      "enable": true,
+      "args": "/search",
+      "allowPrivate": true,
+      "searchFeedback": "",
+      "sauceNAOToken": ""
     },
     "chatGPT": {
       "enable": true,
+      "args": "/chatgpt",
       "pangu": true,
-      "model": "",
+      "model": "gpt-3.5-turbo-1106",
       "apiKey": ""
     }
   }

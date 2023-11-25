@@ -1,6 +1,7 @@
 package main
 
 import (
+	"MacArthurGo/plugins"
 	"MacArthurGo/websocket"
 	"fmt"
 	"github.com/gookit/config/v2"
@@ -52,6 +53,8 @@ func main() {
 
 	go client.ReadPump()
 	go client.WritePump()
+
+	plugins.GetInfo(&client.Send)
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)

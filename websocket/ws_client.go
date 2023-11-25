@@ -41,7 +41,8 @@ func (c *Client) ReadPump() {
 			}
 			break
 		}
-		go MessageFactory(&message, c)
+		go MessageFactory(&message, &c.Send)
+
 	}
 }
 
