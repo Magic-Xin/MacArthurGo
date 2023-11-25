@@ -31,5 +31,5 @@ go.work
 
 config.json
 MacArthurGo
-./log
+log/*
 *.log
