@@ -32,3 +32,11 @@ func Music(urlType string, id int64) string {
 	cq := CQCode{Type: "music", Data: data}
 	return cq.toString()
 }
+
+func Image(file string) string {
+	data := map[string]any{
+		"file": file,
+	}
+	cq := CQCode{Type: "image", Data: data}
+	return cq.toString()
+}
