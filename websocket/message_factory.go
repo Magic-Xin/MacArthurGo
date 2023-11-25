@@ -3,7 +3,6 @@ package websocket
 import (
 	"MacArthurGo/plugins"
 	"encoding/json"
-	"log"
 	"strings"
 )
 
@@ -20,7 +19,6 @@ func MessageFactory(msg *[]byte, send *chan []byte) {
 		if len(words) < 1 {
 			return
 		}
-		log.Println(ctx)
 
 		go plugins.Poke(&ctx, &words, send)
 		go plugins.Roll(&ctx, &words, send)
