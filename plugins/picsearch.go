@@ -249,7 +249,7 @@ func ascii2d(img string, response chan string, limiter chan bool, wg *sync.WaitG
 
 	checkType := []string{"色合検索", "特徴検索"}
 
-	for _, resp := range []*http.Response{respC, respB} {
+	for i, resp := range []*http.Response{respC, respB} {
 		doc, err := xpath.Parse(resp.Body)
 		if err != nil {
 			return
@@ -261,7 +261,7 @@ func ascii2d(img string, response chan string, limiter chan bool, wg *sync.WaitG
 			response <- fmt.Sprintf("%v", err)
 			return
 		}
-		for i, n := range list {
+		for _, n := range list {
 			linkPath := xpath.FindOne(n, `//div[2]/div[3]/h6/a[1]`)
 			authPath := xpath.FindOne(n, `//div[2]/div[3]/h6/a[2]`)
 			picPath := xpath.FindOne(n, `//div[1]/img`)
