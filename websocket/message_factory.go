@@ -27,6 +27,10 @@ func MessageFactory(msg *[]byte, send *chan []byte) {
 		go plugins.Music(&ctx, send)
 		go plugins.PicSearch(&ctx, send)
 
+		//TODO B站链接解析
+		//TODO 语言库回复
+		//TODO setu
+
 		switch words[0] {
 		case "/test":
 			*send <- *plugins.SendMsg(&ctx, "活着呢", false, true)

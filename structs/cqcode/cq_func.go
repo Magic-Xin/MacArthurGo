@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+//TODO CQ码上报Array化
+
 func At(qq int64) string {
 	data := map[string]any{
 		"qq": qq,
