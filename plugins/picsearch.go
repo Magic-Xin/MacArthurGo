@@ -190,7 +190,7 @@ func sauceNAO(img string, response chan string, limiter chan bool, wg *sync.Wait
 		}
 	}
 
-	r := fmt.Sprintf("SauceNAO\n%s\n相似度: %.2f\n", cqcode.Image(thumbNail), similarity)
+	r := fmt.Sprintf("SauceNAO\n%s\n相似度: %.2f%%\n", cqcode.Image(thumbNail), similarity)
 	if title != "" {
 		r += "「" + author + "」"
 		if author != "" {
