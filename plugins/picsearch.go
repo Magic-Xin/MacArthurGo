@@ -185,7 +185,9 @@ func sauceNAO(img string, response chan string, limiter chan bool, wg *sync.Wait
 		if data["source"] != nil {
 			sourceUrl = data["source"].(string)
 		}
-		extUrl = data["ext_urls"].([]any)[0].(string)
+		if data["ext_urls"] != nil {
+			extUrl = data["ext_urls"].([]any)[0].(string)
+		}
 	}
 
 	r := fmt.Sprintf("SauceNAO\n%s\n相似度: %.2f\n", cqcode.Image(thumbNail), similarity)
@@ -199,7 +201,9 @@ func sauceNAO(img string, response chan string, limiter chan bool, wg *sync.Wait
 	if sourceUrl != "" {
 		r += sourceUrl + "\n"
 	}
-	r += extUrl
+	if extUrl != "" {
+		r += extUrl
+	}
 	response <- r
 	<-limiter
 }
