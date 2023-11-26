@@ -41,7 +41,7 @@ func ChatGPT(ctx *map[string]any, words *[]string, send *chan []byte) {
 		reply = pangu.SpacingText(reply)
 	}
 
-	if (*ctx)["message_type"].(string) == "group" {
+	if (*ctx)["message_type"].(string) == "group" && config.Bool("plugins.chatGPT.groupForward") {
 		var data []_struct.ForwardNode
 		sender := (*ctx)["sender"].(map[string]any)
 		data = append(data, *ConstructForwardNode(&str, sender["nickname"].(string), int64(sender["user_id"].(float64))),
