@@ -3,7 +3,6 @@ package cqcode
 import (
 	"regexp"
 	"strings"
-	"time"
 )
 
 func At(qq int64) string {
@@ -14,13 +13,9 @@ func At(qq int64) string {
 	return cq.toString()
 }
 
-func Reply(msgId int64, text string, qq int64, seq int64) string {
+func Reply(msgId int64) string {
 	data := map[string]any{
-		"id":   msgId,
-		"text": text,
-		"qq":   qq,
-		"time": time.Now().Unix(),
-		"seq":  seq,
+		"id": msgId,
 	}
 	cq := CQCode{Type: "reply", Data: data}
 	return cq.toString()
