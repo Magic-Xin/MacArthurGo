@@ -128,14 +128,16 @@ func picSearch(ctx *map[string]any, send *chan []byte, msg string, isEcho bool, 
 	end := time.Since(start)
 	if result != nil {
 		result = append(result, fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))
-		if isGroup && config.Bool("plugins.picSearch.groupForward") {
+		if config.Bool("plugins.picSearch.groupForward") {
 			var data []_struct.ForwardNode
 			for _, r := range result {
 				data = append(data, *essentials.ConstructForwardNode(&r, essentials.Info.NickName, essentials.Info.UserId))
 			}
-			msg := *essentials.SendGroupForward(ctx, &data)
-			log.Println(string(msg))
-			*send <- msg
+			if isGroup {
+				*send <- *essentials.SendGroupForward(ctx, &data)
+			} else {
+				*send <- *essentials.SendPrivateForward(ctx, &data)
+			}
 		} else {
 			for _, r := range result {
 				*send <- *essentials.SendMsg(ctx, r, false, false)
