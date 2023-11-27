@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"fmt"
+	"github.com/gookit/config/v2"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
@@ -43,6 +44,9 @@ func (c *Client) ReadPump() {
 		}
 		go MessageFactory(&message, &c.Send)
 
+		if config.Bool("debug") {
+			log.Println(string(message))
+		}
 	}
 }
 
@@ -63,6 +67,10 @@ func (c *Client) WritePump() {
 					log.Fatalf("Client channel error: %v", err)
 				}
 				return
+			}
+
+			if config.Bool("debug") {
+				log.Println(string(message))
 			}
 
 			w, err := c.Conn.NextWriter(websocket.TextMessage)
