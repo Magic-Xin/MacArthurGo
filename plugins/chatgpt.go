@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"MacArthurGo/plugins/essentials"
 	_struct "MacArthurGo/structs"
 	"context"
 	"github.com/gookit/config/v2"
@@ -10,13 +11,34 @@ import (
 	"strings"
 )
 
-func ChatGPT(ctx *map[string]any, words *[]string, send *chan []byte) {
-	if !config.Bool("plugins.chatGPT.enable") || (*words)[0] != config.String("plugins.chatGPT.args") || len(*words) < 2 {
+type ChatGPT struct{}
+
+func init() {
+	chatGPT := essentials.Plugin{
+		Name:            "ChatGPT",
+		Enabled:         config.Bool("plugins.chatGPT.enable"),
+		Arg:             config.String("plugins.chatGPT.args"),
+		PluginInterface: &ChatGPT{},
+	}
+	essentials.PluginArray = append(essentials.PluginArray, &chatGPT)
+
+	essentials.MessageArray = append(essentials.MessageArray, &chatGPT)
+}
+
+func (c *ChatGPT) ReceiveAll(ctx *map[string]any, send *chan []byte) {}
+
+func (c *ChatGPT) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
+	if !essentials.CheckArgument(ctx, config.String("plugins.chatGPT.args")) || !config.Bool("plugins.chatGPT.enable") {
+		return
+	}
+
+	words := essentials.SplitArgument(ctx)
+	if len(words) < 2 {
 		return
 	}
 
 	client := openai.NewClient(config.String("plugins.chatGPT.apiKey"))
-	str := strings.Join((*words)[1:], " ")
+	str := strings.Join((words)[1:], " ")
 
 	resp, err := client.CreateChatCompletion(
 		context.Background(),
@@ -44,10 +66,12 @@ func ChatGPT(ctx *map[string]any, words *[]string, send *chan []byte) {
 	if (*ctx)["message_type"].(string) == "group" && config.Bool("plugins.chatGPT.groupForward") {
 		var data []_struct.ForwardNode
 		sender := (*ctx)["sender"].(map[string]any)
-		data = append(data, *ConstructForwardNode(&str, sender["nickname"].(string), int64(sender["user_id"].(float64))),
-			*ConstructForwardNode(&reply, info.NickName, info.UserId))
-		*send <- *SendGroupForward(ctx, &data)
+		data = append(data, *essentials.ConstructForwardNode(&str, sender["nickname"].(string), int64(sender["user_id"].(float64))),
+			*essentials.ConstructForwardNode(&reply, essentials.Info.NickName, essentials.Info.UserId))
+		*send <- *essentials.SendGroupForward(ctx, &data)
 	} else {
-		*send <- *SendMsg(ctx, reply, false, false)
+		*send <- *essentials.SendMsg(ctx, reply, false, false)
 	}
 }
+
+func (c *ChatGPT) ReceiveEcho(ctx *map[string]any, send *chan []byte) {}

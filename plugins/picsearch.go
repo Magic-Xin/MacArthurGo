@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"MacArthurGo/plugins/essentials"
 	_struct "MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"encoding/json"
@@ -20,44 +21,62 @@ import (
 	"time"
 )
 
-func PicSearch(ctx *map[string]any, send *chan []byte) {
+type PicSearch struct{}
+
+func init() {
+	pSearch := essentials.Plugin{
+		Name:            "搜图",
+		Enabled:         config.Bool("plugins.picSearch.enable"),
+		Arg:             config.String("plugins.picSearch.args"),
+		PluginInterface: &PicSearch{},
+	}
+	essentials.PluginArray = append(essentials.PluginArray, &pSearch)
+
+	essentials.MessageArray = append(essentials.MessageArray, &pSearch)
+	essentials.EchoArray = append(essentials.EchoArray, &pSearch)
+}
+
+func (p *PicSearch) ReceiveAll(ctx *map[string]any, send *chan []byte) {}
+
+func (p *PicSearch) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
+	if !config.Bool("plugins.picSearch.enable") ||
+		!strings.Contains((*ctx)["raw_message"].(string), config.String("plugins.picSearch.args")) {
+		return
+	}
+
+	if (*ctx)["message_type"].(string) == "group" {
+		picSearch(ctx, send, (*ctx)["raw_message"].(string), false, true)
+	} else {
+		picSearch(ctx, send, (*ctx)["raw_message"].(string), false, false)
+	}
+}
+
+func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 	if !config.Bool("plugins.picSearch.enable") {
 		return
 	}
-	var (
-		msg     string
-		isEcho  bool
-		isGroup bool
-		isStart bool
-	)
-	if (*ctx)["echo"] != nil {
-		if (*ctx)["data"].(map[string]any)["message"] != nil && (*ctx)["echo"].(string) == "picSearch" {
-			isEcho = true
-			*ctx = (*ctx)["data"].(map[string]any)
-			msg = (*ctx)["message"].(string)
-			isGroup = (*ctx)["group"].(bool)
-		}
-	} else {
-		msg = (*ctx)["raw_message"].(string)
-		if (*ctx)["message_type"].(string) == "group" {
-			isGroup = true
-		}
-	}
 
+	if (*ctx)["data"].(map[string]any)["message"] != nil && (*ctx)["echo"].(string) == "picSearch" {
+		*ctx = (*ctx)["data"].(map[string]any)
+		picSearch(ctx, send, (*ctx)["message"].(string), true, (*ctx)["group"].(bool))
+	}
+}
+
+func picSearch(ctx *map[string]any, send *chan []byte, msg string, isEcho bool, isGroup bool) {
 	if !isGroup && !config.Bool("plugins.picSearch.allowPrivate") {
 		return
 	}
-	if !isEcho && !strings.Contains(msg, config.String("plugins.picSearch.args")) {
-		return
-	}
 
-	var result []string
+	var (
+		result  []string
+		isStart bool
+	)
 	cc := cqcode.FromStr(msg)
 	start := time.Now()
 	for _, c := range *cc {
 		if c.Type == "image" {
 			if !isStart {
-				*send <- *SendMsg(ctx, config.String("plugins.picSearch.searchFeedback"), false, false)
+				*send <- *essentials.SendMsg(ctx, config.String("plugins.picSearch.searchFeedback"), false, false)
 				isStart = true
 			}
 			fileUrl := c.Data["url"].(string)
@@ -90,7 +109,7 @@ func PicSearch(ctx *map[string]any, send *chan []byte) {
 			close(response)
 			wgResponse.Wait()
 		}
-		if c.Type == "reply" {
+		if c.Type == "reply" && !isEcho {
 			cqMid := c.Data["id"].(string)
 			mid, err := strconv.Atoi(cqMid)
 			if err != nil {
@@ -112,14 +131,14 @@ func PicSearch(ctx *map[string]any, send *chan []byte) {
 		if isGroup && config.Bool("plugins.picSearch.groupForward") {
 			var data []_struct.ForwardNode
 			for _, r := range result {
-				data = append(data, *ConstructForwardNode(&r, info.NickName, info.UserId))
+				data = append(data, *essentials.ConstructForwardNode(&r, essentials.Info.NickName, essentials.Info.UserId))
 			}
-			msg := *SendGroupForward(ctx, &data)
+			msg := *essentials.SendGroupForward(ctx, &data)
 			log.Println(string(msg))
 			*send <- msg
 		} else {
 			for _, r := range result {
-				*send <- *SendMsg(ctx, r, false, false)
+				*send <- *essentials.SendMsg(ctx, r, false, false)
 			}
 		}
 	}

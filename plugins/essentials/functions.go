@@ -1,4 +1,4 @@
-package plugins
+package essentials
 
 import (
 	_struct "MacArthurGo/structs"
@@ -6,6 +6,18 @@ import (
 	"encoding/json"
 	"strings"
 )
+
+func SendAction(action string, params any, echo string) *[]byte {
+	if action == "" {
+		return nil
+	}
+
+	act := _struct.Action{Action: action, Params: params}
+	eAct := _struct.EchoAction{Action: act, Echo: echo}
+	jsonMsg, _ := json.Marshal(eAct)
+
+	return &jsonMsg
+}
 
 func SendMsg(ctx *map[string]any, message string, at bool, reply bool) *[]byte {
 	if message == "" || ctx == nil {
@@ -66,6 +78,14 @@ func ConstructForwardNode(data *string, name string, uin int64) *_struct.Forward
 	node := _struct.NewForwardNode(name, uin)
 	node.Data.Content = *data
 	return node
+}
+
+func CheckArgument(ctx *map[string]any, arg string) bool {
+	return strings.Fields((*ctx)["raw_message"].(string))[0] == arg
+}
+
+func SplitArgument(ctx *map[string]any) []string {
+	return strings.Fields((*ctx)["raw_message"].(string))
 }
 
 func constructMessage(ctx *map[string]any, message string) *[]byte {

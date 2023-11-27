@@ -1,13 +1,30 @@
 package plugins
 
 import (
+	"MacArthurGo/plugins/essentials"
 	"github.com/gookit/config/v2"
 	"regexp"
 	"strconv"
 	"strings"
 )
 
-func Music(ctx *map[string]any, send *chan []byte) {
+type Music struct{}
+
+func init() {
+	music := essentials.Plugin{
+		Name:            "音乐链接解析",
+		Enabled:         config.Bool("plugins.music.enable"),
+		Arg:             "",
+		PluginInterface: &Music{},
+	}
+	essentials.PluginArray = append(essentials.PluginArray, &music)
+
+	essentials.MessageArray = append(essentials.MessageArray, &music)
+}
+
+func (m *Music) ReceiveAll(ctx *map[string]any, send *chan []byte) {}
+
+func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	if !config.Bool("plugins.music.enable") {
 		return
 	}
@@ -26,8 +43,10 @@ func Music(ctx *map[string]any, send *chan []byte) {
 		if len(match) > 0 {
 			id, err := strconv.ParseInt(match[0][1], 10, 64)
 			if err == nil {
-				*send <- *SendMusic(ctx, urlType, id)
+				*send <- *essentials.SendMusic(ctx, urlType, id)
 			}
 		}
 	}
 }
+
+func (m *Music) ReceiveEcho(ctx *map[string]any, send *chan []byte) {}
