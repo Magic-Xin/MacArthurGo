@@ -9,7 +9,7 @@ type CQCode struct {
 	Data map[string]any
 }
 
-func (cq *CQCode) toString() string {
+func (cq CQCode) toString() string {
 	res := fmt.Sprintf("CQ:%s", cq.Type)
 	for k, v := range cq.Data {
 		switch v.(type) {
