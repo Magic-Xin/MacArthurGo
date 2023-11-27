@@ -25,7 +25,7 @@ func init() {
 	essentials.MessageArray = append(essentials.MessageArray, &chatGPT)
 }
 
-func (c *ChatGPT) ReceiveAll(ctx *map[string]any, send *chan []byte) {}
+func (c *ChatGPT) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (c *ChatGPT) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	if !essentials.CheckArgument(ctx, config.String("plugins.chatGPT.args")) || !config.Bool("plugins.chatGPT.enable") {
@@ -74,4 +74,4 @@ func (c *ChatGPT) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 }
 
-func (c *ChatGPT) ReceiveEcho(ctx *map[string]any, send *chan []byte) {}
+func (c *ChatGPT) ReceiveEcho(_ *map[string]any, _ *chan []byte) {}

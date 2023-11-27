@@ -26,7 +26,7 @@ func init() {
 	EchoArray = append(EchoArray, &plugin)
 }
 
-func (l *LoginInfo) ReceiveAll(ctx *map[string]any, send *chan []byte) {
+func (l *LoginInfo) ReceiveAll(_ *map[string]any, send *chan []byte) {
 	if Info.NickName == "" || Info.UserId == 0 {
 		*send <- *SendAction("get_login_info", nil, "info")
 	}
@@ -66,7 +66,7 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 }
 
-func (l *LoginInfo) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
+func (l *LoginInfo) ReceiveEcho(ctx *map[string]any, _ *chan []byte) {
 	if (*ctx)["echo"].(string) != "info" {
 		return
 	}

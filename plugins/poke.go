@@ -21,7 +21,7 @@ func init() {
 	essentials.MessageArray = append(essentials.MessageArray, &poke)
 }
 
-func (p *Poke) ReceiveAll(ctx *map[string]any, send *chan []byte) {}
+func (p *Poke) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (p *Poke) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	if !essentials.CheckArgument(ctx, config.String("plugins.poke.args")) || !config.Bool("plugins.poke.enable") {
@@ -53,4 +53,4 @@ func (p *Poke) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	*send <- *msg
 }
 
-func (p *Poke) ReceiveEcho(ctx *map[string]any, send *chan []byte) {}
+func (p *Poke) ReceiveEcho(_ *map[string]any, _ *chan []byte) {}

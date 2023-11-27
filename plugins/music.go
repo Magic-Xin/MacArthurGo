@@ -22,7 +22,7 @@ func init() {
 	essentials.MessageArray = append(essentials.MessageArray, &music)
 }
 
-func (m *Music) ReceiveAll(ctx *map[string]any, send *chan []byte) {}
+func (m *Music) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	if !config.Bool("plugins.music.enable") {
@@ -49,4 +49,4 @@ func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 }
 
-func (m *Music) ReceiveEcho(ctx *map[string]any, send *chan []byte) {}
+func (m *Music) ReceiveEcho(_ *map[string]any, _ *chan []byte) {}

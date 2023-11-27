@@ -36,7 +36,7 @@ func init() {
 	essentials.EchoArray = append(essentials.EchoArray, &pSearch)
 }
 
-func (p *PicSearch) ReceiveAll(ctx *map[string]any, send *chan []byte) {}
+func (p *PicSearch) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (p *PicSearch) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	if !config.Bool("plugins.picSearch.enable") ||

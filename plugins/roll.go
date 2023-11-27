@@ -23,7 +23,7 @@ func init() {
 	essentials.MessageArray = append(essentials.MessageArray, &roll)
 }
 
-func (r *Roll) ReceiveAll(ctx *map[string]any, send *chan []byte) {}
+func (r *Roll) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (r *Roll) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	if !essentials.CheckArgument(ctx, config.String("plugins.roll.args")) || !config.Bool("plugins.roll.enable") {
@@ -49,7 +49,7 @@ func (r *Roll) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	*send <- *msg
 }
 
-func (r *Roll) ReceiveEcho(ctx *map[string]any, send *chan []byte) {}
+func (r *Roll) ReceiveEcho(_ *map[string]any, _ *chan []byte) {}
 
 func getRoll(n int) string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
