@@ -1,4 +1,5 @@
 {
+  "debug": false,
   "address": "",
   "authToken": "",
   "retryTimes": 0,
@@ -19,6 +20,7 @@
     "picSearch":{
       "enable": true,
       "args": "/search",
+      "groupForward": false,
       "allowPrivate": true,
       "searchFeedback": "",
       "sauceNAOToken": ""
@@ -26,6 +28,7 @@
     "chatGPT": {
       "enable": true,
       "args": "/chatgpt",
+      "groupForward": false,
       "pangu": true,
       "model": "gpt-3.5-turbo-1106",
       "apiKey": ""
