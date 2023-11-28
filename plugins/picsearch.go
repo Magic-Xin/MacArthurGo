@@ -33,7 +33,7 @@ func init() {
 		Plugin: essentials.Plugin{
 			Name:    "搜图",
 			Enabled: config.Bool("plugins.picSearch.enable"),
-			Arg:     config.String("plugins.picSearch.args"),
+			Arg:     config.Strings("plugins.picSearch.args"),
 		},
 		groupForward:   config.Bool("plugins.picSearch.groupForward"),
 		allowPrivate:   config.Bool("plugins.picSearch.allowPrivate"),
@@ -46,7 +46,7 @@ func init() {
 func (p *PicSearch) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (p *PicSearch) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !p.Enabled || !strings.Contains((*ctx)["raw_message"].(string), p.Arg) {
+	if !p.Enabled || !strings.Contains((*ctx)["raw_message"].(string), p.Arg[0]) {
 		return
 	}
 

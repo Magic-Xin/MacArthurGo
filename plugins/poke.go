@@ -16,7 +16,7 @@ func init() {
 		essentials.Plugin{
 			Name:    "戳一戳",
 			Enabled: config.Bool("plugins.poke.enable"),
-			Arg:     config.String("plugins.poke.args"),
+			Arg:     config.Strings("plugins.poke.args"),
 		},
 	}
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &poke})
@@ -25,7 +25,7 @@ func init() {
 func (p *Poke) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (p *Poke) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !essentials.CheckArgument(ctx, p.Arg) || !p.Enabled {
+	if !essentials.CheckArgument(ctx, p.Arg[0]) || !p.Enabled {
 		return
 	}
 

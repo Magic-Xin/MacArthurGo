@@ -3,7 +3,7 @@ package essentials
 type Plugin struct {
 	Name    string
 	Enabled bool
-	Arg     string
+	Arg     []string
 }
 
 type PluginInterface struct {

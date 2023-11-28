@@ -18,7 +18,7 @@ func init() {
 		essentials.Plugin{
 			Name:    "随机",
 			Enabled: config.Bool("plugins.roll.enable"),
-			Arg:     config.String("plugins.roll.args"),
+			Arg:     config.Strings("plugins.roll.args"),
 		},
 	}
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &roll})
@@ -27,7 +27,7 @@ func init() {
 func (r *Roll) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (r *Roll) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !essentials.CheckArgument(ctx, r.Arg) || !r.Enabled {
+	if !essentials.CheckArgument(ctx, r.Arg[0]) || !r.Enabled {
 		return
 	}
 
