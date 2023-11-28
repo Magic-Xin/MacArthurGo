@@ -16,8 +16,8 @@ func MessageFactory(msg *[]byte, send *chan []byte) {
 	}
 
 	ctx := i.(map[string]any)
-	for _, p := range essentials.AllArray {
-		go p.PluginInterface.ReceiveAll(&ctx, send)
+	for _, p := range essentials.PluginArray {
+		go p.Interface.ReceiveAll(&ctx, send)
 	}
 
 	if ctx["post_type"] == "message" {
@@ -25,14 +25,14 @@ func MessageFactory(msg *[]byte, send *chan []byte) {
 			return
 		}
 
-		for _, p := range essentials.MessageArray {
-			go p.PluginInterface.ReceiveMessage(&ctx, send)
+		for _, p := range essentials.PluginArray {
+			go p.Interface.ReceiveMessage(&ctx, send)
 		}
 	}
 
 	if ctx["echo"] != nil {
-		for _, p := range essentials.EchoArray {
-			go p.PluginInterface.ReceiveEcho(&ctx, send)
+		for _, p := range essentials.PluginArray {
+			go p.Interface.ReceiveEcho(&ctx, send)
 		}
 	}
 }

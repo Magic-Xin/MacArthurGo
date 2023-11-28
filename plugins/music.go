@@ -8,24 +8,24 @@ import (
 	"strings"
 )
 
-type Music struct{}
+type Music struct {
+	essentials.Plugin
+}
 
 func init() {
-	music := essentials.Plugin{
-		Name:            "音乐链接解析",
-		Enabled:         config.Bool("plugins.music.enable"),
-		Arg:             "",
-		PluginInterface: &Music{},
+	music := Music{
+		essentials.Plugin{
+			Name:    "音乐链接解析",
+			Enabled: config.Bool("plugins.music.enable"),
+		},
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &music)
-
-	essentials.MessageArray = append(essentials.MessageArray, &music)
+	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &music})
 }
 
 func (m *Music) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !config.Bool("plugins.music.enable") {
+	if !m.Enabled {
 		return
 	}
 
