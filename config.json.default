@@ -8,18 +8,18 @@
   "plugins": {
     "poke": {
       "enable": true,
-      "args": "/poke"
+      "args": ["/poke"]
     },
     "roll": {
       "enable": true,
-      "args": "/roll"
+      "args": ["/roll"]
     },
     "music": {
       "enable": true
     },
     "picSearch":{
       "enable": true,
-      "args": "/search",
+      "args": ["/search"],
       "groupForward": false,
       "allowPrivate": true,
       "searchFeedback": "",
@@ -27,7 +27,7 @@
     },
     "chatGPT": {
       "enable": true,
-      "args": "/chatgpt",
+      "args": ["/chatgpt"],
       "groupForward": false,
       "pangu": true,
       "model": "gpt-3.5-turbo-1106",

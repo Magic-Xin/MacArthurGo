@@ -24,7 +24,7 @@ func init() {
 		Plugin: essentials.Plugin{
 			Name:    "ChatGPT",
 			Enabled: config.Bool("plugins.chatGPT.enable"),
-			Arg:     config.String("plugins.chatGPT.args"),
+			Arg:     config.Strings("plugins.chatGPT.args"),
 		},
 		groupForward: config.Bool("plugins.chatGPT.groupForward"),
 		panGu:        config.Bool("plugins.chatGPT.pangu"),
@@ -37,7 +37,7 @@ func init() {
 func (c *ChatGPT) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (c *ChatGPT) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !essentials.CheckArgument(ctx, c.Arg) || !c.Enabled {
+	if !essentials.CheckArgument(ctx, c.Arg[0]) || !c.Enabled {
 		return
 	}
 

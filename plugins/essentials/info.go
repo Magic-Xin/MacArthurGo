@@ -21,7 +21,7 @@ func init() {
 		Plugin: Plugin{
 			Name:    "info",
 			Enabled: true,
-			Arg:     "/test /help",
+			Arg:     []string{"/test", "/help"},
 		},
 	}
 	PluginArray = append(PluginArray, &PluginInterface{Interface: &info})
@@ -44,10 +44,10 @@ func (l *LoginInfo) ReceiveAll(_ *map[string]any, send *chan []byte) {
 }
 
 func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if CheckArgument(ctx, l.Arg) {
+	if CheckArgument(ctx, l.Arg[0]) {
 		*send <- *SendMsg(ctx, "活着呢", false, true)
 	}
-	if CheckArgument(ctx, "/help") {
+	if CheckArgument(ctx, l.Arg[1]) {
 		result := []string{"插件: "}
 		for _, p := range PluginArray {
 			var res string
@@ -70,8 +70,10 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 			if arg := ref.Elem().FieldByName("Arg"); arg.IsValid() {
 				res += "		触发指令: "
-				if arg.String() != "" {
-					res += arg.String()
+				if arg.Interface().([]string) != nil {
+					for _, a := range arg.Interface().([]string) {
+						res += a + "    "
+					}
 				} else {
 					res += "无"
 				}
