@@ -21,7 +21,7 @@ func init() {
 		Plugin: Plugin{
 			Name:    "info",
 			Enabled: true,
-			Arg:     "/test",
+			Arg:     "/test /help",
 		},
 	}
 	PluginArray = append(PluginArray, &PluginInterface{Interface: &info})
