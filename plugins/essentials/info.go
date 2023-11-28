@@ -3,10 +3,12 @@ package essentials
 import (
 	"github.com/gookit/config/v2"
 	"log"
+	"reflect"
 	"strings"
 )
 
 type LoginInfo struct {
+	Plugin
 	NickName string
 	UserId   int64
 	Login    bool
@@ -15,15 +17,14 @@ type LoginInfo struct {
 var Info LoginInfo
 
 func init() {
-	plugin := Plugin{
-		Name:            "info",
-		Enabled:         true,
-		Arg:             "/test",
-		PluginInterface: &Info,
+	info := LoginInfo{
+		Plugin: Plugin{
+			Name:    "info",
+			Enabled: true,
+			Arg:     "/test",
+		},
 	}
-	AllArray = append(AllArray, &plugin)
-	MessageArray = append(MessageArray, &plugin)
-	EchoArray = append(EchoArray, &plugin)
+	PluginArray = append(PluginArray, &PluginInterface{Interface: &info})
 }
 
 func (l *LoginInfo) ReceiveAll(_ *map[string]any, send *chan []byte) {
@@ -43,21 +44,40 @@ func (l *LoginInfo) ReceiveAll(_ *map[string]any, send *chan []byte) {
 }
 
 func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if CheckArgument(ctx, "/test") {
+	if CheckArgument(ctx, l.Arg) {
 		*send <- *SendMsg(ctx, "活着呢", false, true)
 	}
 	if CheckArgument(ctx, "/help") {
 		result := []string{"插件: "}
 		for _, p := range PluginArray {
-			res := p.Name
-			if !p.Enabled {
-				res += "(已禁用)"
-			}
-			res += "	  触发指令: "
-			if p.Arg != "" {
-				res += p.Arg
+			var res string
+			ref := reflect.ValueOf(p.Interface)
+			if name := ref.Elem().FieldByName("Name"); name.IsValid() {
+				res += name.String()
 			} else {
-				res += "无"
+				*send <- *SendMsg(ctx, "插件解析出错", false, false)
+				return
+			}
+
+			if enable := ref.Elem().FieldByName("Enabled"); enable.IsValid() {
+				if !enable.Bool() {
+					res += "(已禁用)"
+				}
+			} else {
+				*send <- *SendMsg(ctx, "插件解析出错", false, false)
+				return
+			}
+
+			if arg := ref.Elem().FieldByName("Arg"); arg.IsValid() {
+				res += "		触发指令: "
+				if arg.String() != "" {
+					res += arg.String()
+				} else {
+					res += "无"
+				}
+			} else {
+				*send <- *SendMsg(ctx, "插件解析出错", false, false)
+				return
 			}
 			result = append(result, res)
 		}

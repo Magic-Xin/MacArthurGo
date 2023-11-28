@@ -4,6 +4,7 @@ import (
 	_struct "MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"encoding/json"
+	"regexp"
 	"strings"
 )
 
@@ -86,6 +87,16 @@ func CheckArgument(ctx *map[string]any, arg string) bool {
 
 func SplitArgument(ctx *map[string]any) []string {
 	return strings.Fields((*ctx)["raw_message"].(string))
+}
+
+func GetUniversalImgURL(url string) string {
+	pattern := regexp.MustCompile(`^https?://(c2cpicdw|gchat)\.qpic\.cn/(offpic|gchatpic)_new/`)
+	if pattern.MatchString(url) {
+		url = strings.Replace(url, "/c2cpicdw.qpic.cn/offpic_new/", "/gchat.qpic.cn/gchatpic_new/", 1)
+		url = regexp.MustCompile(`/\d+/+\d+-\d+-`).ReplaceAllString(url, "/0/0-0-")
+		url = strings.TrimSuffix(url, "?.*$")
+	}
+	return url
 }
 
 func constructMessage(ctx *map[string]any, message string) *[]byte {

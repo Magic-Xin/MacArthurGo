@@ -14,56 +14,62 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
-type PicSearch struct{}
+type PicSearch struct {
+	essentials.Plugin
+	groupForward   bool
+	allowPrivate   bool
+	searchFeedback string
+	sauceNAOToken  string
+}
 
 func init() {
-	pSearch := essentials.Plugin{
-		Name:            "搜图",
-		Enabled:         config.Bool("plugins.picSearch.enable"),
-		Arg:             config.String("plugins.picSearch.args"),
-		PluginInterface: &PicSearch{},
+	pSearch := PicSearch{
+		Plugin: essentials.Plugin{
+			Name:    "搜图",
+			Enabled: config.Bool("plugins.picSearch.enable"),
+			Arg:     config.String("plugins.picSearch.args"),
+		},
+		groupForward:   config.Bool("plugins.picSearch.groupForward"),
+		allowPrivate:   config.Bool("plugins.picSearch.allowPrivate"),
+		searchFeedback: config.String("plugins.picSearch.searchFeedback"),
+		sauceNAOToken:  config.String("plugins.picSearch.sauceNAOToken"),
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &pSearch)
-
-	essentials.MessageArray = append(essentials.MessageArray, &pSearch)
-	essentials.EchoArray = append(essentials.EchoArray, &pSearch)
+	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &pSearch})
 }
 
 func (p *PicSearch) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (p *PicSearch) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !config.Bool("plugins.picSearch.enable") ||
-		!strings.Contains((*ctx)["raw_message"].(string), config.String("plugins.picSearch.args")) {
+	if !p.Enabled || !strings.Contains((*ctx)["raw_message"].(string), p.Arg) {
 		return
 	}
 
 	if (*ctx)["message_type"].(string) == "group" {
-		picSearch(ctx, send, (*ctx)["raw_message"].(string), false, true)
+		p.picSearch(ctx, send, (*ctx)["raw_message"].(string), false, true)
 	} else {
-		picSearch(ctx, send, (*ctx)["raw_message"].(string), false, false)
+		p.picSearch(ctx, send, (*ctx)["raw_message"].(string), false, false)
 	}
 }
 
 func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
-	if !config.Bool("plugins.picSearch.enable") {
+	if !p.Enabled {
 		return
 	}
 
 	if (*ctx)["data"].(map[string]any)["message"] != nil && (*ctx)["echo"].(string) == "picSearch" {
 		*ctx = (*ctx)["data"].(map[string]any)
-		picSearch(ctx, send, (*ctx)["message"].(string), true, (*ctx)["group"].(bool))
+		p.picSearch(ctx, send, (*ctx)["message"].(string), true, (*ctx)["group"].(bool))
 	}
 }
 
-func picSearch(ctx *map[string]any, send *chan []byte, msg string, isEcho bool, isGroup bool) {
-	if !isGroup && !config.Bool("plugins.picSearch.allowPrivate") {
+func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string, isEcho bool, isGroup bool) {
+	if !isGroup && !p.allowPrivate {
 		return
 	}
 
@@ -76,11 +82,11 @@ func picSearch(ctx *map[string]any, send *chan []byte, msg string, isEcho bool, 
 	for _, c := range *cc {
 		if c.Type == "image" {
 			if !isStart {
-				*send <- *essentials.SendMsg(ctx, config.String("plugins.picSearch.searchFeedback"), false, false)
+				*send <- *essentials.SendMsg(ctx, p.searchFeedback, false, false)
 				isStart = true
 			}
 			fileUrl := c.Data["url"].(string)
-			fileUrl = getUniversalImgURL(fileUrl)
+			fileUrl = essentials.GetUniversalImgURL(fileUrl)
 
 			wg := &sync.WaitGroup{}
 			wgResponse := &sync.WaitGroup{}
@@ -100,9 +106,9 @@ func picSearch(ctx *map[string]any, send *chan []byte, msg string, isEcho bool, 
 				limiter <- true
 				switch i {
 				case 0:
-					go sauceNAO(fileUrl, response, limiter, wg)
+					go p.sauceNAO(fileUrl, response, limiter, wg)
 				case 1:
-					go ascii2d(fileUrl, response, limiter, wg)
+					go p.ascii2d(fileUrl, response, limiter, wg)
 				}
 			}
 			wg.Wait()
@@ -128,7 +134,7 @@ func picSearch(ctx *map[string]any, send *chan []byte, msg string, isEcho bool, 
 	end := time.Since(start)
 	if result != nil {
 		result = append(result, fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))
-		if config.Bool("plugins.picSearch.groupForward") {
+		if p.groupForward {
 			var data []_struct.ForwardNode
 			for _, r := range result {
 				data = append(data, *essentials.ConstructForwardNode(&r, essentials.Info.NickName, essentials.Info.UserId))
@@ -146,22 +152,11 @@ func picSearch(ctx *map[string]any, send *chan []byte, msg string, isEcho bool, 
 	}
 }
 
-func getUniversalImgURL(url string) string {
-	pattern := regexp.MustCompile(`^https?://(c2cpicdw|gchat)\.qpic\.cn/(offpic|gchatpic)_new/`)
-	if pattern.MatchString(url) {
-		url = strings.Replace(url, "/c2cpicdw.qpic.cn/offpic_new/", "/gchat.qpic.cn/gchatpic_new/", 1)
-		url = regexp.MustCompile(`/\d+/+\d+-\d+-`).ReplaceAllString(url, "/0/0-0-")
-		url = strings.TrimSuffix(url, "?.*$")
-	}
-	return url
-}
-
-func sauceNAO(img string, response chan string, limiter chan bool, wg *sync.WaitGroup) {
+func (p *PicSearch) sauceNAO(img string, response chan string, limiter chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	const api = "https://saucenao.com/search.php?db=999&output_type=2&testmode=1&numres=1"
-	token := config.String("plugins.picSearch.sauceNAOToken")
 
-	reqUrl := api + "&api_key=" + token + "&url=" + img
+	reqUrl := api + "&api_key=" + p.sauceNAOToken + "&url=" + img
 	client := web.NewTLS12Client()
 	req, _ := http.NewRequest("GET", reqUrl, nil)
 	resp, _ := client.Do(req)
@@ -229,7 +224,7 @@ func sauceNAO(img string, response chan string, limiter chan bool, wg *sync.Wait
 	<-limiter
 }
 
-func ascii2d(img string, response chan string, limiter chan bool, wg *sync.WaitGroup) {
+func (p *PicSearch) ascii2d(img string, response chan string, limiter chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	const api = "https://ascii2d.net/search/uri"
 	client := web.NewTLS12Client()

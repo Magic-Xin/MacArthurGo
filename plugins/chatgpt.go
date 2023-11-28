@@ -11,24 +11,33 @@ import (
 	"strings"
 )
 
-type ChatGPT struct{}
+type ChatGPT struct {
+	essentials.Plugin
+	groupForward bool
+	panGu        bool
+	model        string
+	apiKey       string
+}
 
 func init() {
-	chatGPT := essentials.Plugin{
-		Name:            "ChatGPT",
-		Enabled:         config.Bool("plugins.chatGPT.enable"),
-		Arg:             config.String("plugins.chatGPT.args"),
-		PluginInterface: &ChatGPT{},
+	chatGPT := ChatGPT{
+		Plugin: essentials.Plugin{
+			Name:    "ChatGPT",
+			Enabled: config.Bool("plugins.chatGPT.enable"),
+			Arg:     config.String("plugins.chatGPT.args"),
+		},
+		groupForward: config.Bool("plugins.chatGPT.groupForward"),
+		panGu:        config.Bool("plugins.chatGPT.pangu"),
+		model:        config.String("plugins.chatGPT.model"),
+		apiKey:       config.String("plugins.chatGPT.apiKey"),
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &chatGPT)
-
-	essentials.MessageArray = append(essentials.MessageArray, &chatGPT)
+	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &chatGPT})
 }
 
 func (c *ChatGPT) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (c *ChatGPT) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !essentials.CheckArgument(ctx, config.String("plugins.chatGPT.args")) || !config.Bool("plugins.chatGPT.enable") {
+	if !essentials.CheckArgument(ctx, c.Arg) || !c.Enabled {
 		return
 	}
 
@@ -37,13 +46,13 @@ func (c *ChatGPT) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		return
 	}
 
-	client := openai.NewClient(config.String("plugins.chatGPT.apiKey"))
+	client := openai.NewClient(c.apiKey)
 	str := strings.Join((words)[1:], " ")
 
 	resp, err := client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			Model: config.String("plugins.chatGPT.model"),
+			Model: c.model,
 			Messages: []openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleUser,
@@ -55,15 +64,16 @@ func (c *ChatGPT) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 	if err != nil {
 		log.Printf("ChatCompletion error: %v", err)
+		*send <- *essentials.SendMsg(ctx, err.Error(), false, false)
 		return
 	}
 
 	reply := resp.Choices[0].Message.Content
-	if config.Bool("plugins.chatGPT.pangu") {
+	if c.panGu {
 		reply = pangu.SpacingText(reply)
 	}
 
-	if (*ctx)["message_type"].(string) == "group" && config.Bool("plugins.chatGPT.groupForward") {
+	if (*ctx)["message_type"].(string) == "group" && c.groupForward {
 		var data []_struct.ForwardNode
 		sender := (*ctx)["sender"].(map[string]any)
 		data = append(data, *essentials.ConstructForwardNode(&str, sender["nickname"].(string), int64(sender["user_id"].(float64))),

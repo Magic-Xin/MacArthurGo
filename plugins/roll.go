@@ -9,40 +9,41 @@ import (
 	"time"
 )
 
-type Roll struct{}
+type Roll struct {
+	essentials.Plugin
+}
 
 func init() {
-	roll := essentials.Plugin{
-		Name:            "随机",
-		Enabled:         config.Bool("plugins.roll.enable"),
-		Arg:             config.String("plugins.roll.args"),
-		PluginInterface: &Roll{},
+	roll := Roll{
+		essentials.Plugin{
+			Name:    "随机",
+			Enabled: config.Bool("plugins.roll.enable"),
+			Arg:     config.String("plugins.roll.args"),
+		},
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &roll)
-
-	essentials.MessageArray = append(essentials.MessageArray, &roll)
+	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &roll})
 }
 
 func (r *Roll) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (r *Roll) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !essentials.CheckArgument(ctx, config.String("plugins.roll.args")) || !config.Bool("plugins.roll.enable") {
+	if !essentials.CheckArgument(ctx, r.Arg) || !r.Enabled {
 		return
 	}
 
 	words := essentials.SplitArgument(ctx)
 	var result string
 	if len(words) == 1 {
-		result = getRoll(-1)
+		result = r.getRoll(-1)
 	} else if len(words) == 2 {
 		n, err := strconv.Atoi((words)[1])
 		if err != nil {
-			result = getRoll(-1)
+			result = r.getRoll(-1)
 		} else {
-			result = getRoll(n)
+			result = r.getRoll(n)
 		}
 	} else {
-		result = getRollContent((words)[1:])
+		result = r.getRollContent((words)[1:])
 	}
 
 	msg := essentials.SendMsg(ctx, result, false, true)
@@ -51,7 +52,7 @@ func (r *Roll) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 func (r *Roll) ReceiveEcho(_ *map[string]any, _ *chan []byte) {}
 
-func getRoll(n int) string {
+func (*Roll) getRoll(n int) string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	if n < 1 {
 		return fmt.Sprintf("生成 [0-9] 随机值：%d", r.Intn(10))
@@ -59,7 +60,7 @@ func getRoll(n int) string {
 	return fmt.Sprintf("生成 [0-%d] 随机值：%d", n, r.Intn(n))
 }
 
-func getRollContent(content []string) string {
+func (*Roll) getRollContent(content []string) string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return fmt.Sprintf("随机结果为：%s", content[r.Intn(len(content))])
 }

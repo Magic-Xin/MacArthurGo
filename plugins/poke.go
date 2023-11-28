@@ -7,24 +7,25 @@ import (
 	"strconv"
 )
 
-type Poke struct{}
+type Poke struct {
+	essentials.Plugin
+}
 
 func init() {
-	poke := essentials.Plugin{
-		Name:            "戳一戳",
-		Enabled:         config.Bool("plugins.poke.enable"),
-		Arg:             config.String("plugins.poke.args"),
-		PluginInterface: &Poke{},
+	poke := Poke{
+		essentials.Plugin{
+			Name:    "戳一戳",
+			Enabled: config.Bool("plugins.poke.enable"),
+			Arg:     config.String("plugins.poke.args"),
+		},
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &poke)
-
-	essentials.MessageArray = append(essentials.MessageArray, &poke)
+	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &poke})
 }
 
 func (p *Poke) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (p *Poke) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !essentials.CheckArgument(ctx, config.String("plugins.poke.args")) || !config.Bool("plugins.poke.enable") {
+	if !essentials.CheckArgument(ctx, p.Arg) || !p.Enabled {
 		return
 	}
 
