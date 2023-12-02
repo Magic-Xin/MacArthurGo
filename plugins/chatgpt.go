@@ -78,7 +78,7 @@ func (c *ChatGPT) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		sender := (*ctx)["sender"].(map[string]any)
 		data = append(data, *essentials.ConstructForwardNode(&str, sender["nickname"].(string), int64(sender["user_id"].(float64))),
 			*essentials.ConstructForwardNode(&reply, essentials.Info.NickName, essentials.Info.UserId))
-		*send <- *essentials.SendGroupForward(ctx, &data)
+		*send <- *essentials.SendGroupForward(ctx, &data, "")
 	} else {
 		*send <- *essentials.SendMsg(ctx, reply, false, false)
 	}
