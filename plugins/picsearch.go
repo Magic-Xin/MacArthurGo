@@ -22,10 +22,11 @@ import (
 
 type PicSearch struct {
 	essentials.Plugin
-	groupForward   bool
-	allowPrivate   bool
-	searchFeedback string
-	sauceNAOToken  string
+	groupForward      bool
+	allowPrivate      bool
+	searchFeedback    string
+	sauceNAOToken     string
+	handleBannedHosts bool
 }
 
 func init() {
@@ -35,10 +36,11 @@ func init() {
 			Enabled: config.Bool("plugins.picSearch.enable"),
 			Arg:     config.Strings("plugins.picSearch.args"),
 		},
-		groupForward:   config.Bool("plugins.picSearch.groupForward"),
-		allowPrivate:   config.Bool("plugins.picSearch.allowPrivate"),
-		searchFeedback: config.String("plugins.picSearch.searchFeedback"),
-		sauceNAOToken:  config.String("plugins.picSearch.sauceNAOToken"),
+		groupForward:      config.Bool("plugins.picSearch.groupForward"),
+		allowPrivate:      config.Bool("plugins.picSearch.allowPrivate"),
+		handleBannedHosts: config.Bool("plugins.picSearch.handleBannedHosts"),
+		searchFeedback:    config.String("plugins.picSearch.searchFeedback"),
+		sauceNAOToken:     config.String("plugins.picSearch.sauceNAOToken"),
 	}
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &pSearch})
 }
@@ -62,10 +64,19 @@ func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 		return
 	}
 
-	if (*ctx)["data"].(map[string]any)["message"] != nil && (*ctx)["echo"].(string) == "picSearch" {
-		*ctx = (*ctx)["data"].(map[string]any)
-		p.picSearch(ctx, send, (*ctx)["message"].(string), true, (*ctx)["group"].(bool))
+	if (*ctx)["data"] != nil {
+		if (*ctx)["echo"].(string) == "picSearch" {
+			*ctx = (*ctx)["data"].(map[string]any)
+			p.picSearch(ctx, send, (*ctx)["message"].(string), true, (*ctx)["group"].(bool))
+		}
+		//if (*ctx)["data"].(map[string]any)["status"].(string) == "failed" && strings.Contains((*ctx)["echo"].(string), "picForward") {
+		//
+		//}
 	}
+}
+
+func (p *PicSearch) groupFailed(ctx *map[string]any, send *chan []byte, res string) {
+	*send <- *essentials.SendMsg(ctx, "合并转发失败，将独立发送搜索结果", false, false)
 }
 
 func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string, isEcho bool, isGroup bool) {
@@ -86,7 +97,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 				isStart = true
 			}
 			fileUrl := c.Data["url"].(string)
-			fileUrl = essentials.GetUniversalImgURL(fileUrl)
+			fileUrl, key := essentials.GetUniversalImgURL(fileUrl)
 
 			wg := &sync.WaitGroup{}
 			wgResponse := &sync.WaitGroup{}
@@ -121,28 +132,30 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 			if err != nil {
 				continue
 			}
-			jsonMsg, _ := json.Marshal(_struct.EchoAction{Action: _struct.Action{
-				Action: "get_msg",
-				Params: _struct.GetMsg{
-					Id: mid,
-				},
-			}, Echo: "picSearch"})
-			*send <- jsonMsg
+			*send <- *essentials.SendAction("get_msg", _struct.GetMsg{Id: mid}, "picSearch")
 			return
 		}
 	}
 	end := time.Since(start)
 	if result != nil {
+		if p.handleBannedHosts {
+			result = *essentials.HandleBannedHostsArray(&result)
+		}
 		result = append(result, fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))
 		if p.groupForward {
-			var data []_struct.ForwardNode
+			var (
+				data []_struct.ForwardNode
+				echo string
+			)
 			for _, r := range result {
 				data = append(data, *essentials.ConstructForwardNode(&r, essentials.Info.NickName, essentials.Info.UserId))
+				echo += r + "\n"
 			}
+			echo = "picForward" + echo
 			if isGroup {
-				*send <- *essentials.SendGroupForward(ctx, &data)
+				*send <- *essentials.SendGroupForward(ctx, &data, echo)
 			} else {
-				*send <- *essentials.SendPrivateForward(ctx, &data)
+				*send <- *essentials.SendPrivateForward(ctx, &data, echo)
 			}
 		} else {
 			for _, r := range result {
