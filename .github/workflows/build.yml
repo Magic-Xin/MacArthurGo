@@ -25,7 +25,8 @@ jobs:
     - name: Build
       run: |
         mkdir build
-        go build -v ./build
+        cd build
+        go build -v ../
 
     - name: Upload To Artifact
       uses: actions/upload-artifact@main
