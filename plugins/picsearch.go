@@ -43,6 +43,12 @@ func init() {
 		sauceNAOToken:     config.String("plugins.picSearch.sauceNAOToken"),
 	}
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &pSearch})
+
+	sqlTable := `CREATE TABLE IF NOT EXISTS picsearch(uid TEXT PRIMARY KEY NOT NULL, res TEXT NOT NULL, created NUMERIC NOT NULL);`
+	_, err := essentials.DB.Exec(sqlTable)
+	if err != nil {
+		log.Printf("SQL exec error: %v", err)
+	}
 }
 
 func (p *PicSearch) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
@@ -69,14 +75,35 @@ func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 			*ctx = (*ctx)["data"].(map[string]any)
 			p.picSearch(ctx, send, (*ctx)["message"].(string), true, (*ctx)["group"].(bool))
 		}
-		//if (*ctx)["data"].(map[string]any)["status"].(string) == "failed" && strings.Contains((*ctx)["echo"].(string), "picForward") {
-		//
-		//}
+		if (*ctx)["data"].(map[string]any)["status"] != nil && strings.Contains((*ctx)["echo"].(string), "picForward") {
+			if (*ctx)["data"].(map[string]any)["status"].(string) == "failed" {
+				p.groupFailed(send, strings.Split((*ctx)["echo"].(string), "|")[1:])
+			}
+		}
 	}
 }
 
-func (p *PicSearch) groupFailed(ctx *map[string]any, send *chan []byte, res string) {
+func (p *PicSearch) groupFailed(send *chan []byte, echo []string) {
+	ctx := &map[string]any{
+		"message_type": echo[1],
+		"sender": map[string]any{
+			"user_id": echo[2],
+		},
+		"group_id": echo[2],
+	}
+
 	*send <- *essentials.SendMsg(ctx, "合并转发失败，将独立发送搜索结果", false, false)
+
+	res := p.selectDB(echo[0])
+	if res == nil {
+		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", false, false)
+		return
+	}
+
+	result := strings.Split(*res, "|")
+	for _, r := range result {
+		*send <- *essentials.SendMsg(ctx, r, false, false)
+	}
 }
 
 func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string, isEcho bool, isGroup bool) {
@@ -85,6 +112,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 	}
 
 	var (
+		key     string
 		result  []string
 		isStart bool
 	)
@@ -97,7 +125,14 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 				isStart = true
 			}
 			fileUrl := c.Data["url"].(string)
-			fileUrl, key := essentials.GetUniversalImgURL(fileUrl)
+			fileUrl, key = essentials.GetUniversalImgURL(fileUrl)
+			res := p.selectDB(key)
+			if res != nil {
+				log.Println("已查询到缓存")
+				result = append(result, "已查询到缓存")
+				result = append(result, strings.Split(*res, "|")...)
+				break
+			}
 
 			wg := &sync.WaitGroup{}
 			wgResponse := &sync.WaitGroup{}
@@ -141,21 +176,19 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 		if p.handleBannedHosts {
 			result = *essentials.HandleBannedHostsArray(&result)
 		}
+
+		p.insertDB(key, strings.Join(result, "|"))
+
 		result = append(result, fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))
 		if p.groupForward {
-			var (
-				data []_struct.ForwardNode
-				echo string
-			)
+			var data []_struct.ForwardNode
 			for _, r := range result {
 				data = append(data, *essentials.ConstructForwardNode(&r, essentials.Info.NickName, essentials.Info.UserId))
-				echo += r + "\n"
 			}
-			echo = "picForward" + echo
 			if isGroup {
-				*send <- *essentials.SendGroupForward(ctx, &data, echo)
+				*send <- *essentials.SendGroupForward(ctx, &data, *p.genEcho(ctx, key, isGroup))
 			} else {
-				*send <- *essentials.SendPrivateForward(ctx, &data, echo)
+				*send <- *essentials.SendPrivateForward(ctx, &data, *p.genEcho(ctx, key, isGroup))
 			}
 		} else {
 			for _, r := range result {
@@ -312,4 +345,48 @@ func (p *PicSearch) ascii2d(img string, response chan string, limiter chan bool,
 		}
 	}
 	<-limiter
+}
+
+func (p *PicSearch) genEcho(ctx *map[string]any, key string, isGroup bool) *string {
+	res := "picForward|" + key
+	if !isGroup {
+		res += "|private|" + strconv.FormatInt(int64((*ctx)["sender"].(map[string]any)["user_id"].(float64)), 10)
+	} else {
+		res += "|group|" + strconv.FormatInt(int64((*ctx)["group_id"].(float64)), 10)
+	}
+
+	return &res
+}
+
+func (p *PicSearch) insertDB(uid string, res string) {
+	stmt, err := essentials.DB.Prepare("INSERT INTO picsearch(uid, res, created) values (?, ?, ?)")
+	if err != nil {
+		log.Printf("Database insert prepare error: %v", err)
+		return
+	}
+	_, err = stmt.Exec(uid, res, time.Now())
+	if err != nil {
+		log.Printf("Database insert execution error: %v", err)
+	}
+}
+
+func (p *PicSearch) selectDB(uid string) *string {
+	query, err := essentials.DB.Query("SELECT res FROM picsearch WHERE uid=?", uid)
+	if err != nil {
+		return nil
+	}
+
+	var res string
+	for query.Next() {
+		err = query.Scan(&res)
+		if err != nil {
+			return nil
+		}
+	}
+
+	if res == "" {
+		return nil
+	}
+
+	return &res
 }
