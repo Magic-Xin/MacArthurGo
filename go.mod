@@ -18,6 +18,7 @@ require (
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/gookit/goutil v0.6.14 // indirect
 	github.com/imdario/mergo v0.3.15 // indirect
+	github.com/mattn/go-sqlite3 v1.14.18 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
