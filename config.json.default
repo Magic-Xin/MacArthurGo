@@ -20,15 +20,18 @@
     "picSearch":{
       "enable": true,
       "args": ["/search"],
-      "groupForward": false,
+      "groupForward": true,
       "allowPrivate": true,
+      "handleBannedHosts": true,
+      "expirationTime": 86400,
+      "intervalTime": 1800,
       "searchFeedback": "",
       "sauceNAOToken": ""
     },
     "chatGPT": {
       "enable": true,
       "args": ["/chatgpt"],
-      "groupForward": false,
+      "groupForward": true,
       "pangu": true,
       "model": "gpt-3.5-turbo-1106",
       "apiKey": ""

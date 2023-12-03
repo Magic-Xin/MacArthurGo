@@ -53,26 +53,22 @@ func SendMusic(ctx *map[string]any, urlType string, id int64) *[]byte {
 	return constructMessage(ctx, message)
 }
 
-func SendPrivateForward(ctx *map[string]any, data *[]_struct.ForwardNode) *[]byte {
+func SendPrivateForward(ctx *map[string]any, data *[]_struct.ForwardNode, echo string) *[]byte {
 	params := _struct.PrivateForward{
 		UserId:   int64((*ctx)["sender"].(map[string]any)["user_id"].(float64)),
 		Messages: *data,
 	}
-	act := _struct.Action{Action: "send_private_forward_msg", Params: params}
 
-	jsonMsg, _ := json.Marshal(act)
-	return &jsonMsg
+	return SendAction("send_private_forward_msg", params, echo)
 }
 
-func SendGroupForward(ctx *map[string]any, data *[]_struct.ForwardNode) *[]byte {
+func SendGroupForward(ctx *map[string]any, data *[]_struct.ForwardNode, echo string) *[]byte {
 	params := _struct.GroupForward{
 		GroupId:  int64((*ctx)["group_id"].(float64)),
 		Messages: *data,
 	}
-	act := _struct.Action{Action: "send_group_forward_msg", Params: params}
 
-	jsonMsg, _ := json.Marshal(act)
-	return &jsonMsg
+	return SendAction("send_group_forward_msg", params, echo)
 }
 
 func ConstructForwardNode(data *string, name string, uin int64) *_struct.ForwardNode {
@@ -89,14 +85,32 @@ func SplitArgument(ctx *map[string]any) []string {
 	return strings.Fields((*ctx)["raw_message"].(string))
 }
 
-func GetUniversalImgURL(url string) string {
+func GetUniversalImgURL(url string) (string, string) {
 	pattern := regexp.MustCompile(`^https?://(c2cpicdw|gchat)\.qpic\.cn/(offpic|gchatpic)_new/`)
 	if pattern.MatchString(url) {
 		url = strings.Replace(url, "/c2cpicdw.qpic.cn/offpic_new/", "/gchat.qpic.cn/gchatpic_new/", 1)
 		url = regexp.MustCompile(`/\d+/+\d+-\d+-`).ReplaceAllString(url, "/0/0-0-")
 		url = strings.TrimSuffix(url, "?.*$")
 	}
-	return url
+
+	uidPattern := regexp.MustCompile(`/0/0-0-(\w+)/`)
+	match := uidPattern.FindAllStringSubmatch(url, -1)
+	if match != nil {
+		return url, match[0][1]
+	}
+
+	return url, ""
+}
+
+func HandleBannedHostsArray(str *[]string) *[]string {
+	bannedHosts := []string{"danbooru.donmai.us", "konachan.com"}
+	for _, s := range *str {
+		s = strings.Replace(s, "//", "//\u200B", -1)
+		for _, host := range bannedHosts {
+			s = strings.Replace(s, host, strings.Replace(host, ".", ".\u200B", -1), -1)
+		}
+	}
+	return str
 }
 
 func constructMessage(ctx *map[string]any, message string) *[]byte {
@@ -105,7 +119,7 @@ func constructMessage(ctx *map[string]any, message string) *[]byte {
 		userId  int64
 		groupId int64
 	)
-	if (*ctx)["group_id"] == nil {
+	if messageType == "private" {
 		userId = int64((*ctx)["sender"].(map[string]any)["user_id"].(float64))
 	} else {
 		groupId = int64((*ctx)["group_id"].(float64))
