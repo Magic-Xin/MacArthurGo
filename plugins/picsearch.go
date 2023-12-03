@@ -74,8 +74,7 @@ func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 		if (*ctx)["echo"].(string) == "picSearch" {
 			*ctx = (*ctx)["data"].(map[string]any)
 			p.picSearch(ctx, send, (*ctx)["message"].(string), true, (*ctx)["group"].(bool))
-		}
-		if (*ctx)["data"].(map[string]any)["status"] != nil && strings.Contains((*ctx)["echo"].(string), "picForward") {
+		} else if (*ctx)["data"].(map[string]any)["status"] != nil && strings.Contains((*ctx)["echo"].(string), "picForward") {
 			if (*ctx)["data"].(map[string]any)["status"].(string) == "failed" {
 				p.groupFailed(send, strings.Split((*ctx)["echo"].(string), "|")[1:])
 			}
@@ -115,6 +114,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 		key     string
 		result  []string
 		isStart bool
+		cached  bool
 	)
 	cc := cqcode.FromStr(msg)
 	start := time.Now()
@@ -128,7 +128,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 			fileUrl, key = essentials.GetUniversalImgURL(fileUrl)
 			res := p.selectDB(key)
 			if res != nil {
-				log.Println("已查询到缓存")
+				cached = true
 				result = append(result, "已查询到缓存")
 				result = append(result, strings.Split(*res, "|")...)
 				break
@@ -176,10 +176,11 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 		if p.handleBannedHosts {
 			result = *essentials.HandleBannedHostsArray(&result)
 		}
+		if !cached {
+			p.insertDB(key, strings.Join(result, "|"))
+			result = append(result, fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))
+		}
 
-		p.insertDB(key, strings.Join(result, "|"))
-
-		result = append(result, fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))
 		if p.groupForward {
 			var data []_struct.ForwardNode
 			for _, r := range result {
@@ -364,7 +365,7 @@ func (p *PicSearch) insertDB(uid string, res string) {
 		log.Printf("Database insert prepare error: %v", err)
 		return
 	}
-	_, err = stmt.Exec(uid, res, time.Now())
+	_, err = stmt.Exec(uid, res, time.Now().Unix())
 	if err != nil {
 		log.Printf("Database insert execution error: %v", err)
 	}
