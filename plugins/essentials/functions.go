@@ -119,7 +119,7 @@ func constructMessage(ctx *map[string]any, message string) *[]byte {
 		userId  int64
 		groupId int64
 	)
-	if (*ctx)["group_id"] == nil {
+	if messageType == "private" {
 		userId = int64((*ctx)["sender"].(map[string]any)["user_id"].(float64))
 	} else {
 		groupId = int64((*ctx)["group_id"].(float64))
