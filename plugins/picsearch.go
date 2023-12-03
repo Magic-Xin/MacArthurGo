@@ -80,21 +80,22 @@ func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 		if (*ctx)["echo"].(string) == "picSearch" {
 			*ctx = (*ctx)["data"].(map[string]any)
 			p.picSearch(ctx, send, (*ctx)["message"].(string), true, (*ctx)["group"].(bool))
-		} else if (*ctx)["data"].(map[string]any)["status"] != nil && strings.Contains((*ctx)["echo"].(string), "picForward") {
-			if (*ctx)["data"].(map[string]any)["status"].(string) == "failed" {
-				p.groupFailed(send, strings.Split((*ctx)["echo"].(string), "|")[1:])
-			}
+		}
+	} else if (*ctx)["msg"] != nil && strings.Contains((*ctx)["echo"].(string), "picForward") {
+		if (*ctx)["msg"].(string) == "SEND_MSG_API_ERROR" {
+			p.groupFailed(send, strings.Split((*ctx)["echo"].(string), "|")[1:])
 		}
 	}
 }
 
 func (p *PicSearch) groupFailed(send *chan []byte, echo []string) {
+	id, _ := strconv.ParseFloat(echo[2], 64)
 	ctx := &map[string]any{
 		"message_type": echo[1],
 		"sender": map[string]any{
-			"user_id": echo[2],
+			"user_id": id,
 		},
-		"group_id": echo[2],
+		"group_id": id,
 	}
 
 	*send <- *essentials.SendMsg(ctx, "合并转发失败，将独立发送搜索结果", false, false)

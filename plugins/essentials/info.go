@@ -28,10 +28,8 @@ func init() {
 }
 
 func (l *LoginInfo) ReceiveAll(_ *map[string]any, send *chan []byte) {
-	if Info.NickName == "" || Info.UserId == 0 {
-		*send <- *SendAction("get_login_info", nil, "info")
-	}
 	if !Info.Login {
+		*send <- *SendAction("get_login_info", nil, "info")
 		sendCtx := map[string]any{
 			"message_type": "private",
 			"sender": map[string]any{
