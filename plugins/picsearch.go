@@ -24,9 +24,11 @@ type PicSearch struct {
 	essentials.Plugin
 	groupForward      bool
 	allowPrivate      bool
+	handleBannedHosts bool
+	expirationTime    int64
+	intervalTime      int64
 	searchFeedback    string
 	sauceNAOToken     string
-	handleBannedHosts bool
 }
 
 func init() {
@@ -39,6 +41,8 @@ func init() {
 		groupForward:      config.Bool("plugins.picSearch.groupForward"),
 		allowPrivate:      config.Bool("plugins.picSearch.allowPrivate"),
 		handleBannedHosts: config.Bool("plugins.picSearch.handleBannedHosts"),
+		expirationTime:    config.Int64("plugins.picSearch.expirationTime"),
+		intervalTime:      config.Int64("plugins.picSearch.intervalTime"),
 		searchFeedback:    config.String("plugins.picSearch.searchFeedback"),
 		sauceNAOToken:     config.String("plugins.picSearch.sauceNAOToken"),
 	}
@@ -49,6 +53,8 @@ func init() {
 	if err != nil {
 		log.Printf("SQL exec error: %v", err)
 	}
+
+	go pSearch.deleteExpiration()
 }
 
 func (p *PicSearch) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
@@ -374,6 +380,7 @@ func (p *PicSearch) insertDB(uid string, res string) {
 func (p *PicSearch) selectDB(uid string) *string {
 	query, err := essentials.DB.Query("SELECT res FROM picsearch WHERE uid=?", uid)
 	if err != nil {
+		log.Printf("Database query error: %v", err)
 		return nil
 	}
 
@@ -390,4 +397,20 @@ func (p *PicSearch) selectDB(uid string) *string {
 	}
 
 	return &res
+}
+
+func (p *PicSearch) deleteExpiration() {
+	for {
+		stmt, err := essentials.DB.Prepare("DELETE FROM picsearch WHERE uid=(SELECT uid FROM picsearch WHERE (?-created) > ?)")
+		if err != nil {
+			log.Printf("Database delete prepare error: %v", err)
+			return
+		}
+
+		_, err = stmt.Exec(time.Now().Unix(), p.expirationTime)
+		if err != nil {
+			log.Printf("Database delete execution error: %v", err)
+		}
+		time.Sleep(time.Duration(p.intervalTime) * time.Second)
+	}
 }
