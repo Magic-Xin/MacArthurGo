@@ -1,6 +1,7 @@
 NAME=MacArthurGo
 BINDIR=build
 GOBUILD=go build
+LDFLAGS=-s -w
 
 DARWIN_PLATFORM_LIST = \
 	darwin-amd64 \
@@ -19,28 +20,28 @@ WINDOWS_PLATFORM_LIST = \
 all: linux-amd64 # Most used
 
 darwin-amd64:
-	xgo --targets=darwin-amd64 --out $(BINDIR)/MacArthurGo
+	xgo --targets="darwin-amd64" -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo
 
 darwin-arm64:
-	xgo --targets=darwin-arm64 --out $(BINDIR)/MacArthurGo
+	xgo --targets="darwin-arm64" -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo
 
 linux-386:
-	xgo --targets=linux-386 --out $(BINDIR)/MacArthurGo
+	xgo --targets="linux-386" -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo
 
 linux-amd64:
-	xgo --targets=linux-amd64 --out $(BINDIR)/MacArthurGo
+	xgo --targets="linux-amd64" -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo
 
 linux-arm64:
-	xgo --targets=linux-arm64 --out $(BINDIR)/MacArthurGo
+	xgo --targets="linux-arm64" -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo
 
 windows-386:
-	xgo --targets=windows-386 --out $(BINDIR)/MacArthurGo.exe
+	xgo --targets="windows-386" -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo.exe
 
 windows-amd64:
-	xgo --targets=windows-amd64 --out $(BINDIR)/MacArthurGo.exe
+	xgo --targets="windows-amd64" -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo.exe
 
 windows-arm64:
-	xgo --targets=windows-arm64 --out $(BINDIR)/MacArthurGo.exe
+	xgo --targets="windows-arm64" -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo.exe
 
 darwin_releases=$(addsuffix .tar, $(DARWIN_PLATFORM_LIST))
 
