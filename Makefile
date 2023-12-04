@@ -1,5 +1,5 @@
 NAME=MacArthurGo
-BINDIR=build
+BINDIR=./build
 GOBUILD=go build
 LDFLAGS=-s -w
 
