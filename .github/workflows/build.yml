@@ -48,8 +48,7 @@ jobs:
       with:
         name: MacArthurGo-${{ env.sha_short }}
         path: |
-          bin/*.tar.gz
-          bin/*.zip
+          bin/*
 
     - name: Upload To Release
       uses: softprops/action-gh-release@v1
@@ -57,6 +56,5 @@ jobs:
       with:
         body: New Release.
         path: |
-          bin/*.tar.gz
-          bin/*.zip
+          bin/*
           config.json.default
