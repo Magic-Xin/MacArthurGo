@@ -1,6 +1,6 @@
 NAME=MacArthurGo
 BINDIR=build
-GOBUILD=go build CGO_ENABLED=1
+GOBUILD=go build
 
 DARWIN_PLATFORM_LIST = \
 	darwin-amd64 \
@@ -19,28 +19,28 @@ WINDOWS_PLATFORM_LIST = \
 all: linux-amd64 # Most used
 
 darwin-amd64:
-	GOARCH=amd64 GOOS=darwin $(GOBUILD) -o $(BINDIR)/MacArthurGo
+	CGO_ENABLED=1 GOARCH=amd64 GOOS=darwin $(GOBUILD) -o $(BINDIR)/MacArthurGo
 
 darwin-arm64:
-	GOARCH=arm64 GOOS=darwin $(GOBUILD) -o $(BINDIR)/MacArthurGo
+	CGO_ENABLED=1 GOARCH=arm64 GOOS=darwin $(GOBUILD) -o $(BINDIR)/MacArthurGo
 
 linux-386:
-	GOARCH=386 GOOS=linux $(GOBUILD) -o $(BINDIR)/MacArthurGo
+	CGO_ENABLED=1 GOARCH=386 GOOS=linux $(GOBUILD) -o $(BINDIR)/MacArthurGo
 
 linux-amd64:
-	GOARCH=amd64 GOOS=linux $(GOBUILD) -o $(BINDIR)/MacArthurGo
+	CGO_ENABLED=1 GOARCH=amd64 GOOS=linux $(GOBUILD) -o $(BINDIR)/MacArthurGo
 
 linux-arm64:
-	GOARCH=arm64 GOOS=linux $(GOBUILD) -o $(BINDIR)/MacArthurGo
+	CGO_ENABLED=1 GOARCH=arm64 GOOS=linux $(GOBUILD) -o $(BINDIR)/MacArthurGo
 
 windows-386:
-	GOARCH=386 GOOS=windows $(GOBUILD) -o $(BINDIR)/MacArthurGo.exe
+	CGO_ENABLED=1 GOARCH=386 GOOS=windows $(GOBUILD) -o $(BINDIR)/MacArthurGo.exe
 
 windows-amd64:
-	GOARCH=amd64 GOOS=windows $(GOBUILD) -o $(BINDIR)/MacArthurGo.exe
+	CGO_ENABLED=1 GOARCH=amd64 GOOS=windows $(GOBUILD) -o $(BINDIR)/MacArthurGo.exe
 
 windows-arm64:
-	GOARCH=arm64 GOOS=windows $(GOBUILD) -o $(BINDIR)/MacArthurGo.exe
+	CGO_ENABLED=1 GOARCH=arm64 GOOS=windows $(GOBUILD) -o $(BINDIR)/MacArthurGo.exe
 
 darwin_releases=$(addsuffix .tar, $(DARWIN_PLATFORM_LIST))
 
