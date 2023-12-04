@@ -53,7 +53,7 @@ $(darwin_releases): %.tar : %
 linux_releases=$(addsuffix .tar, $(LINUX_PLATFORM_LIST))
 
 $(linux_releases): %.tar : %
-	chmod +x $(BINDIR)/MacArthurGo
+	chmod +x $(BINDIR)/MacArthurGo-*
 	-${upx} --lzma --best $(BINDIR)/MacArthurGo
 	cd $(BINDIR) && tar -zcvf $(NAME)-$(basename $@).tar.gz MacArthurGo-*
 	rm -rf $(BINDIR)/MacArthurGo-*
