@@ -47,7 +47,7 @@ darwin_releases=$(addsuffix .tar, $(DARWIN_PLATFORM_LIST))
 
 $(darwin_releases): %.tar : %
 	chmod +x $(BINDIR)/MacArthurGo-*
-	cd $(BINDIR) && tar -zcvf $(NAME)-$(basename $@).tar.gz -C MacArthurGo-*
+	cd $(BINDIR) && tar -zcvf $(NAME)-$(basename $@).tar.gz MacArthurGo-*
 	rm -rf $(BINDIR)/MacArthurGo-*
 
 linux_releases=$(addsuffix .tar, $(LINUX_PLATFORM_LIST))
