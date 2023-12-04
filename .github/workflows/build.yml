@@ -35,7 +35,7 @@ jobs:
     - name: Build
       run: |
         mkdir build
-        make release
+        make releases
 
     - name: Upload To Artifact
       uses: actions/upload-artifact@main
