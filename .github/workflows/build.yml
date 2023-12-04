@@ -39,7 +39,4 @@ jobs:
     - name: Upload To Artifact
       uses: actions/upload-artifact@main
       with:
-        name: MacArthurGo-${{ env.sha_short }}
-        path: |
-          build/MacArthurGo?.tar.gz
-          build/MacArthurGo?.zip
+        path: build/*
