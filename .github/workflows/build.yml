@@ -6,7 +6,6 @@ name: Build
 on:
   workflow_dispatch:
   push:
-    branches: [ "main" ]
     tags:
       - "v*.*.*"
 
@@ -57,7 +56,7 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       with:
         body: New Release.
-        path: |
+        files: |
           out/*.tar.gz
           out/*.zip
           config.json.default
