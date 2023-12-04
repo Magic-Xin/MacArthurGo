@@ -20,10 +20,10 @@ WINDOWS_PLATFORM_LIST = \
 all: linux-amd64 # Most used
 
 darwin-amd64:
-	xgo --targets=darwin/amd64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	xgo --targets=darwin-10.14/amd64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
 
 darwin-arm64:
-	xgo --targets=darwin/arm64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	xgo --targets=darwin-10.14/arm64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
 
 linux-386:
 	xgo --targets=linux/386 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
@@ -35,13 +35,13 @@ linux-arm64:
 	xgo --targets=linux/arm64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
 
 windows-386:
-	xgo --targets=windows/386 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	xgo --targets=windows-6.3/386 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
 
 windows-amd64:
-	xgo --targets=windows/amd64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	xgo --targets=windows-6.3/amd64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
 
 windows-arm64:
-	xgo --targets=windows/arm64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	xgo --targets=windows-6.3/arm64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
 
 darwin_releases=$(addsuffix .tar, $(DARWIN_PLATFORM_LIST))
 
@@ -54,16 +54,16 @@ linux_releases=$(addsuffix .tar, $(LINUX_PLATFORM_LIST))
 
 $(linux_releases): %.tar : %
 	chmod +x $(BINDIR)/MacArthurGo-*
-	-${upx} --lzma --best $(BINDIR)/MacArthurGo
+	-${upx} --lzma --best $(BINDIR)/MacArthurGo-*
 	cd $(BINDIR) && tar -zcvf $(NAME)-$(basename $@).tar.gz MacArthurGo-*
 	rm -rf $(BINDIR)/MacArthurGo-*
 
 windows_releases=$(addsuffix .zip, $(WINDOWS_PLATFORM_LIST))
 
 $(windows_releases): %.zip : %
-	-${upx} --lzma --best $(BINDIR)/MacArthurGo-*.exe
-	cd $(BINDIR) && zip -v9 $(NAME)-$(basename $@).zip MacArthurGo-*.exe
-	rm -rf $(BINDIR)/MacArthurGo-*.exe
+	-${upx} --lzma --best $(BINDIR)/MacArthurGo-*
+	cd $(BINDIR) && zip -v9 $(NAME)-$(basename $@).zip MacArthurGo-*
+	rm -rf $(BINDIR)/MacArthurGo-*
 
 all-arch: $(PLATFORM_LIST)
 
