@@ -61,6 +61,7 @@ $(linux_releases): %.tar : %
 windows_releases=$(addsuffix .zip, $(WINDOWS_PLATFORM_LIST))
 
 $(windows_releases): %.zip : %
+	-${upx} --lzma --best $(BINDIR)/MacArthurGo.exe
 	zip -v9 $(BINDIR)/$(NAME)-$(basename $@).zip $(BINDIR)/MacArthurGo.exe
 	rm -rf $(BINDIR)/MacArthurGo.exe
 

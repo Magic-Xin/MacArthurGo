@@ -16,7 +16,6 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Set environment
-      shell: bash
       run: |
         echo "sha_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
 
@@ -41,4 +40,6 @@ jobs:
       uses: actions/upload-artifact@main
       with:
         name: MacArthurGo-${{ env.sha_short }}
-        path: ./build
+        path: |
+          build/MacArthurGo?.tar.gz
+          build/MacArthurGo?.zip
