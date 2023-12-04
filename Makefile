@@ -46,7 +46,6 @@ darwin_releases=$(addsuffix .tar, $(DARWIN_PLATFORM_LIST))
 
 $(darwin_releases): %.tar : %
 	chmod +x $(BINDIR)/MacArthurGo
-	-${upx} --lzma --best $(BINDIR)/MacArthurGo
 	tar -zcvf $(BINDIR)/$(NAME)-$(basename $@).tar.gz -C $(BINDIR) MacArthurGo
 	rm -rf $(BINDIR)/MacArthurGo
 
@@ -62,7 +61,7 @@ windows_releases=$(addsuffix .zip, $(WINDOWS_PLATFORM_LIST))
 
 $(windows_releases): %.zip : %
 	-${upx} --lzma --best $(BINDIR)/MacArthurGo.exe
-	zip -v9 $(BINDIR)/$(NAME)-$(basename $@).zip $(BINDIR)/MacArthurGo.exe
+	zip -v9 $(NAME)-$(basename $@).zip $(BINDIR)/MacArthurGo.exe
 	rm -rf $(BINDIR)/MacArthurGo.exe
 
 all-arch: $(PLATFORM_LIST)
