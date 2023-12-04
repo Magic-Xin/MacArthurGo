@@ -1,6 +1,6 @@
 NAME=MacArthurGo
 BINDIR=build
-GOBUILD=go build
+GOBUILD=go build CGO_ENABLED=1
 
 DARWIN_PLATFORM_LIST = \
 	darwin-amd64 \
