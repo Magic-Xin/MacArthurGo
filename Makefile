@@ -1,5 +1,5 @@
 NAME=MacArthurGo
-BINDIR=build
+BINDIR=bin
 GOBUILD=go build
 LDFLAGS=-s -w
 
@@ -46,24 +46,24 @@ windows-arm64:
 darwin_releases=$(addsuffix .tar, $(DARWIN_PLATFORM_LIST))
 
 $(darwin_releases): %.tar : %
-	cd $(BINDIR)
-	chmod +x *
-	tar -zcvf $(NAME)-$(basename $@).tar.gz *
+	chmod +x $(BINDIR)/MacArthurGo-*
+	tar -zcvf $(BINDIR)/$(NAME)-$(basename $@).tar.gz -C $(BINDIR) MacArthurGo-*
+	rm -rf $(BINDIR)/MacArthurGo-*
 
 linux_releases=$(addsuffix .tar, $(LINUX_PLATFORM_LIST))
 
 $(linux_releases): %.tar : %
-	cd $(BINDIR)
-	chmod +x *
-	-${upx} --lzma --best *
-	tar -zcvf $(NAME)-$(basename $@).tar.gz *
+	chmod +x $(BINDIR)/MacArthurGo
+	-${upx} --lzma --best $(BINDIR)/MacArthurGo
+	tar -zcvf $(BINDIR)/$(NAME)-$(basename $@).tar.gz -C $(BINDIR) MacArthurGo-*
+	rm -rf $(BINDIR)/MacArthurGo-*
 
 windows_releases=$(addsuffix .zip, $(WINDOWS_PLATFORM_LIST))
 
 $(windows_releases): %.zip : %
-	cd $(BINDIR)
-	-${upx} --lzma --best *.exe
-	zip -v9 $(NAME)-$(basename $@).zip *.exe
+	-${upx} --lzma --best $(BINDIR)/MacArthurGo-*.exe
+	zip -v9 $(BINDIR)/$(NAME)-$(basename $@).zip $(BINDIR)/MacArthurGo-*.exe
+	rm -rf $(BINDIR)/MacArthurGo-*.exe
 
 all-arch: $(PLATFORM_LIST)
 
