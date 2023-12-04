@@ -15,10 +15,17 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Set enviroment
+    - name: Set environment
       shell: bash
       run: |
         echo "sha_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
+
+    - name: Setup UPX
+      run: |
+        cd ..
+        wget https://github.com/upx/upx/releases/download/v4.2.1/upx-4.2.1-amd64_linux.tar.xz
+        tar xf upx-4.2.1-amd64_linux.tar.xz
+        echo "upx=../upx-4.2.1-amd64_linux/upx" >> $GITHUB_ENV
 
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -28,11 +35,10 @@ jobs:
     - name: Build
       run: |
         mkdir build
-        cd build
-        go build -v ../
+        make release
 
     - name: Upload To Artifact
       uses: actions/upload-artifact@main
       with:
         name: MacArthurGo-${{ env.sha_short }}
-        path: ./build/MacArthurGo
+        path: ./build
