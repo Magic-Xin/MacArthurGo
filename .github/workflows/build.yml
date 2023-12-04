@@ -15,6 +15,11 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Set enviroment
+      shell: bash
+      run: |
+        echo "sha_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
@@ -29,4 +34,5 @@ jobs:
     - name: Upload To Artifact
       uses: actions/upload-artifact@main
       with:
+        name: MacArthurGo-${{ env.sha_short }}
         path: ./build/MacArthurGo
