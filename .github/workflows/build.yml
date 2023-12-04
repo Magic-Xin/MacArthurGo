@@ -41,6 +41,7 @@ jobs:
     - name: Build
       run: |
         mkdir bin
+        mkdir out
         make releases
 
     - name: Upload To Artifact
@@ -48,7 +49,8 @@ jobs:
       with:
         name: MacArthurGo-${{ env.sha_short }}
         path: |
-          bin/*
+          out/*.tar.gz
+          out/*.zip
 
     - name: Upload To Release
       uses: softprops/action-gh-release@v1
@@ -56,5 +58,6 @@ jobs:
       with:
         body: New Release.
         path: |
-          bin/*
+          out/*.tar.gz
+          out/*.zip
           config.json.default

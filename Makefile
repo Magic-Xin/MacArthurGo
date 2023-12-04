@@ -1,5 +1,6 @@
 NAME=MacArthurGo
 BINDIR=bin
+OUTDIR=out
 GOBUILD=go build
 LDFLAGS=-s -w
 
@@ -43,7 +44,7 @@ darwin_releases=$(addsuffix .tar, $(DARWIN_PLATFORM_LIST))
 
 $(darwin_releases): %.tar : %
 	chmod +x $(BINDIR)/MacArthurGo-*
-	cd $(BINDIR) && tar -zcvf $(NAME)-$(basename $@).tar.gz MacArthurGo-*
+	cd $(BINDIR) && tar -zcvf ../$(OUTDIR)/$(NAME)-$(basename $@).tar.gz MacArthurGo-*
 	rm -rf $(BINDIR)/MacArthurGo-*
 
 linux_releases=$(addsuffix .tar, $(LINUX_PLATFORM_LIST))
@@ -51,14 +52,14 @@ linux_releases=$(addsuffix .tar, $(LINUX_PLATFORM_LIST))
 $(linux_releases): %.tar : %
 	chmod +x $(BINDIR)/MacArthurGo-*
 	-${upx} --lzma --best $(BINDIR)/MacArthurGo-*
-	cd $(BINDIR) && tar -zcvf $(NAME)-$(basename $@).tar.gz MacArthurGo-*
+	cd $(BINDIR) && tar -zcvf ../$(OUTDIR)/$(NAME)-$(basename $@).tar.gz MacArthurGo-*
 	rm -rf $(BINDIR)/MacArthurGo-*
 
 windows_releases=$(addsuffix .zip, $(WINDOWS_PLATFORM_LIST))
 
 $(windows_releases): %.zip : %
 	-${upx} --lzma --best $(BINDIR)/MacArthurGo-*
-	cd $(BINDIR) && zip -v9 $(NAME)-$(basename $@).zip MacArthurGo-*
+	cd $(BINDIR) && zip -v9 ../$(OUTDIR)/$(NAME)-$(basename $@).zip MacArthurGo-*
 	rm -rf $(BINDIR)/MacArthurGo-*
 
 all-arch: $(PLATFORM_LIST)
