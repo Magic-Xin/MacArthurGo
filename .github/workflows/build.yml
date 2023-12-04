@@ -47,4 +47,6 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       with:
         body: New Release.
-        path: build/*
+        path: |
+          build/*
+          config.json.default
