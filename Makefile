@@ -14,8 +14,7 @@ LINUX_PLATFORM_LIST = \
 
 WINDOWS_PLATFORM_LIST = \
 	windows-386 \
-    windows-amd64 \
-    windows-arm64
+    windows-amd64
 
 all: linux-amd64 # Most used
 
@@ -39,9 +38,6 @@ windows-386:
 
 windows-amd64:
 	xgo --targets=windows-6.3/amd64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
-
-windows-arm64:
-	xgo --targets=windows-6.3/arm64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
 
 darwin_releases=$(addsuffix .tar, $(DARWIN_PLATFORM_LIST))
 
