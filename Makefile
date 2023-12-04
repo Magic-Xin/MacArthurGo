@@ -46,24 +46,24 @@ windows-arm64:
 darwin_releases=$(addsuffix .tar, $(DARWIN_PLATFORM_LIST))
 
 $(darwin_releases): %.tar : %
-	chmod +x $(BINDIR)/*
-	tar -zcvf $(BINDIR)/$(NAME)-$(basename $@).tar.gz -C $(BINDIR) *
-	rm -rf $(BINDIR)/MacArthurGo
+	cd $(BINDIR)
+	chmod +x *
+	tar -zcvf $(NAME)-$(basename $@).tar.gz *
 
 linux_releases=$(addsuffix .tar, $(LINUX_PLATFORM_LIST))
 
 $(linux_releases): %.tar : %
-	chmod +x $(BINDIR)/*
-	-${upx} --lzma --best $(BINDIR)/MacArthurGo
-	tar -zcvf $(BINDIR)/$(NAME)-$(basename $@).tar.gz -C $(BINDIR) *
-	rm -rf $(BINDIR)/MacArthurGo
+	cd $(BINDIR)
+	chmod +x *
+	-${upx} --lzma --best *
+	tar -zcvf $(NAME)-$(basename $@).tar.gz *
 
 windows_releases=$(addsuffix .zip, $(WINDOWS_PLATFORM_LIST))
 
 $(windows_releases): %.zip : %
-	-${upx} --lzma --best $(BINDIR)/*.exe
-	zip -v9 $(BINDIR)/$(NAME)-$(basename $@).zip $(BINDIR)/*.exe
-	rm -rf $(BINDIR)/MacArthurGo.exe
+	cd $(BINDIR)
+	-${upx} --lzma --best *.exe
+	zip -v9 $(NAME)-$(basename $@).zip *.exe
 
 all-arch: $(PLATFORM_LIST)
 
