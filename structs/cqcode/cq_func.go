@@ -78,8 +78,7 @@ func Escape(str string, insideCQ bool) string {
 	}
 
 	s = strings.ReplaceAll(s, ",", "&#44;")
-	// FIXME
-	//s = regexp.MustCompile(`(\ud83c[\udf00-\udfff])|(\ud83d[\udc00-\ude4f\ude80-\udeff])|[\u2600-\u2B55]`).ReplaceAllString(s, " ")
+	s = regexp.MustCompile(`(\x{d83c}[\x{df00}-\x{dfff}])|(\x{d83d}[\x{dc00}-\x{de4f}\x{de80}-\x{deff}])|[\x{2600}-\x{2B55}]`).ReplaceAllString(s, " ")
 
 	return s
 }
