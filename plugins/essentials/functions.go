@@ -20,7 +20,7 @@ func SendAction(action string, params any, echo string) *[]byte {
 	return &jsonMsg
 }
 
-func SendMsg(ctx *map[string]any, message string, at bool, reply bool) *[]byte {
+func SendMsg(ctx *map[string]any, message string, at bool) *[]byte {
 	if message == "" || ctx == nil {
 		return nil
 	}
@@ -30,12 +30,6 @@ func SendMsg(ctx *map[string]any, message string, at bool, reply bool) *[]byte {
 	if at && (*ctx)["message_type"] == "group" {
 		uid := int64((*ctx)["user_id"].(float64))
 		messageArray = append([]string{cqcode.At(uid)}, messageArray...)
-	}
-
-	//FIXME
-	if reply {
-		msgId := int64((*ctx)["message_id"].(float64))
-		messageArray = append([]string{cqcode.Reply(msgId)}, messageArray...)
 	}
 
 	return constructMessage(ctx, strings.Join(messageArray, ""))

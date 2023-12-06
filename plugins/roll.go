@@ -46,7 +46,7 @@ func (r *Roll) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		result = r.getRollContent((words)[1:])
 	}
 
-	msg := essentials.SendMsg(ctx, result, false, true)
+	msg := essentials.SendMsg(ctx, result, false)
 	*send <- *msg
 }
 

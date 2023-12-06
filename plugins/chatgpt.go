@@ -64,7 +64,7 @@ func (c *ChatGPT) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 	if err != nil {
 		log.Printf("ChatCompletion error: %v", err)
-		*send <- *essentials.SendMsg(ctx, err.Error(), false, false)
+		*send <- *essentials.SendMsg(ctx, err.Error(), false)
 		return
 	}
 
@@ -80,7 +80,7 @@ func (c *ChatGPT) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 			*essentials.ConstructForwardNode(&reply, essentials.Info.NickName, essentials.Info.UserId))
 		*send <- *essentials.SendGroupForward(ctx, &data, "")
 	} else {
-		*send <- *essentials.SendMsg(ctx, reply, false, false)
+		*send <- *essentials.SendMsg(ctx, reply, false)
 	}
 }
 

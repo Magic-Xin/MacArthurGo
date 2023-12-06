@@ -98,17 +98,17 @@ func (p *PicSearch) groupFailed(send *chan []byte, echo []string) {
 		"group_id": id,
 	}
 
-	*send <- *essentials.SendMsg(ctx, "合并转发失败，将独立发送搜索结果", false, false)
+	*send <- *essentials.SendMsg(ctx, "合并转发失败，将独立发送搜索结果", false)
 
 	res := p.selectDB(echo[0])
 	if res == nil {
-		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", false, false)
+		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", false)
 		return
 	}
 
 	result := strings.Split(*res, "|")
 	for _, r := range result {
-		*send <- *essentials.SendMsg(ctx, r, false, false)
+		*send <- *essentials.SendMsg(ctx, r, false)
 	}
 }
 
@@ -128,7 +128,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 	for _, c := range *cc {
 		if c.Type == "image" {
 			if !isStart {
-				*send <- *essentials.SendMsg(ctx, p.searchFeedback, false, false)
+				*send <- *essentials.SendMsg(ctx, p.searchFeedback, false)
 				isStart = true
 			}
 			fileUrl := c.Data["url"].(string)
@@ -200,7 +200,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 			}
 		} else {
 			for _, r := range result {
-				*send <- *essentials.SendMsg(ctx, r, false, false)
+				*send <- *essentials.SendMsg(ctx, r, false)
 			}
 		}
 	}
