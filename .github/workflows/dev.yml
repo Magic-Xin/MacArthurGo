@@ -55,9 +55,9 @@ jobs:
           mkdir bin
           mkdir out
           xgo --targets=$GOOS/$GOARCH -ldflags="-w -s" --out $BINDIR/MacArthurGo ./
-          if [ $GOOS != "windows-6.3" ]; then chmod +x $(BINDIR)/MacArthurGo-*; fi
-          if [ $GOOS != "darwin-10.14" ]; then ${upx} --lzma --best $(BINDIR)/MacArthurGo-*; fi
-          if [ $GOOS != "windows-6.3" ]; then cd $(BINDIR) && tar -zcvf ../$(OUTDIR)/$(NAME)-$(basename $@).tar.gz MacArthurGo-*; else cd $(BINDIR) && zip -v9 ../$(OUTDIR)/$(NAME)-$(basename $@).zip MacArthurGo-*; fi
+          if [ $GOOS != "windows-6.3" ]; then chmod +x $BINDIR/MacArthurGo-*; fi
+          if [ $GOOS != "darwin-10.14" ]; then ${upx} --lzma --best $BINDIR/MacArthurGo-*; fi
+          if [ $GOOS != "windows-6.3" ]; then cd $BINDIR && tar -zcvf ../$OUTDIR/$NAME.tar.gz MacArthurGo-*; else cd $BINDIR && zip -v9 ../$OUTDIR/$NAME.zip MacArthurGo-*; fi
 
       - name: Upload To Artifact
         uses: actions/upload-artifact@main
