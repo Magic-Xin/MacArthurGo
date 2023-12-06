@@ -137,7 +137,8 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 			if res != nil {
 				cached = true
 				result = append(result, "已查询到缓存")
-				result = append(result, strings.Split(*res, "|")...)
+				split := strings.Split(*res, "|")
+				result = append(result, split[:len(split)-1]...)
 				break
 			}
 
@@ -184,8 +185,8 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 			result = *essentials.HandleBannedHostsArray(&result)
 		}
 		if !cached {
-			p.insertDB(key, strings.Join(result, "|"))
 			result = append(result, fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))
+			p.insertDB(key, strings.Join(result, "|"))
 		}
 
 		if p.groupForward {
