@@ -46,7 +46,7 @@ jobs:
       - name: Build
         env:
           GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }
+          GOARCH: ${{ matrix.goarch }}
           NAME: MacArthurGo
           BINDIR: bin
           OUTDIR: out
