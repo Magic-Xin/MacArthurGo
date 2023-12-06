@@ -36,7 +36,7 @@ func init() {
 		Plugin: essentials.Plugin{
 			Name:    "搜图",
 			Enabled: config.Bool("plugins.picSearch.enable"),
-			Arg:     config.Strings("plugins.picSearch.args"),
+			Args:    config.Strings("plugins.picSearch.args"),
 		},
 		groupForward:      config.Bool("plugins.picSearch.groupForward"),
 		allowPrivate:      config.Bool("plugins.picSearch.allowPrivate"),
@@ -60,7 +60,7 @@ func init() {
 func (p *PicSearch) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (p *PicSearch) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !p.Enabled || !strings.Contains((*ctx)["raw_message"].(string), p.Arg[0]) {
+	if !p.Enabled || !p.checkArgs(ctx) {
 		return
 	}
 
@@ -81,10 +81,46 @@ func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 			*ctx = (*ctx)["data"].(map[string]any)
 			p.picSearch(ctx, send, (*ctx)["message"].(string), true, (*ctx)["group"].(bool))
 		}
-	} else if (*ctx)["msg"] != nil && strings.Contains((*ctx)["echo"].(string), "picForward") {
+	} else if (*ctx)["msg"] != nil {
 		if (*ctx)["msg"].(string) == "SEND_MSG_API_ERROR" {
-			p.groupFailed(send, strings.Split((*ctx)["echo"].(string), "|")[1:])
+			if strings.Contains((*ctx)["echo"].(string), "picForward") {
+				p.SecondTimesGroupForward(send, strings.Split((*ctx)["echo"].(string), "|")[1:])
+			} else if strings.Contains((*ctx)["echo"].(string), "picFailed") {
+				p.groupFailed(send, strings.Split((*ctx)["echo"].(string), "|")[1:])
+			}
+
 		}
+	}
+}
+
+func (p *PicSearch) SecondTimesGroupForward(send *chan []byte, echo []string) {
+	id, _ := strconv.ParseFloat(echo[2], 64)
+	ctx := &map[string]any{
+		"message_type": echo[1],
+		"sender": map[string]any{
+			"user_id": id,
+		},
+		"group_id": id,
+	}
+
+	res := p.selectDB(echo[0])
+	if res == nil {
+		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", false)
+		return
+	}
+
+	result := append([]string{"SauceNAO 搜索结果被 QQ 拦截，已舍弃"}, strings.Split(*res, "|")...)
+
+	var data []_struct.ForwardNode
+	for _, r := range result {
+		if !strings.Contains(r, "SauceNAO") {
+			data = append(data, *essentials.ConstructForwardNode(&r, essentials.Info.NickName, essentials.Info.UserId))
+		}
+	}
+	if echo[1] == "group" {
+		*send <- *essentials.SendGroupForward(ctx, &data, *p.genEcho(ctx, echo[0], true))
+	} else {
+		*send <- *essentials.SendPrivateForward(ctx, &data, *p.genEcho(ctx, echo[0], true))
 	}
 }
 
@@ -98,17 +134,17 @@ func (p *PicSearch) groupFailed(send *chan []byte, echo []string) {
 		"group_id": id,
 	}
 
-	*send <- *essentials.SendMsg(ctx, "合并转发失败，将独立发送搜索结果", false, false)
+	*send <- *essentials.SendMsg(ctx, "合并转发失败，将独立发送搜索结果", false)
 
 	res := p.selectDB(echo[0])
 	if res == nil {
-		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", false, false)
+		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", false)
 		return
 	}
 
 	result := strings.Split(*res, "|")
 	for _, r := range result {
-		*send <- *essentials.SendMsg(ctx, r, false, false)
+		*send <- *essentials.SendMsg(ctx, r, false)
 	}
 }
 
@@ -128,7 +164,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 	for _, c := range *cc {
 		if c.Type == "image" {
 			if !isStart {
-				*send <- *essentials.SendMsg(ctx, p.searchFeedback, false, false)
+				*send <- *essentials.SendMsg(ctx, p.searchFeedback, false)
 				isStart = true
 			}
 			fileUrl := c.Data["url"].(string)
@@ -137,7 +173,8 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 			if res != nil {
 				cached = true
 				result = append(result, "已查询到缓存")
-				result = append(result, strings.Split(*res, "|")...)
+				split := strings.Split(*res, "|")
+				result = append(result, split[:len(split)-1]...)
 				break
 			}
 
@@ -184,8 +221,8 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 			result = *essentials.HandleBannedHostsArray(&result)
 		}
 		if !cached {
-			p.insertDB(key, strings.Join(result, "|"))
 			result = append(result, fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))
+			p.insertDB(key, strings.Join(result, "|"))
 		}
 
 		if p.groupForward {
@@ -194,13 +231,13 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 				data = append(data, *essentials.ConstructForwardNode(&r, essentials.Info.NickName, essentials.Info.UserId))
 			}
 			if isGroup {
-				*send <- *essentials.SendGroupForward(ctx, &data, *p.genEcho(ctx, key, isGroup))
+				*send <- *essentials.SendGroupForward(ctx, &data, *p.genEcho(ctx, key, false))
 			} else {
-				*send <- *essentials.SendPrivateForward(ctx, &data, *p.genEcho(ctx, key, isGroup))
+				*send <- *essentials.SendPrivateForward(ctx, &data, *p.genEcho(ctx, key, false))
 			}
 		} else {
 			for _, r := range result {
-				*send <- *essentials.SendMsg(ctx, r, false, false)
+				*send <- *essentials.SendMsg(ctx, r, false)
 			}
 		}
 	}
@@ -355,9 +392,25 @@ func (p *PicSearch) ascii2d(img string, response chan string, limiter chan bool,
 	<-limiter
 }
 
-func (p *PicSearch) genEcho(ctx *map[string]any, key string, isGroup bool) *string {
-	res := "picForward|" + key
-	if !isGroup {
+func (p *PicSearch) checkArgs(ctx *map[string]any) bool {
+	for _, arg := range p.Args {
+		if strings.Contains((*ctx)["raw_message"].(string), arg) {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *PicSearch) genEcho(ctx *map[string]any, key string, retry bool) *string {
+	var res string
+
+	if retry {
+		res = "picFailed|" + key
+	} else {
+		res = "picForward|" + key
+	}
+
+	if (*ctx)["message_type"].(string) == "private" {
 		res += "|private|" + strconv.FormatInt(int64((*ctx)["sender"].(map[string]any)["user_id"].(float64)), 10)
 	} else {
 		res += "|group|" + strconv.FormatInt(int64((*ctx)["group_id"].(float64)), 10)

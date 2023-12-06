@@ -15,14 +15,6 @@ func At(qq int64) string {
 	return cq.toString()
 }
 
-func Reply(msgId int64) string {
-	data := map[string]any{
-		"id": msgId,
-	}
-	cq := CQCode{Type: "reply", Data: data}
-	return cq.toString()
-}
-
 func Poke(qq int64) string {
 	data := map[string]any{
 		"qq": qq,
@@ -78,8 +70,7 @@ func Escape(str string, insideCQ bool) string {
 	}
 
 	s = strings.ReplaceAll(s, ",", "&#44;")
-	// FIXME
-	//s = regexp.MustCompile(`(\ud83c[\udf00-\udfff])|(\ud83d[\udc00-\ude4f\ude80-\udeff])|[\u2600-\u2B55]`).ReplaceAllString(s, " ")
+	s = regexp.MustCompile(`(\x{d83c}[\x{df00}-\x{dfff}])|(\x{d83d}[\x{dc00}-\x{de4f}\x{de80}-\x{deff}])|[\x{2600}-\x{2B55}]`).ReplaceAllString(s, " ")
 
 	return s
 }

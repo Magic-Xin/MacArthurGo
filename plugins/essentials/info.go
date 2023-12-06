@@ -21,7 +21,7 @@ func init() {
 		Plugin: Plugin{
 			Name:    "info",
 			Enabled: true,
-			Arg:     []string{"/test", "/help"},
+			Args:    []string{"/test", "/help"},
 		},
 	}
 	PluginArray = append(PluginArray, &PluginInterface{Interface: &info})
@@ -36,16 +36,16 @@ func (l *LoginInfo) ReceiveAll(_ *map[string]any, send *chan []byte) {
 				"user_id": float64(config.Int64("admin")),
 			},
 		}
-		*send <- *SendMsg(&sendCtx, "MacArthurGo 已上线", false, false)
+		*send <- *SendMsg(&sendCtx, "MacArthurGo 已上线", false)
 		Info.Login = true
 	}
 }
 
 func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if CheckArgument(ctx, l.Arg[0]) {
-		*send <- *SendMsg(ctx, "活着呢", false, true)
+	if CheckArgument(ctx, l.Args[0]) {
+		*send <- *SendMsg(ctx, "活着呢", false)
 	}
-	if CheckArgument(ctx, l.Arg[1]) {
+	if CheckArgument(ctx, l.Args[1]) {
 		result := []string{"插件: "}
 		for _, p := range PluginArray {
 			var res string
@@ -53,7 +53,7 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 			if name := ref.Elem().FieldByName("Name"); name.IsValid() {
 				res += name.String()
 			} else {
-				*send <- *SendMsg(ctx, "插件解析出错", false, false)
+				*send <- *SendMsg(ctx, "插件解析出错", false)
 				return
 			}
 
@@ -62,7 +62,7 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 					res += "(已禁用)"
 				}
 			} else {
-				*send <- *SendMsg(ctx, "插件解析出错", false, false)
+				*send <- *SendMsg(ctx, "插件解析出错", false)
 				return
 			}
 
@@ -76,13 +76,13 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 					res += "无"
 				}
 			} else {
-				*send <- *SendMsg(ctx, "插件解析出错", false, false)
+				*send <- *SendMsg(ctx, "插件解析出错", false)
 				return
 			}
 			result = append(result, res)
 		}
 
-		*send <- *SendMsg(ctx, strings.Join(result, "\n"), false, true)
+		*send <- *SendMsg(ctx, strings.Join(result, "\n"), false)
 	}
 }
 
