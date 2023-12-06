@@ -23,7 +23,6 @@ jobs:
             goarch: "386"
           - goos: windows-6.3
             goarch: arm64
-        fail-fast: true
     steps:
       - uses: actions/checkout@v3
 
