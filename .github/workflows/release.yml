@@ -17,10 +17,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Set environment
-      run: |
-        echo "sha_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
-
     - name: Setup UPX
       run: |
         cd ..
