@@ -72,7 +72,16 @@ func ConstructForwardNode(data *string, name string, uin int64) *_struct.Forward
 }
 
 func CheckArgument(ctx *map[string]any, arg string) bool {
-	return strings.Fields((*ctx)["raw_message"].(string))[0] == arg
+	return SplitArgument(ctx)[0] == arg
+}
+
+func CheckArgumentArray(ctx *map[string]any, args *[]string) bool {
+	for _, arg := range *args {
+		if SplitArgument(ctx)[0] == arg {
+			return true
+		}
+	}
+	return false
 }
 
 func SplitArgument(ctx *map[string]any) []string {

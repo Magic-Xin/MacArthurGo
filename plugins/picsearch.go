@@ -36,7 +36,7 @@ func init() {
 		Plugin: essentials.Plugin{
 			Name:    "搜图",
 			Enabled: config.Bool("plugins.picSearch.enable"),
-			Arg:     config.Strings("plugins.picSearch.args"),
+			Args:    config.Strings("plugins.picSearch.args"),
 		},
 		groupForward:      config.Bool("plugins.picSearch.groupForward"),
 		allowPrivate:      config.Bool("plugins.picSearch.allowPrivate"),
@@ -60,7 +60,7 @@ func init() {
 func (p *PicSearch) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (p *PicSearch) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !p.Enabled || !strings.Contains((*ctx)["raw_message"].(string), p.Arg[0]) {
+	if !p.Enabled || !p.checkArgs(ctx) {
 		return
 	}
 
@@ -353,6 +353,15 @@ func (p *PicSearch) ascii2d(img string, response chan string, limiter chan bool,
 		}
 	}
 	<-limiter
+}
+
+func (p *PicSearch) checkArgs(ctx *map[string]any) bool {
+	for _, arg := range p.Args {
+		if strings.Contains((*ctx)["raw_message"].(string), arg) {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *PicSearch) genEcho(ctx *map[string]any, key string, isGroup bool) *string {

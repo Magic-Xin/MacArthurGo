@@ -21,7 +21,7 @@ func init() {
 		Plugin: Plugin{
 			Name:    "info",
 			Enabled: true,
-			Arg:     []string{"/test", "/help"},
+			Args:    []string{"/test", "/help"},
 		},
 	}
 	PluginArray = append(PluginArray, &PluginInterface{Interface: &info})
@@ -42,10 +42,10 @@ func (l *LoginInfo) ReceiveAll(_ *map[string]any, send *chan []byte) {
 }
 
 func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if CheckArgument(ctx, l.Arg[0]) {
+	if CheckArgument(ctx, l.Args[0]) {
 		*send <- *SendMsg(ctx, "活着呢", false)
 	}
-	if CheckArgument(ctx, l.Arg[1]) {
+	if CheckArgument(ctx, l.Args[1]) {
 		result := []string{"插件: "}
 		for _, p := range PluginArray {
 			var res string
