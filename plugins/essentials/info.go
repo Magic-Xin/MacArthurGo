@@ -66,7 +66,7 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 				return
 			}
 
-			if arg := ref.Elem().FieldByName("Arg"); arg.IsValid() {
+			if arg := ref.Elem().FieldByName("Args"); arg.IsValid() {
 				res += "		触发指令: "
 				if arg.Interface().([]string) != nil {
 					for _, a := range arg.Interface().([]string) {
