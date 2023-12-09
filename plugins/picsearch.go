@@ -76,19 +76,16 @@ func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 		return
 	}
 
-	if (*ctx)["data"] != nil {
-		if (*ctx)["echo"].(string) == "picSearch" {
-			*ctx = (*ctx)["data"].(map[string]any)
-			p.picSearch(ctx, send, (*ctx)["message"].(string), true, (*ctx)["group"].(bool))
-		}
-	} else if (*ctx)["msg"] != nil {
-		if (*ctx)["msg"].(string) == "SEND_MSG_API_ERROR" {
-			if strings.Contains((*ctx)["echo"].(string), "picForward") {
-				p.SecondTimesGroupForward(send, strings.Split((*ctx)["echo"].(string), "|")[1:])
-			} else if strings.Contains((*ctx)["echo"].(string), "picFailed") {
-				p.groupFailed(send, strings.Split((*ctx)["echo"].(string), "|")[1:])
-			}
+	echo := strings.Split((*ctx)["echo"].(string), "|")
 
+	if echo[0] == "picSearch" && (*ctx)["data"] != nil {
+		*ctx = (*ctx)["data"].(map[string]any)
+		p.picSearch(ctx, send, (*ctx)["message"].(string), true, (*ctx)["group"].(bool))
+	} else if (*ctx)["status"].(string) == "failed" {
+		if echo[0] == "picForward" {
+			p.SecondTimesGroupForward(send, echo[1:])
+		} else if echo[0] == "picFailed" {
+			p.groupFailed(send, echo[1:])
 		}
 	}
 }
@@ -109,7 +106,7 @@ func (p *PicSearch) SecondTimesGroupForward(send *chan []byte, echo []string) {
 		return
 	}
 
-	result := append([]string{"SauceNAO 搜索结果被 QQ 拦截，已舍弃"}, strings.Split(*res, "|")...)
+	result := append([]string{"sauceNAO 搜索结果被 QQ 拦截，已舍弃"}, strings.Split(*res, "|")...)
 
 	var data []_struct.ForwardNode
 	for _, r := range result {
