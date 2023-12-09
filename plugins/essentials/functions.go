@@ -4,6 +4,8 @@ import (
 	_struct "MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"encoding/json"
+	"log"
+	"net/http"
 	"regexp"
 	"strings"
 )
@@ -114,6 +116,23 @@ func HandleBannedHostsArray(str *[]string) *[]string {
 		}
 	}
 	return str
+}
+
+func GetOriginUrl(url string) *string {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Printf("Url parser request error: %v", err)
+		return nil
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("Url parser response error: %v", err)
+		return nil
+	}
+
+	originURL := resp.Request.URL.String()
+	return &originURL
 }
 
 func constructMessage(ctx *map[string]any, message string) *[]byte {

@@ -39,12 +39,12 @@ func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	} else if strings.Contains(str, "i.y.qq.com") {
 		urlType = "qq"
 	} else if match := regexp.MustCompile(`(http://163cn.tv/\w+)`).FindAllStringSubmatch(str, -1); match != nil {
-		if url := m.getOriginUrl(match[0][1]); url != nil {
+		if url := essentials.GetOriginUrl(match[0][1]); url != nil {
 			urlType = "163"
 			str = *url
 		}
 	} else if match := regexp.MustCompile(`(https://c6.y.qq.com/\S+)`).FindAllStringSubmatch(str, -1); match != nil {
-		if url := m.getOriginUrl(match[0][1]); url != nil {
+		if url := essentials.GetOriginUrl(match[0][1]); url != nil {
 			urlType = "qq"
 			str = "id=" + *m.getQQMusicID(url) + "&"
 		}
@@ -63,23 +63,6 @@ func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 }
 
 func (m *Music) ReceiveEcho(_ *map[string]any, _ *chan []byte) {}
-
-func (*Music) getOriginUrl(url string) *string {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		log.Printf("Music parser request error: %v", err)
-		return nil
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Printf("Music parser response error: %v", err)
-		return nil
-	}
-
-	originURL := resp.Request.URL.String()
-	return &originURL
-}
 
 func (*Music) getQQMusicID(url *string) *string {
 	if mid := regexp.MustCompile(`songmid=(\w+)&`).FindAllStringSubmatch(*url, -1); mid != nil {
