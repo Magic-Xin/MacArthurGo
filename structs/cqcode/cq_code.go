@@ -4,9 +4,15 @@ import (
 	"fmt"
 )
 
+// CQCode Deprecated
 type CQCode struct {
 	Type string
 	Data map[string]any
+}
+
+type ArrayMessage struct {
+	Type string         `json:"type"`
+	Data map[string]any `json:"data"`
 }
 
 func (cq CQCode) toString() string {
