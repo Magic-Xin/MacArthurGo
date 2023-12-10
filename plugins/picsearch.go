@@ -65,9 +65,9 @@ func (p *PicSearch) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 
 	if (*ctx)["message_type"].(string) == "group" {
-		p.picSearch(ctx, send, (*ctx)["raw_message"].(string), false, true)
+		p.picSearch(ctx, send, false, true)
 	} else {
-		p.picSearch(ctx, send, (*ctx)["raw_message"].(string), false, false)
+		p.picSearch(ctx, send, false, false)
 	}
 }
 
@@ -80,7 +80,7 @@ func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 
 	if echo[0] == "picSearch" && (*ctx)["data"] != nil {
 		*ctx = (*ctx)["data"].(map[string]any)
-		p.picSearch(ctx, send, (*ctx)["message"].(string), true, (*ctx)["group"].(bool))
+		p.picSearch(ctx, send, true, (*ctx)["message_type"].(string) == "group")
 	} else if (*ctx)["status"].(string) == "failed" {
 		if echo[0] == "picForward" {
 			p.SecondTimesGroupForward(send, echo[1:])
@@ -102,7 +102,7 @@ func (p *PicSearch) SecondTimesGroupForward(send *chan []byte, echo []string) {
 
 	res := p.selectDB(echo[0])
 	if res == nil {
-		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", false)
+		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", nil, false, false)
 		return
 	}
 
@@ -111,7 +111,7 @@ func (p *PicSearch) SecondTimesGroupForward(send *chan []byte, echo []string) {
 	var data []_struct.ForwardNode
 	for _, r := range result {
 		if !strings.Contains(r, "SauceNAO") {
-			data = append(data, *essentials.ConstructForwardNode(&r, essentials.Info.NickName, essentials.Info.UserId))
+			data = append(data, *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.StringToArray(r)}))
 		}
 	}
 	if echo[1] == "group" {
@@ -131,37 +131,44 @@ func (p *PicSearch) groupFailed(send *chan []byte, echo []string) {
 		"group_id": id,
 	}
 
-	*send <- *essentials.SendMsg(ctx, "合并转发失败，将独立发送搜索结果", false)
+	*send <- *essentials.SendMsg(ctx, "合并转发失败，将独立发送搜索结果", nil, false, false)
 
 	res := p.selectDB(echo[0])
 	if res == nil {
-		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", false)
+		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", nil, false, false)
 		return
 	}
 
 	result := strings.Split(*res, "|")
 	for _, r := range result {
-		*send <- *essentials.SendMsg(ctx, r, false)
+		*send <- *essentials.SendMsg(ctx, r, nil, false, false)
 	}
 }
 
-func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string, isEcho bool, isGroup bool) {
+func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho bool, isGroup bool) {
 	if !isGroup && !p.allowPrivate {
 		return
 	}
 
 	var (
 		key     string
-		result  []string
+		result  [][]cqcode.ArrayMessage
 		isStart bool
 		cached  bool
 	)
-	cc := cqcode.FromStr(msg)
+
+	msg, err := json.Marshal((*ctx)["message"])
+	if err != nil {
+		log.Printf("Marshal message error: %v", err)
+		return
+	}
+	am := cqcode.Unmarshal(msg)
+
 	start := time.Now()
-	for _, c := range *cc {
+	for _, c := range *am {
 		if c.Type == "image" {
 			if !isStart {
-				*send <- *essentials.SendMsg(ctx, p.searchFeedback, false)
+				*send <- *essentials.SendMsg(ctx, p.searchFeedback, nil, false, true)
 				isStart = true
 			}
 			fileUrl := c.Data["url"].(string)
@@ -169,16 +176,21 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 			res := p.selectDB(key)
 			if res != nil {
 				cached = true
-				result = append(result, "已查询到缓存")
-				split := strings.Split(*res, "|")
-				result = append(result, split[:len(split)-1]...)
-				break
+				result = append(result, []cqcode.ArrayMessage{*cqcode.StringToArray("本次搜图结果来自数据库缓存")})
+				var cachedMsg [][]cqcode.ArrayMessage
+				err = json.Unmarshal([]byte(*res), &cachedMsg)
+				if err != nil {
+					log.Printf("Unmarshal cached message error: %v", err)
+					continue
+				}
+				result = append(result, cachedMsg[:len(cachedMsg)-1]...)
+				continue
 			}
 
 			wg := &sync.WaitGroup{}
 			wgResponse := &sync.WaitGroup{}
 			limiter := make(chan bool, 10)
-			response := make(chan string, 200)
+			response := make(chan []cqcode.ArrayMessage, 200)
 
 			go func() {
 				wgResponse.Add(1)
@@ -203,8 +215,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 			wgResponse.Wait()
 		}
 		if c.Type == "reply" && !isEcho {
-			cqMid := c.Data["id"].(string)
-			mid, err := strconv.Atoi(cqMid)
+			mid := int(c.Data["id"].(float64))
 			if err != nil {
 				continue
 			}
@@ -214,18 +225,20 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 	}
 	end := time.Since(start)
 	if result != nil {
-		if p.handleBannedHosts {
-			result = *essentials.HandleBannedHostsArray(&result)
-		}
 		if !cached {
-			result = append(result, fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))
-			p.insertDB(key, strings.Join(result, "|"))
+			result = append(result, []cqcode.ArrayMessage{*cqcode.StringToArray(fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))})
+			jsonMsg, err := json.Marshal(result)
+			if err != nil {
+				log.Printf("Search result mashal error: %v", err)
+			} else {
+				p.insertDB(key, string(jsonMsg))
+			}
 		}
 
 		if p.groupForward {
 			var data []_struct.ForwardNode
 			for _, r := range result {
-				data = append(data, *essentials.ConstructForwardNode(&r, essentials.Info.NickName, essentials.Info.UserId))
+				data = append(data, *essentials.ConstructForwardNode(&r))
 			}
 			if isGroup {
 				*send <- *essentials.SendGroupForward(ctx, &data, *p.genEcho(ctx, key, false))
@@ -234,13 +247,13 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, msg string
 			}
 		} else {
 			for _, r := range result {
-				*send <- *essentials.SendMsg(ctx, r, false)
+				*send <- *essentials.SendMsg(ctx, "", &r, false, false)
 			}
 		}
 	}
 }
 
-func (p *PicSearch) sauceNAO(img string, response chan string, limiter chan bool, wg *sync.WaitGroup) {
+func (p *PicSearch) sauceNAO(img string, response chan []cqcode.ArrayMessage, limiter chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	const api = "https://saucenao.com/search.php?db=999&output_type=2&testmode=1&numres=1"
 
@@ -259,7 +272,7 @@ func (p *PicSearch) sauceNAO(img string, response chan string, limiter chan bool
 	var i any
 	err := json.Unmarshal(body, &i)
 	if err != nil {
-		response <- fmt.Sprintf("%v", err)
+		response <- []cqcode.ArrayMessage{*cqcode.StringToArray(fmt.Sprintf("%v", err))}
 		return
 	}
 
@@ -293,26 +306,34 @@ func (p *PicSearch) sauceNAO(img string, response chan string, limiter chan bool
 			extUrl = data["ext_urls"].([]any)[0].(string)
 		}
 	}
-
-	r := fmt.Sprintf("SauceNAO\n%s\n相似度: %.2f%%\n", cqcode.Image(thumbNail), similarity)
+	r := []cqcode.ArrayMessage{*cqcode.StringToArray("SauceNAO\n")}
+	r = append(r, *cqcode.Image(thumbNail))
+	msg := fmt.Sprintf("\n相似度: %.2f%%\n", similarity)
 	if title != "" {
-		r += "「" + author + "」"
+		msg += "「" + title + "」"
 		if author != "" {
-			r += "/「" + author + "」"
+			msg += "/「" + author + "」"
 		}
-		r += "\n"
+		msg += "\n"
 	}
 	if sourceUrl != "" {
-		r += sourceUrl + "\n"
+		if p.handleBannedHosts {
+			essentials.HandleBannedHostsArray(&sourceUrl)
+		}
+		msg += sourceUrl + "\n"
 	}
 	if extUrl != "" {
-		r += extUrl
+		if p.handleBannedHosts {
+			essentials.HandleBannedHostsArray(&extUrl)
+		}
+		msg += extUrl
 	}
+	r = append(r, *cqcode.StringToArray(msg))
 	response <- r
 	<-limiter
 }
 
-func (p *PicSearch) ascii2d(img string, response chan string, limiter chan bool, wg *sync.WaitGroup) {
+func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, limiter chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	const api = "https://ascii2d.net/search/uri"
 	client := web.NewTLS12Client()
@@ -325,7 +346,7 @@ func (p *PicSearch) ascii2d(img string, response chan string, limiter chan bool,
 	reqC.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:6.0) Gecko/20100101 Firefox/6.0")
 	respC, err := client.Do(reqC)
 	if err != nil {
-		response <- fmt.Sprintf("%v", err)
+		response <- []cqcode.ArrayMessage{*cqcode.StringToArray(fmt.Sprintf("%v", err))}
 		return
 	}
 
@@ -334,7 +355,7 @@ func (p *PicSearch) ascii2d(img string, response chan string, limiter chan bool,
 	reqB.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:6.0) Gecko/20100101 Firefox/6.0")
 	respB, err := client.Do(reqB)
 	if err != nil {
-		response <- fmt.Sprintf("%v", err)
+		response <- []cqcode.ArrayMessage{*cqcode.StringToArray(fmt.Sprintf("%v", err))}
 		return
 	}
 
@@ -362,7 +383,7 @@ func (p *PicSearch) ascii2d(img string, response chan string, limiter chan bool,
 		list := xpath.Find(doc, `//div[@class="row item-box"]`)
 		if len(list) == 0 {
 			err := errors.New("ascii2d not found")
-			response <- fmt.Sprintf("%v", err)
+			response <- []cqcode.ArrayMessage{*cqcode.StringToArray(fmt.Sprintf("%v", err))}
 			return
 		}
 		for _, n := range list {
@@ -380,8 +401,16 @@ func (p *PicSearch) ascii2d(img string, response chan string, limiter chan bool,
 				Thumb := "https://ascii2d.net" + xpath.SelectAttr(picPath, "src")
 				Type := strings.Trim(xpath.InnerText(typePath), "\n")
 
-				response <- fmt.Sprintf("ascii2d %s\n%s\n%s %s\n「%s」/「%s」\n%s\nArthor:%s",
-					checkType[i], cqcode.Image(Thumb), Info, Type, Name, AuthNm, Link, Author)
+				if p.handleBannedHosts {
+					essentials.HandleBannedHostsArray(&Link)
+				}
+
+				r := []cqcode.ArrayMessage{*cqcode.StringToArray(fmt.Sprintf("ascii2d %s\n", checkType[i]))}
+				r = append(r, *cqcode.Image(Thumb))
+				msg := fmt.Sprintf("\n%s %s\n「%s」/「%s」\n%s\nArthor:%s", Info, Type, Name, AuthNm, Link, Author)
+				r = append(r, *cqcode.StringToArray(msg))
+
+				response <- r
 				break
 			}
 		}
