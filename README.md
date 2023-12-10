@@ -6,6 +6,8 @@ MacArthurGo is a chatbot developed for the **OneBot V11** protocol using Golang.
 
 If you have any comments or suggestions, you are welcome to discuss and provide feedback in the [issues](https://github.com/Magic-Xin/MacArthurGo/issues) section
 
+**Highly recommend using [OpenShamrock](https://github.com/whitechi73/OpenShamrock) as the OneBot server**
+
 ## How to use
 
 - Stable version: Download the compressed package and `config.json.default` for the corresponding system and architecture from the [release](https://github.com/Magic-Xin/MacArthurGo/releases),fill in the `config.json.default` and rename to `config.json` then run the program. 
@@ -33,3 +35,4 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - [saucenao](https://saucenao.com/)
 - [ascii2d](https://ascii2d.net)
 - [go-cqhttp](https://github.com/Mrs4s/go-cqhttp)
+- [OpenShamrock](https://github.com/whitechi73/OpenShamrock)
