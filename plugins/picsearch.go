@@ -60,13 +60,15 @@ func init() {
 func (p *PicSearch) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
 
 func (p *PicSearch) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !p.Enabled || !p.checkArgs(ctx) {
+	if !p.Enabled {
 		return
 	}
 
 	if (*ctx)["message_type"].(string) == "group" {
-		p.picSearch(ctx, send, false, true)
-	} else {
+		if p.checkArgs(ctx) {
+			p.picSearch(ctx, send, false, true)
+		}
+	} else if p.allowPrivate {
 		p.picSearch(ctx, send, false, false)
 	}
 }
