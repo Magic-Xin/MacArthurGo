@@ -55,7 +55,8 @@ jobs:
         run: |
           mkdir bin
           mkdir out
-          xgo --targets=$GOOS/$GOARCH -ldflags="-w -s -X 'MacArthurGo/base.Version=${{ env.sha_short }}' -X 'MacArthurGo/base.Branch=Beta/dev' -X 'MacArthurGo/base.BuildTime=${{ github.event.repository.updated_at}}'" --out $BINDIR/MacArthurGo ./
+          echo "TIME=$(date +'%Y-%m-%dT%H:%M:%SZ' -u)" >> $GITHUB_ENV
+          xgo --targets=$GOOS/$GOARCH -ldflags="-w -s -X 'MacArthurGo/base.Version=${{ env.sha_short }}' -X 'MacArthurGo/base.Branch=Beta/dev' -X 'MacArthurGo/base.BuildTime=$TIME'" --out $BINDIR/MacArthurGo ./
           if [ $GOOS != "windows-6.3" ]; then chmod +x $BINDIR/MacArthurGo-*; fi
           if [ $GOOS != "darwin-10.14" ]; then ${upx} --lzma --best $BINDIR/MacArthurGo-*; fi
           if [ $GOOS != "windows-6.3" ]; then cd $BINDIR && tar -zcvf ../$OUTDIR/$NAME.tar.gz MacArthurGo-*; else cd $BINDIR && zip -v9 ../$OUTDIR/$NAME.zip MacArthurGo-*; fi

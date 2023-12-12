@@ -1,6 +1,7 @@
 package main
 
 import (
+	"MacArthurGo/base"
 	_ "MacArthurGo/base"
 	_ "MacArthurGo/plugins"
 	"MacArthurGo/websocket"
@@ -17,6 +18,8 @@ import (
 func main() {
 	tz, _ := time.LoadLocation("Asia/Shanghai")
 	fileName := fmt.Sprintf(time.Now().In(tz).Format("20060102150405"))
+	buildTime, _ := time.Parse(time.RFC3339, base.BuildTime)
+	base.BuildTime = buildTime.In(tz).Format("2006-01-02 15:04:05")
 	logPath := filepath.Join(".", "log")
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
 		err = os.Mkdir(logPath, os.ModeDir|0755)
