@@ -32,7 +32,7 @@ func main() {
 	mw := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(mw)
 
-	if base.BuildTime == "" {
+	if base.BuildTime != "" {
 		buildTime, _ := time.Parse(time.RFC3339, base.BuildTime)
 		base.BuildTime = buildTime.In(tz).Format("2006-01-02 15:04:05")
 	}
