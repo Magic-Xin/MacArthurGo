@@ -18,8 +18,6 @@ import (
 func main() {
 	tz, _ := time.LoadLocation("Asia/Shanghai")
 	fileName := fmt.Sprintf(time.Now().In(tz).Format("20060102150405"))
-	buildTime, _ := time.Parse(time.RFC3339, base.BuildTime)
-	base.BuildTime = buildTime.In(tz).Format("2006-01-02 15:04:05")
 	logPath := filepath.Join(".", "log")
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
 		err = os.Mkdir(logPath, os.ModeDir|0755)
@@ -33,6 +31,11 @@ func main() {
 	}
 	mw := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(mw)
+
+	if base.BuildTime == "" {
+		buildTime, _ := time.Parse(time.RFC3339, base.BuildTime)
+		base.BuildTime = buildTime.In(tz).Format("2006-01-02 15:04:05")
+	}
 
 	conn, err := websocket.InitWebsocketConnection(config.String("address"), config.String("authToken"))
 	if err != nil {
