@@ -6,6 +6,9 @@
   "waitingSeconds": 30,
   "admin": 0,
   "plugins": {
+    "bili": {
+      "enable": true
+    },
     "poke": {
       "enable": true,
       "args": ["/poke", "/p"]

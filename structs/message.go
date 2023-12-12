@@ -1,10 +1,15 @@
 package structs
 
-type Message struct {
-	MessageType string `json:"message_type"`
-	UserId      int64  `json:"user_id"`
-	GroupId     int64  `json:"group_id"`
-	Message     string `json:"message"`
+import "MacArthurGo/structs/cqcode"
+
+type PrivateMessage struct {
+	UserId  int64                 `json:"user_id"`
+	Message []cqcode.ArrayMessage `json:"message"`
+}
+
+type GroupMessage struct {
+	GroupId int64                 `json:"group_id"`
+	Message []cqcode.ArrayMessage `json:"message"`
 }
 
 type GroupForward struct {
@@ -20,14 +25,10 @@ type PrivateForward struct {
 type ForwardNode struct {
 	Type string `json:"type"`
 	Data struct {
-		Name    string `json:"name"`
-		Uin     int64  `json:"uin"`
-		Content string `json:"content"`
+		Content []cqcode.ArrayMessage `json:"content"`
 	} `json:"data"`
 }
 
-func NewForwardNode(name string, uin int64) *ForwardNode {
-	node := ForwardNode{Type: "node"}
-	node.Data.Name, node.Data.Uin = name, uin
-	return &node
+func NewForwardNode() *ForwardNode {
+	return &ForwardNode{Type: "node"}
 }

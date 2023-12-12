@@ -5,9 +5,8 @@ import (
 	"strings"
 )
 
-//TODO CQ码上报Array化
-
-func At(qq int64) string {
+// CQAt Deprecated
+func CQAt(qq int64) string {
 	data := map[string]any{
 		"qq": qq,
 	}
@@ -15,7 +14,8 @@ func At(qq int64) string {
 	return cq.toString()
 }
 
-func Poke(qq int64) string {
+// CQPoke Deprecated
+func CQPoke(qq int64) string {
 	data := map[string]any{
 		"qq": qq,
 	}
@@ -23,7 +23,8 @@ func Poke(qq int64) string {
 	return cq.toString()
 }
 
-func Music(urlType string, id int64) string {
+// CQMusic Deprecated
+func CQMusic(urlType string, id int64) string {
 	data := map[string]any{
 		"type": urlType,
 		"id":   id,
@@ -32,7 +33,8 @@ func Music(urlType string, id int64) string {
 	return cq.toString()
 }
 
-func Image(file string) string {
+// CQImage Deprecated
+func CQImage(file string) string {
 	data := map[string]any{
 		"file": file,
 	}
@@ -40,6 +42,7 @@ func Image(file string) string {
 	return cq.toString()
 }
 
+// FromStr Deprecated
 func FromStr(str string) *[]CQCode {
 	var result []CQCode
 	cqCodeRegex := regexp.MustCompile(`\[CQ:([^,[\]]+)((?:,[^,=[\]]+=[^,[\]]*)*)]`)

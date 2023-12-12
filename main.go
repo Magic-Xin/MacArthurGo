@@ -1,7 +1,8 @@
 package main
 
 import (
-	_ "MacArthurGo/config"
+	"MacArthurGo/base"
+	_ "MacArthurGo/base"
 	_ "MacArthurGo/plugins"
 	"MacArthurGo/websocket"
 	"fmt"
@@ -30,6 +31,11 @@ func main() {
 	}
 	mw := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(mw)
+
+	if base.BuildTime != "" {
+		buildTime, _ := time.Parse(time.RFC3339, base.BuildTime)
+		base.BuildTime = buildTime.In(tz).Format("2006-01-02 15:04:05")
+	}
 
 	conn, err := websocket.InitWebsocketConnection(config.String("address"), config.String("authToken"))
 	if err != nil {

@@ -3,6 +3,7 @@ package plugins
 import (
 	"MacArthurGo/plugins/essentials"
 	_struct "MacArthurGo/structs"
+	"MacArthurGo/structs/cqcode"
 	"context"
 	"github.com/gookit/config/v2"
 	"github.com/sashabaranov/go-openai"
@@ -64,7 +65,7 @@ func (c *ChatGPT) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 	if err != nil {
 		log.Printf("ChatCompletion error: %v", err)
-		*send <- *essentials.SendMsg(ctx, err.Error(), false)
+		*send <- *essentials.SendMsg(ctx, err.Error(), nil, false, false)
 		return
 	}
 
@@ -75,12 +76,12 @@ func (c *ChatGPT) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 	if (*ctx)["message_type"].(string) == "group" && c.groupForward {
 		var data []_struct.ForwardNode
-		sender := (*ctx)["sender"].(map[string]any)
-		data = append(data, *essentials.ConstructForwardNode(&str, sender["nickname"].(string), int64(sender["user_id"].(float64))),
-			*essentials.ConstructForwardNode(&reply, essentials.Info.NickName, essentials.Info.UserId))
+		originStr := (*ctx)["sender"].(map[string]any)["nickname"].(string) + "：" + str
+		data = append(data, *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(originStr)}),
+			*essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(reply)}))
 		*send <- *essentials.SendGroupForward(ctx, &data, "")
 	} else {
-		*send <- *essentials.SendMsg(ctx, reply, false)
+		*send <- *essentials.SendMsg(ctx, reply, nil, false, false)
 	}
 }
 
