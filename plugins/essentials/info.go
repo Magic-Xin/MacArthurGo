@@ -88,7 +88,7 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 func (l *LoginInfo) ReceiveEcho(ctx *map[string]any, _ *chan []byte) {
 	if (*ctx)["echo"] != nil {
-		if (*ctx)["echo"].(string) == "info" {
+		if (*ctx)["echo"].(string) != "info" {
 			return
 		}
 	}
