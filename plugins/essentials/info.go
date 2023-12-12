@@ -1,6 +1,7 @@
 package essentials
 
 import (
+	"MacArthurGo/base"
 	"github.com/gookit/config/v2"
 	"log"
 	"reflect"
@@ -21,7 +22,7 @@ func init() {
 		Plugin: Plugin{
 			Name:    "info",
 			Enabled: true,
-			Args:    []string{"/test", "/help"},
+			Args:    []string{"/test", "/help", "/info"},
 		},
 	}
 	PluginArray = append(PluginArray, &PluginInterface{Interface: &info})
@@ -83,6 +84,9 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		}
 
 		*send <- *SendMsg(ctx, strings.Join(result, "\n"), nil, false, false)
+	}
+	if CheckArgument(ctx, l.Args[2]) {
+		*send <- *SendMsg(ctx, "分支: "+base.Branch+"\n"+"版本: "+base.Version+"\n"+"编译时间: "+base.BuildTime, nil, false, false)
 	}
 }
 

@@ -1,7 +1,7 @@
 package main
 
 import (
-	_ "MacArthurGo/config"
+	_ "MacArthurGo/base"
 	_ "MacArthurGo/plugins"
 	"MacArthurGo/websocket"
 	"fmt"
