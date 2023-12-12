@@ -23,14 +23,14 @@ func SendAction(action string, params any, echo string) *[]byte {
 	return &jsonMsg
 }
 
-func SendMsg(ctx *map[string]any, message string, addMessage *[]cqcode.ArrayMessage, at bool, reply bool) *[]byte {
-	if message == "" || ctx == nil {
+func SendMsg(ctx *map[string]any, message string, messageArray *[]cqcode.ArrayMessage, at bool, reply bool) *[]byte {
+	if (message == "" && messageArray == nil) || ctx == nil {
 		return nil
 	}
 
 	arrayMessage := []cqcode.ArrayMessage{{Type: "text", Data: map[string]any{"text": message}}}
-	if addMessage != nil {
-		arrayMessage = append(arrayMessage, *addMessage...)
+	if messageArray != nil {
+		arrayMessage = append(arrayMessage, *messageArray...)
 	}
 
 	if at && (*ctx)["message_type"] == "group" {
