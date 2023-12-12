@@ -82,6 +82,10 @@ func CheckArgument(ctx *map[string]any, arg string) bool {
 }
 
 func CheckArgumentArray(ctx *map[string]any, args *[]string) bool {
+	if args == nil {
+		return false
+	}
+
 	for _, arg := range *args {
 		if SplitArgument(ctx)[0] == arg {
 			return true
