@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 )
 
+func Text(text string) *ArrayMessage {
+	return &ArrayMessage{Type: "text", Data: map[string]any{"text": text}}
+}
+
 func At(qq string) *ArrayMessage {
 	return &ArrayMessage{Type: "at", Data: map[string]any{"qq": qq}}
 }
@@ -33,8 +37,4 @@ func Unmarshal(message []byte) *[]ArrayMessage {
 	}
 
 	return &am
-}
-
-func StringToArray(message string) *ArrayMessage {
-	return &ArrayMessage{Type: "text", Data: map[string]any{"text": message}}
 }

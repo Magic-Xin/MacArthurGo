@@ -77,8 +77,8 @@ func (c *ChatGPT) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	if (*ctx)["message_type"].(string) == "group" && c.groupForward {
 		var data []_struct.ForwardNode
 		originStr := (*ctx)["sender"].(map[string]any)["nickname"].(string) + "：" + str
-		data = append(data, *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.StringToArray(originStr)}),
-			*essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.StringToArray(reply)}))
+		data = append(data, *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(originStr)}),
+			*essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(reply)}))
 		*send <- *essentials.SendGroupForward(ctx, &data, "")
 	} else {
 		*send <- *essentials.SendMsg(ctx, reply, nil, false, false)

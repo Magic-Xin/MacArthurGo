@@ -113,7 +113,7 @@ func (p *PicSearch) SecondTimesGroupForward(send *chan []byte, echo []string) {
 	var data []_struct.ForwardNode
 	for _, r := range result {
 		if !strings.Contains(r, "SauceNAO") {
-			data = append(data, *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.StringToArray(r)}))
+			data = append(data, *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(r)}))
 		}
 	}
 	if echo[1] == "group" {
@@ -178,7 +178,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 			res := p.selectDB(key)
 			if res != nil {
 				cached = true
-				result = append(result, []cqcode.ArrayMessage{*cqcode.StringToArray("本次搜图结果来自数据库缓存")})
+				result = append(result, []cqcode.ArrayMessage{*cqcode.Text("本次搜图结果来自数据库缓存")})
 				var cachedMsg [][]cqcode.ArrayMessage
 				err = json.Unmarshal([]byte(*res), &cachedMsg)
 				if err != nil {
@@ -228,7 +228,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 	end := time.Since(start)
 	if result != nil {
 		if !cached {
-			result = append(result, []cqcode.ArrayMessage{*cqcode.StringToArray(fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))})
+			result = append(result, []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))})
 			jsonMsg, err := json.Marshal(result)
 			if err != nil {
 				log.Printf("Search result mashal error: %v", err)
@@ -274,7 +274,7 @@ func (p *PicSearch) sauceNAO(img string, response chan []cqcode.ArrayMessage, li
 	var i any
 	err := json.Unmarshal(body, &i)
 	if err != nil {
-		response <- []cqcode.ArrayMessage{*cqcode.StringToArray(fmt.Sprintf("%v", err))}
+		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 
@@ -308,7 +308,7 @@ func (p *PicSearch) sauceNAO(img string, response chan []cqcode.ArrayMessage, li
 			extUrl = data["ext_urls"].([]any)[0].(string)
 		}
 	}
-	r := []cqcode.ArrayMessage{*cqcode.StringToArray("SauceNAO\n")}
+	r := []cqcode.ArrayMessage{*cqcode.Text("SauceNAO\n")}
 	r = append(r, *cqcode.Image(thumbNail))
 	msg := fmt.Sprintf("\n相似度: %.2f%%\n", similarity)
 	if title != "" {
@@ -330,7 +330,7 @@ func (p *PicSearch) sauceNAO(img string, response chan []cqcode.ArrayMessage, li
 		}
 		msg += extUrl
 	}
-	r = append(r, *cqcode.StringToArray(msg))
+	r = append(r, *cqcode.Text(msg))
 	response <- r
 	<-limiter
 }
@@ -348,7 +348,7 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 	reqC.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:6.0) Gecko/20100101 Firefox/6.0")
 	respC, err := client.Do(reqC)
 	if err != nil {
-		response <- []cqcode.ArrayMessage{*cqcode.StringToArray(fmt.Sprintf("%v", err))}
+		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 
@@ -357,7 +357,7 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 	reqB.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:6.0) Gecko/20100101 Firefox/6.0")
 	respB, err := client.Do(reqB)
 	if err != nil {
-		response <- []cqcode.ArrayMessage{*cqcode.StringToArray(fmt.Sprintf("%v", err))}
+		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 
@@ -385,7 +385,7 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 		list := xpath.Find(doc, `//div[@class="row item-box"]`)
 		if len(list) == 0 {
 			err := errors.New("ascii2d not found")
-			response <- []cqcode.ArrayMessage{*cqcode.StringToArray(fmt.Sprintf("%v", err))}
+			response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
 			return
 		}
 		for _, n := range list {
@@ -407,10 +407,10 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 					essentials.HandleBannedHostsArray(&Link)
 				}
 
-				r := []cqcode.ArrayMessage{*cqcode.StringToArray(fmt.Sprintf("ascii2d %s\n", checkType[i]))}
+				r := []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("ascii2d %s\n", checkType[i]))}
 				r = append(r, *cqcode.Image(Thumb))
 				msg := fmt.Sprintf("\n%s %s\n「%s」/「%s」\n%s\nArthor:%s", Info, Type, Name, AuthNm, Link, Author)
-				r = append(r, *cqcode.StringToArray(msg))
+				r = append(r, *cqcode.Text(msg))
 
 				response <- r
 				break
