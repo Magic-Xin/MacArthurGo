@@ -96,6 +96,9 @@ func (l *LoginInfo) ReceiveEcho(ctx *map[string]any, _ *chan []byte) {
 			return
 		}
 	}
+	if (*ctx)["data"] == nil {
+		return
+	}
 	data := (*ctx)["data"].(map[string]any)
 	Info.NickName, Info.UserId = data["nickname"].(string), int64(data["user_id"].(float64))
 	log.Printf("Get account nickname: %s, id: %d", Info.NickName, Info.UserId)
