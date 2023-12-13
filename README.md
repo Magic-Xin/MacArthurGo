@@ -25,10 +25,8 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 
 ## TODO
 
-- CQ code in array way
-- BiliBili url parser
 - Random setu
-- ...
+- ...Add more
 
 ## Thanks to the following projects or services
 - [cq-picsearcher-bot](https://github.com/Tsuk1ko/cq-picsearcher-bot)
@@ -36,3 +34,4 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - [ascii2d](https://ascii2d.net)
 - [go-cqhttp](https://github.com/Mrs4s/go-cqhttp)
 - [OpenShamrock](https://github.com/whitechi73/OpenShamrock)
+- [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
