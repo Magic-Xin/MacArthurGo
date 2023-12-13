@@ -16,9 +16,8 @@ func SendAction(action string, params any, echo string) *[]byte {
 		return nil
 	}
 
-	act := _struct.Action{Action: action, Params: params}
-	eAct := _struct.EchoAction{Action: act, Echo: echo}
-	jsonMsg, _ := json.Marshal(eAct)
+	act := _struct.Action{Action: action, Params: params, Echo: echo}
+	jsonMsg, _ := json.Marshal(act)
 
 	return &jsonMsg
 }
