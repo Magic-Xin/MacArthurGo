@@ -48,7 +48,12 @@ func (b *Bili) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	rawMsg := (*ctx)["raw_message"].(string)
 	var bvid string
 	if match := biliShort.FindAllStringSubmatch(rawMsg, -1); match != nil {
-		bvid = bv.FindAllStringSubmatch(*essentials.GetOriginUrl(match[0][1]), -1)[0][1]
+		biliLong := bv.FindAllStringSubmatch(*essentials.GetOriginUrl(match[0][1]), -1)
+		if biliLong != nil {
+			bvid = biliLong[0][1]
+		} else {
+			return
+		}
 	} else if match = bv.FindAllStringSubmatch(rawMsg, -1); match != nil {
 		bvid = match[0][1]
 	} else {
