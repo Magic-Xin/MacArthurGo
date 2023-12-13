@@ -6,7 +6,6 @@ import (
 )
 
 func MessageFactory(msg *[]byte, send *chan []byte) {
-	//TODO B站链接解析
 	//TODO 语言库回复
 	//TODO setu
 	var i any
