@@ -18,7 +18,9 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 ## Plugins
 
 - ChatGPT
+- Alibaba QianWen
 - Music url parser
+- Bilibili url parser
 - Picture Search
 - Poke
 - Roll
