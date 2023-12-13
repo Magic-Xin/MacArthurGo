@@ -31,13 +31,22 @@
       "searchFeedback": "",
       "sauceNAOToken": ""
     },
-    "chatGPT": {
+    "chatAI": {
       "enable": true,
-      "args": ["/chatgpt", "/c"],
+      "chatGPT": {
+        "enable": true,
+        "args": ["/chatgpt", "/c"],
+        "model": "gpt-3.5-turbo-1106",
+        "apiKey": ""
+      },
+      "qWen": {
+        "enable": true,
+        "args": ["/qwen", "/q"],
+        "model": "qwen-max",
+        "apiKey": ""
+      },
       "groupForward": true,
-      "pangu": true,
-      "model": "gpt-3.5-turbo-1106",
-      "apiKey": ""
+      "pangu": true
     }
   }
 }
