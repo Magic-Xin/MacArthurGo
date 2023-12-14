@@ -94,7 +94,7 @@ jobs:
           CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
           CC=${CC} go build -trimpath -ldflags "${LDFLAGS}" -o ${BINDIR}/${NAME}
           chmod +x ${BINDIR}/${NAME}
-          ${upx} --lzma --best $[BINDIR]/${NAME}
+          ${upx} --lzma --best ${BINDIR}/${NAME}
           cd ${BINDIR} && tar -zcvf ../${OUTDIR}/${NAME}.tar.gz ${NAME}
 
 
