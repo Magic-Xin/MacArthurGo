@@ -154,8 +154,16 @@ func (q *QWen) RequireAnswer(str string) *string {
 
 	payload := map[string]interface{}{
 		"model": q.model,
-		"input": map[string]any{
-			"prompt": str,
+		"input": map[string][]map[string]string{
+			"messages": {
+				{
+					"role":    "user",
+					"content": str,
+				},
+			},
+		},
+		"params": map[string]any{
+			"enable_search": true,
 		},
 	}
 	jsonPayload, err := json.Marshal(payload)
