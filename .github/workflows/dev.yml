@@ -20,13 +20,17 @@ jobs:
             goarch: "386"
           - goos: windows-6.3
             goarch: arm64
+        include:
+          - goos: android
+            goarch: arm64
     steps:
       - uses: actions/checkout@v3
 
       - name: Set Environment
         run: |
           echo "sha_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
-          echo "TIME=$(date +'%Y-%m-%dT%H:%M:%SZ' -u)" >> $GITHUB_ENV
+          echo "BUILDTIME=$(date +'%Y-%m-%dT%H:%M:%SZ' -u)" >> $GITHUB_ENV
+          echo "LDFLAGS=-w -s -X 'MacArthurGo/base.Version=${{ env.sha_short }}' -X 'MacArthurGo/base.Branch=Beta/dev' -X 'MacArthurGo/base.BuildTime=${BUILDTIME}'" >> $GITHUB_ENV
 
       - name: Setup UPX
         run: |
@@ -41,11 +45,21 @@ jobs:
           go-version: '1.21'
 
       - name: Set up xgo
+        if: ${{ matrix.goos!='android' }}
         run: |
           docker pull techknowlogick/xgo:latest
           go install src.techknowlogick.com/xgo@latest
+
+      - name: Set up NDK
+        uses: nttld/setup-ndk@v1
+        if: ${{ matrix.goos=='android' }}
+        id: setup-ndk
+        with:
+          ndk-version: r26b
+          add-to-path: true
           
       - name: Build
+        if: ${{ matrix.goos!='android' }}
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
@@ -56,10 +70,30 @@ jobs:
         run: |
           mkdir bin
           mkdir out
-          xgo --targets=$GOOS/$GOARCH -ldflags="-w -s -X 'MacArthurGo/base.Version=${{ env.sha_short }}' -X 'MacArthurGo/base.Branch=Beta/dev' -X 'MacArthurGo/base.BuildTime=${{ env.TIME }}'" --out $BINDIR/MacArthurGo ./
-          if [ $GOOS != "windows-6.3" ]; then chmod +x $BINDIR/MacArthurGo-*; fi
-          if [ $GOOS != "darwin-10.14" ]; then ${upx} --lzma --best $BINDIR/MacArthurGo-*; fi
-          if [ $GOOS != "windows-6.3" ]; then cd $BINDIR && tar -zcvf ../$OUTDIR/$NAME.tar.gz MacArthurGo-*; else cd $BINDIR && zip -v9 ../$OUTDIR/$NAME.zip MacArthurGo-*; fi
+          xgo --targets=${GOOS}/${GOARCH} -ldflags="${LDFLAGS}" --out ${BINDIR}/${NAME} ./
+          if [ $GOOS != "windows-6.3" ]; then chmod +x ${BINDIR}/${NAME}-*; fi
+          if [ $GOOS != "darwin-10.14" ]; then ${upx} --lzma --best ${BINDIR}/${NAME}-*; fi
+          if [ $GOOS != "windows-6.3" ]; then cd ${BINDIR} && tar -zcvf ../${OUTDIR}/${NAME}.tar.gz ${NAME}-*; else cd ${BINDIR} && zip -v9 ../${OUTDIR}/${NAME}.zip ${NAME}-*; fi
+
+      - name: Build Android
+        if: ${{ matrix.goos=='android' }}
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          NAME: MacArthurGo
+          BINDIR: bin
+          OUTDIR: out
+          CGO_ENABLED: 1
+        run: |
+          mkdir bin
+          mkdir out
+          CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
+          CC=${CC} go build -trimpath -ldflags "${LDFLAGS}" -o ${BINDIR}/${NAME}
+          chmod +x ${BINDIR}/${NAME}*
+          ${upx} --lzma --best $[BINDIR]/${NAME}*
+          cd ${BINDIR} && tar -zcvf ../${OUTDIR}/${NAME}.tar.gz ${NAME}*
+
 
       - name: Upload To Artifact
         uses: actions/upload-artifact@main
