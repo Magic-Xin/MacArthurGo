@@ -101,7 +101,7 @@ jobs:
       - name: Upload To Artifact
         uses: actions/upload-artifact@main
         with:
-          name: ${{ matrix.goos }}-${{ matrix.goarch }}-${SHASHORT}
+          name: ${{ matrix.goos }}-${{ matrix.goarch }}-${{ env.SHASHORT }}
           path: |
             out/*.tar.gz
             out/*.zip
