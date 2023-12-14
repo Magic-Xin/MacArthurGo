@@ -145,7 +145,7 @@ func (c *ChatGPT) RequireAnswer(str string) *string {
 }
 
 func (q *QWen) RequireAnswer(str string) *string {
-	if q.Enabled {
+	if !q.Enabled {
 		res := "QWen disabled"
 		return &res
 	}
