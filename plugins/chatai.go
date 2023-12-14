@@ -141,7 +141,8 @@ func (c *ChatGPT) RequireAnswer(str string) *string {
 		return &res
 	}
 
-	return &resp.Choices[0].Message.Content
+	res := c.model + ": " + resp.Choices[0].Message.Content
+	return &res
 }
 
 func (q *QWen) RequireAnswer(str string) *string {
@@ -210,7 +211,7 @@ func (q *QWen) RequireAnswer(str string) *string {
 	ctx := i.(map[string]any)
 	if ctx["output"] != nil {
 		if ctx["output"].(map[string]any)["text"] != nil {
-			res := ctx["output"].(map[string]any)["text"].(string)
+			res := q.model + ": " + ctx["output"].(map[string]any)["text"].(string)
 			return &res
 		}
 	}
