@@ -34,7 +34,7 @@ linux-arm64:
 	xgo --targets=linux/arm64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
 
 android-arm64:
-	CGO_ENABLED=1 GOOS=android GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-android-arm64 ./
+	CC=${CC} CGO_ENABLED=1 GOOS=android GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-android-arm64 ./
 
 windows-386:
 	xgo --targets=windows-6.3/386 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
