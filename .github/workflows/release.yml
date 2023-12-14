@@ -34,6 +34,14 @@ jobs:
         docker pull techknowlogick/xgo:latest
         go install src.techknowlogick.com/xgo@latest
 
+    - name: Set up NDK
+      uses: nttld/setup-ndk@v1
+      if: ${{ matrix.goos=='android' }}
+      id: setup-ndk
+      with:
+        ndk-version: r26b
+        add-to-path: true
+
     - name: Build
       run: |
         mkdir bin
