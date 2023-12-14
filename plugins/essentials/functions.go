@@ -3,7 +3,9 @@ package essentials
 import (
 	_struct "MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
+	"crypto/md5"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -138,6 +140,10 @@ func GetOriginUrl(url string) *string {
 
 	originURL := resp.Request.URL.String()
 	return &originURL
+}
+
+func Md5(origin *[]byte) string {
+	return fmt.Sprintf("%x", md5.Sum(*origin))
 }
 
 func constructMessage(ctx *map[string]any, message *[]cqcode.ArrayMessage) *[]byte {
