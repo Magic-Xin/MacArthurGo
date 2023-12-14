@@ -24,6 +24,7 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - Picture Search
 - Poke
 - Roll
+- Repeat
 
 ## TODO
 
