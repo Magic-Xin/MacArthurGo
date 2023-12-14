@@ -25,8 +25,6 @@ type PicSearch struct {
 	groupForward      bool
 	allowPrivate      bool
 	handleBannedHosts bool
-	expirationTime    int64
-	intervalTime      int64
 	searchFeedback    string
 	sauceNAOToken     string
 }
@@ -41,20 +39,19 @@ func init() {
 		groupForward:      config.Bool("plugins.picSearch.groupForward"),
 		allowPrivate:      config.Bool("plugins.picSearch.allowPrivate"),
 		handleBannedHosts: config.Bool("plugins.picSearch.handleBannedHosts"),
-		expirationTime:    config.Int64("plugins.picSearch.expirationTime"),
-		intervalTime:      config.Int64("plugins.picSearch.intervalTime"),
 		searchFeedback:    config.String("plugins.picSearch.searchFeedback"),
 		sauceNAOToken:     config.String("plugins.picSearch.sauceNAOToken"),
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &pSearch})
 
 	sqlTable := `CREATE TABLE IF NOT EXISTS picsearch(uid TEXT PRIMARY KEY NOT NULL, res TEXT NOT NULL, created NUMERIC NOT NULL);`
 	_, err := essentials.DB.Exec(sqlTable)
 	if err != nil {
 		log.Printf("SQL exec error: %v", err)
+		return
 	}
 
-	go pSearch.deleteExpiration()
+	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &pSearch})
+	go essentials.DeleteExpired("DELETE FROM picsearch WHERE (? - created) > ?", config.Int64("plugins.picSearch.expirationTime"), config.Int64("plugins.picSearch.intervalTime"))
 }
 
 func (p *PicSearch) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
@@ -102,13 +99,14 @@ func (p *PicSearch) SecondTimesGroupForward(send *chan []byte, echo []string) {
 		"group_id": id,
 	}
 
-	res := p.selectDB(echo[0])
-	if res == nil {
+	selectRes := essentials.SelectDB("SELECT res FROM picsearch WHERE uid=?", echo[0])
+	if selectRes == nil {
 		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", nil, false, false)
 		return
 	}
 
-	result := append([]string{"sauceNAO 搜索结果被 QQ 拦截，已舍弃"}, strings.Split(*res, "|")...)
+	res := (*selectRes)[0]["res"].(string)
+	result := append([]string{"sauceNAO 搜索结果被 QQ 拦截，已舍弃"}, strings.Split(res, "|")...)
 
 	var data []_struct.ForwardNode
 	for _, r := range result {
@@ -135,13 +133,14 @@ func (p *PicSearch) groupFailed(send *chan []byte, echo []string) {
 
 	*send <- *essentials.SendMsg(ctx, "合并转发失败，将独立发送搜索结果", nil, false, false)
 
-	res := p.selectDB(echo[0])
-	if res == nil {
+	selectRes := essentials.SelectDB("SELECT res FROM picsearch WHERE uid=?", echo[0])
+	if selectRes == nil {
 		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", nil, false, false)
 		return
 	}
 
-	result := strings.Split(*res, "|")
+	res := (*selectRes)[0]["res"].(string)
+	result := strings.Split(res, "|")
 	for _, r := range result {
 		*send <- *essentials.SendMsg(ctx, r, nil, false, false)
 	}
@@ -175,12 +174,13 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 			}
 			fileUrl := c.Data["url"].(string)
 			fileUrl, key = essentials.GetUniversalImgURL(fileUrl)
-			res := p.selectDB(key)
-			if res != nil {
+			selectRes := essentials.SelectDB("SELECT res FROM picsearch WHERE uid=?", key)
+			if selectRes != nil {
+				res := (*selectRes)[0]["res"].(string)
 				cached = true
 				result = append(result, []cqcode.ArrayMessage{*cqcode.Text("本次搜图结果来自数据库缓存")})
 				var cachedMsg [][]cqcode.ArrayMessage
-				err = json.Unmarshal([]byte(*res), &cachedMsg)
+				err = json.Unmarshal([]byte(res), &cachedMsg)
 				if err != nil {
 					log.Printf("Unmarshal cached message error: %v", err)
 					continue
@@ -233,7 +233,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 			if err != nil {
 				log.Printf("Search result mashal error: %v", err)
 			} else {
-				p.insertDB(key, string(jsonMsg))
+				essentials.InsertDB("picsearch", &[]string{"uid", "res", "created"}, key, string(jsonMsg), time.Now().Unix())
 			}
 		}
 
@@ -445,54 +445,4 @@ func (p *PicSearch) genEcho(ctx *map[string]any, key string, retry bool) *string
 	}
 
 	return &res
-}
-
-func (p *PicSearch) insertDB(uid string, res string) {
-	stmt, err := essentials.DB.Prepare("INSERT INTO picsearch(uid, res, created) values (?, ?, ?)")
-	if err != nil {
-		log.Printf("Database insert prepare error: %v", err)
-		return
-	}
-	_, err = stmt.Exec(uid, res, time.Now().Unix())
-	if err != nil {
-		log.Printf("Database insert execution error: %v", err)
-	}
-}
-
-func (p *PicSearch) selectDB(uid string) *string {
-	query, err := essentials.DB.Query("SELECT res FROM picsearch WHERE uid=?", uid)
-	if err != nil {
-		log.Printf("Database query error: %v", err)
-		return nil
-	}
-
-	var res string
-	for query.Next() {
-		err = query.Scan(&res)
-		if err != nil {
-			return nil
-		}
-	}
-
-	if res == "" {
-		return nil
-	}
-
-	return &res
-}
-
-func (p *PicSearch) deleteExpiration() {
-	for {
-		stmt, err := essentials.DB.Prepare("DELETE FROM picsearch WHERE uid=(SELECT uid FROM picsearch WHERE (?-created) > ?)")
-		if err != nil {
-			log.Printf("Database delete prepare error: %v", err)
-			return
-		}
-
-		_, err = stmt.Exec(time.Now().Unix(), p.expirationTime)
-		if err != nil {
-			log.Printf("Database delete execution error: %v", err)
-		}
-		time.Sleep(time.Duration(p.intervalTime) * time.Second)
-	}
 }
