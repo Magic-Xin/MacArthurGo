@@ -87,7 +87,7 @@ jobs:
         run: |
           mkdir bin
           CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
-          CC=${CC} go build -trimpath -ldflags "${LDFLAGS}" -o ${BINDIR}/${NAME}-${GOOS}-${GOARCH} ./
+          CC=${CC} go build -ldflags "${LDFLAGS}" -o ${BINDIR}/${NAME}-${GOOS}-${GOARCH} ./
           chmod +x ${BINDIR}/${NAME}-${GOOS}-${GOARCH}
           ${upx} --lzma --best ${BINDIR}/${NAME}-${GOOS}-${GOARCH}
 
