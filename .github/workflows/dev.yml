@@ -12,7 +12,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # build and publish in parallel: linux/386, linux/amd64, windows/386, windows/amd64, darwin/amd64, darwin/arm64
         goos: [ linux, windows-6.3, darwin-10.14 ]
         goarch: [ "386", amd64, arm64 ]
         exclude:
@@ -68,7 +67,6 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           NAME: MacArthurGo
           BINDIR: bin
-          OUTDIR: out
           CGO_ENABLED: 1
         run: |
           mkdir bin
@@ -76,7 +74,6 @@ jobs:
           xgo --targets=${GOOS}/${GOARCH} -ldflags="${LDFLAGS}" --out ${BINDIR}/${NAME} ./
           if [ $GOOS != "windows-6.3" ]; then chmod +x ${BINDIR}/${NAME}-*; fi
           if [ $GOOS != "darwin-10.14" ]; then ${upx} --lzma --best ${BINDIR}/${NAME}-*; fi
-          if [ $GOOS != "windows-6.3" ]; then cd ${BINDIR} && tar -zcvf ../${OUTDIR}/${NAME}.tar.gz ${NAME}-*; else cd ${BINDIR} && zip -v9 ../${OUTDIR}/${NAME}.zip ${NAME}-*; fi
 
       - name: Build Android
         if: ${{ matrix.goos=='android' }}
@@ -86,16 +83,13 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           NAME: MacArthurGo
           BINDIR: bin
-          OUTDIR: out
           CGO_ENABLED: 1
         run: |
           mkdir bin
-          mkdir out
           CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
-          CC=${CC} go build -trimpath -ldflags "${LDFLAGS}" -o ${BINDIR}/${NAME}
-          chmod +x ${BINDIR}/${NAME}
-          ${upx} --lzma --best ${BINDIR}/${NAME}
-          cd ${BINDIR} && tar -zcvf ../${OUTDIR}/${NAME}.tar.gz ${NAME}
+          CC=${CC} go build -trimpath -ldflags "${LDFLAGS}" -o ${BINDIR}/${NAME}-${GOOS}-${GOARCH} ./
+          chmod +x ${BINDIR}/${NAME}-${GOOS}-${GOARCH}
+          ${upx} --lzma --best ${BINDIR}/${NAME}-${GOOS}-${GOARCH}
 
 
       - name: Upload To Artifact
@@ -103,5 +97,4 @@ jobs:
         with:
           name: ${{ matrix.goos }}-${{ matrix.goarch }}-${{ env.SHASHORT }}
           path: |
-            out/*.tar.gz
-            out/*.zip
+            bin/*
