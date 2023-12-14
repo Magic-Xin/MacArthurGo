@@ -100,7 +100,10 @@ func (p *PicSearch) SecondTimesGroupForward(send *chan []byte, echo []string) {
 	}
 
 	selectRes := essentials.SelectDB("SELECT res FROM picsearch WHERE uid=?", echo[0])
-	if len(*selectRes) == 0 {
+	if selectRes == nil {
+		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", nil, false, false)
+		return
+	} else if len(*selectRes) == 0 {
 		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", nil, false, false)
 		return
 	}
@@ -134,7 +137,10 @@ func (p *PicSearch) groupFailed(send *chan []byte, echo []string) {
 	*send <- *essentials.SendMsg(ctx, "合并转发失败，将独立发送搜索结果", nil, false, false)
 
 	selectRes := essentials.SelectDB("SELECT res FROM picsearch WHERE uid=?", echo[0])
-	if len(*selectRes) == 0 {
+	if selectRes == nil {
+		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", nil, false, false)
+		return
+	} else if len(*selectRes) == 0 {
 		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", nil, false, false)
 		return
 	}
@@ -175,18 +181,20 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 			fileUrl := c.Data["url"].(string)
 			fileUrl, key = essentials.GetUniversalImgURL(fileUrl)
 			selectRes := essentials.SelectDB("SELECT res FROM picsearch WHERE uid=?", key)
-			if len(*selectRes) > 0 {
-				res := (*selectRes)[0]["res"].(string)
-				cached = true
-				result = append(result, []cqcode.ArrayMessage{*cqcode.Text("本次搜图结果来自数据库缓存")})
-				var cachedMsg [][]cqcode.ArrayMessage
-				err = json.Unmarshal([]byte(res), &cachedMsg)
-				if err != nil {
-					log.Printf("Unmarshal cached message error: %v", err)
+			if selectRes != nil {
+				if len(*selectRes) > 0 {
+					res := (*selectRes)[0]["res"].(string)
+					cached = true
+					result = append(result, []cqcode.ArrayMessage{*cqcode.Text("本次搜图结果来自数据库缓存")})
+					var cachedMsg [][]cqcode.ArrayMessage
+					err = json.Unmarshal([]byte(res), &cachedMsg)
+					if err != nil {
+						log.Printf("Unmarshal cached message error: %v", err)
+						continue
+					}
+					result = append(result, cachedMsg[:len(cachedMsg)-1]...)
 					continue
 				}
-				result = append(result, cachedMsg[:len(cachedMsg)-1]...)
-				continue
 			}
 
 			wg := &sync.WaitGroup{}
