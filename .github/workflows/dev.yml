@@ -28,9 +28,12 @@ jobs:
 
       - name: Set Environment
         run: |
-          echo "sha_short=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
+          echo "SHASHORT=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
           echo "BUILDTIME=$(date +'%Y-%m-%dT%H:%M:%SZ' -u)" >> $GITHUB_ENV
-          echo "LDFLAGS=-w -s -X 'MacArthurGo/base.Version=${{ env.sha_short }}' -X 'MacArthurGo/base.Branch=Beta/dev' -X 'MacArthurGo/base.BuildTime=${BUILDTIME}'" >> $GITHUB_ENV
+
+      - name: Set LDFLAGS
+        run: |
+          echo "LDFLAGS=-w -s -X 'MacArthurGo/base.Version=${SHASHORT}' -X 'MacArthurGo/base.Branch=Beta/dev' -X 'MacArthurGo/base.BuildTime=${BUILDTIME}'" >> $GITHUB_ENV
 
       - name: Setup UPX
         run: |
@@ -90,15 +93,15 @@ jobs:
           mkdir out
           CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
           CC=${CC} go build -trimpath -ldflags "${LDFLAGS}" -o ${BINDIR}/${NAME}
-          chmod +x ${BINDIR}/${NAME}*
-          ${upx} --lzma --best $[BINDIR]/${NAME}*
-          cd ${BINDIR} && tar -zcvf ../${OUTDIR}/${NAME}.tar.gz ${NAME}*
+          chmod +x ${BINDIR}/${NAME}
+          ${upx} --lzma --best $[BINDIR]/${NAME}
+          cd ${BINDIR} && tar -zcvf ../${OUTDIR}/${NAME}.tar.gz ${NAME}
 
 
       - name: Upload To Artifact
         uses: actions/upload-artifact@main
         with:
-          name: ${{ matrix.goos }}-${{ matrix.goarch }}-${{ env.sha_short }}
+          name: ${{ matrix.goos }}-${{ matrix.goarch }}-${SHASHORT}
           path: |
             out/*.tar.gz
             out/*.zip
