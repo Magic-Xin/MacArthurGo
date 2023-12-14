@@ -12,10 +12,9 @@ type LoginInfo struct {
 	Plugin
 	NickName string
 	UserId   int64
+	Admin    int64
 	Login    bool
 }
-
-var Info LoginInfo
 
 func init() {
 	info := LoginInfo{
@@ -24,21 +23,15 @@ func init() {
 			Enabled: true,
 			Args:    []string{"/test", "/help", "/info"},
 		},
+		Admin: config.Int64("admin"),
 	}
 	PluginArray = append(PluginArray, &PluginInterface{Interface: &info})
 }
 
 func (l *LoginInfo) ReceiveAll(_ *map[string]any, send *chan []byte) {
-	if !Info.Login {
-		*send <- *SendAction("get_login_info", nil, "info")
-		sendCtx := map[string]any{
-			"message_type": "private",
-			"sender": map[string]any{
-				"user_id": float64(config.Int64("admin")),
-			},
-		}
-		*send <- *SendMsg(&sendCtx, "MacArthurGo 已上线", nil, false, false)
-		Info.Login = true
+	if !l.Login {
+		*send <- *SendAction("get_login_info", struct{}{}, "info")
+		l.Login = true
 	}
 }
 
@@ -90,13 +83,19 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 }
 
-func (l *LoginInfo) ReceiveEcho(ctx *map[string]any, _ *chan []byte) {
-	if (*ctx)["echo"] != nil {
-		if (*ctx)["echo"].(string) != "info" {
-			return
-		}
+func (l *LoginInfo) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
+	if (*ctx)["echo"].(string) != "info" || (*ctx)["data"] == nil {
+		return
 	}
+
 	data := (*ctx)["data"].(map[string]any)
-	Info.NickName, Info.UserId = data["nickname"].(string), int64(data["user_id"].(float64))
-	log.Printf("Get account nickname: %s, id: %d", Info.NickName, Info.UserId)
+	l.NickName, l.UserId = data["nickname"].(string), int64(data["user_id"].(float64))
+	log.Printf("Get account nickname: %s, id: %d", l.NickName, l.UserId)
+	sendCtx := map[string]any{
+		"message_type": "private",
+		"sender": map[string]any{
+			"user_id": float64(l.Admin),
+		},
+	}
+	*send <- *SendMsg(&sendCtx, "MacArthurGo 已上线", nil, false, false)
 }

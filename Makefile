@@ -1,8 +1,8 @@
 NAME=MacArthurGo
 BINDIR=bin
 OUTDIR=out
-GOBUILD=go build
-LDFLAGS=-s -w -X MacArthurGo/base.Version=$(shell git describe --tags --always --dirty)  -X MacArthurGo/base.Branch=release -X MacArthurGo/base.BuildTime=$(shell date +'%Y-%m-%dT%H:%M:%SZ' -u)
+LDFLAGS=-s -w -X MacArthurGo/base.Version=$(shell git describe --tags --always --dirty)  -X MacArthurGo/base.Branch=Release -X MacArthurGo/base.BuildTime=$(shell date +'%Y-%m-%dT%H:%M:%SZ' -u)
+CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
 
 DARWIN_PLATFORM_LIST = \
 	darwin-amd64 \
@@ -11,13 +11,12 @@ DARWIN_PLATFORM_LIST = \
 LINUX_PLATFORM_LIST = \
 	linux-386 \
 	linux-amd64 \
-	linux-arm64
+	linux-arm64 \
+	android-arm64
 
 WINDOWS_PLATFORM_LIST = \
 	windows-386 \
     windows-amd64
-
-all: linux-amd64 # Most used
 
 darwin-amd64:
 	xgo --targets=darwin-10.14/amd64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
@@ -33,6 +32,9 @@ linux-amd64:
 
 linux-arm64:
 	xgo --targets=linux/arm64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+
+android-arm64:
+	CGO_ENABLED=1 GOOS=android GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-android-arm64 ./
 
 windows-386:
 	xgo --targets=windows-6.3/386 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
