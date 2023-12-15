@@ -46,8 +46,10 @@ func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 			str := msg.Data["text"].(string)
 			if strings.Contains(str, "https://music.163.com/") {
 				urlType = "163"
+				res = str
 			} else if strings.Contains(str, "https://i.y.qq.com/") {
 				urlType = "qq"
+				res = str
 			} else if match := regexp.MustCompile(`(http://163cn.tv/\w+)`).FindAllStringSubmatch(str, -1); match != nil {
 				if url := essentials.GetOriginUrl(match[0][1]); url != nil {
 					urlType = "163"
@@ -66,9 +68,8 @@ func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 
 	if urlType != "" {
-		re := regexp.MustCompile(`id=(\d+)&`)
-		match := re.FindAllStringSubmatch(res, -1)
-		if len(match) > 0 {
+		match := regexp.MustCompile(`id=(\d+)&`).FindAllStringSubmatch(res, -1)
+		if match != nil {
 			id, err := strconv.ParseInt(match[0][1], 10, 64)
 			if err == nil {
 				*send <- *essentials.SendMusic(ctx, urlType, id)
