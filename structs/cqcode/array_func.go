@@ -17,7 +17,7 @@ func Reply(id int64) *ArrayMessage {
 }
 
 func Poke(id int64) *ArrayMessage {
-	return &ArrayMessage{Type: "poke", Data: map[string]any{"type": 1, "id": id}}
+	return &ArrayMessage{Type: "touch", Data: map[string]any{"id": id}}
 }
 
 func Music(urlType string, id int64) *ArrayMessage {
