@@ -66,7 +66,12 @@ func (p *PicSearch) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 			p.picSearch(ctx, send, false, true)
 		}
 	} else if p.allowPrivate {
-		p.picSearch(ctx, send, false, false)
+		if p.checkArgs(ctx) {
+			p.picSearch(ctx, send, false, false)
+		} else if !strings.HasPrefix(essentials.SplitArgument(ctx)[0], "/") {
+			p.picSearch(ctx, send, false, false)
+		}
+
 	}
 }
 
