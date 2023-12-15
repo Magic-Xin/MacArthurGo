@@ -2,8 +2,6 @@ package plugins
 
 import (
 	"MacArthurGo/plugins/essentials"
-	"MacArthurGo/structs/cqcode"
-	"encoding/json"
 	"github.com/gookit/config/v2"
 	"io"
 	"log"
@@ -37,23 +35,13 @@ func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	var (
 		urlType string
 		res     string
-		message []cqcode.ArrayMessage
 	)
-	if (*ctx)["message"] == nil {
-		return
-	}
-	msg, err := json.Marshal((*ctx)["message"])
-	if err != nil {
-		log.Printf("Music json marshal error: %v", err)
-		return
-	}
-	err = json.Unmarshal(msg, &message)
-	if err != nil {
-		log.Printf("Music json unmarshal error: %v", err)
+	message := essentials.DecodeArrayMessage(ctx)
+	if message == nil {
 		return
 	}
 
-	for _, msg := range message {
+	for _, msg := range *message {
 		if msg.Type == "text" && msg.Data["text"] != nil {
 			str := msg.Data["text"].(string)
 			if strings.Contains(str, "https://music.163.com/") {

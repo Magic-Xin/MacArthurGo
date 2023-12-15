@@ -2,7 +2,6 @@ package plugins
 
 import (
 	"MacArthurGo/plugins/essentials"
-	"MacArthurGo/structs/cqcode"
 	"encoding/json"
 	"github.com/gookit/config/v2"
 	"log"
@@ -45,10 +44,13 @@ func (r *Repeat) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		return
 	}
 
-	var message []cqcode.ArrayMessage
 	msg, err := json.Marshal((*ctx)["message"])
 	if err != nil {
 		log.Printf("Repeat json marshal error: %v", err)
+		return
+	}
+	message := essentials.DecodeArrayMessage(ctx)
+	if message == nil {
 		return
 	}
 
@@ -59,18 +61,11 @@ func (r *Repeat) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		repeatMap.Store(groupId, []any{md5, 1})
 		return
 	}
-	err = json.Unmarshal(msg, &message)
-	if err != nil {
-		log.Printf("Repeat json unmarshal error: %v", err)
-		return
-	}
-	if len(message) == 0 {
-		return
-	}
+
 	if cache.([]any)[0].(string) == md5 {
 		if cache.([]any)[1].(int) >= int(r.Times) && r.getRand(false) {
 			repeatMap.Store(groupId, []any{md5, 1})
-			*send <- *essentials.SendMsg(ctx, "", &message, false, false)
+			*send <- *essentials.SendMsg(ctx, "", message, false, false)
 			return
 		} else {
 			repeatMap.Store(groupId, []any{md5, cache.([]any)[1].(int) + 1})
@@ -80,7 +75,7 @@ func (r *Repeat) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 
 	if r.getRand(true) {
-		*send <- *essentials.SendMsg(ctx, "", &message, false, false)
+		*send <- *essentials.SendMsg(ctx, "", message, false, false)
 	}
 }
 

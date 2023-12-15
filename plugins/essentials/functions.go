@@ -142,6 +142,15 @@ func GetOriginUrl(url string) *string {
 	return &originURL
 }
 
+func DecodeArrayMessage(ctx *map[string]any) *[]cqcode.ArrayMessage {
+	msg, err := json.Marshal((*ctx)["message"])
+	if err != nil {
+		log.Printf("Marshal message error: %v", err)
+		return nil
+	}
+	return cqcode.Unmarshal(msg)
+}
+
 func Md5(origin *[]byte) string {
 	return fmt.Sprintf("%x", md5.Sum(*origin))
 }
