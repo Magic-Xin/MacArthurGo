@@ -2,6 +2,8 @@ package plugins
 
 import (
 	"MacArthurGo/plugins/essentials"
+	"MacArthurGo/structs/cqcode"
+	"encoding/json"
 	"github.com/gookit/config/v2"
 	"io"
 	"log"
@@ -32,27 +34,52 @@ func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		return
 	}
 
-	var urlType string
-	str := (*ctx)["raw_message"].(string)
-	if strings.Contains(str, "music.163.com") {
-		urlType = "163"
-	} else if strings.Contains(str, "i.y.qq.com") {
-		urlType = "qq"
-	} else if match := regexp.MustCompile(`(http://163cn.tv/\w+)`).FindAllStringSubmatch(str, -1); match != nil {
-		if url := essentials.GetOriginUrl(match[0][1]); url != nil {
-			urlType = "163"
-			str = *url
-		}
-	} else if match := regexp.MustCompile(`(https://c6.y.qq.com/\S+)`).FindAllStringSubmatch(str, -1); match != nil {
-		if url := essentials.GetOriginUrl(match[0][1]); url != nil {
-			urlType = "qq"
-			str = "id=" + *m.getQQMusicID(url) + "&"
+	var (
+		urlType string
+		res     string
+		message []cqcode.ArrayMessage
+	)
+	if (*ctx)["message"] == nil {
+		return
+	}
+	msg, err := json.Marshal((*ctx)["message"])
+	if err != nil {
+		log.Printf("Music json marshal error: %v", err)
+		return
+	}
+	err = json.Unmarshal(msg, &message)
+	if err != nil {
+		log.Printf("Music json unmarshal error: %v", err)
+		return
+	}
+
+	for _, msg := range message {
+		if msg.Type == "text" && msg.Data["text"] != nil {
+			str := msg.Data["text"].(string)
+			if strings.Contains(str, "https://music.163.com/") {
+				urlType = "163"
+			} else if strings.Contains(str, "https://i.y.qq.com/") {
+				urlType = "qq"
+			} else if match := regexp.MustCompile(`(http://163cn.tv/\w+)`).FindAllStringSubmatch(str, -1); match != nil {
+				if url := essentials.GetOriginUrl(match[0][1]); url != nil {
+					urlType = "163"
+					res = *url
+				}
+			} else if match = regexp.MustCompile(`(https://c6.y.qq.com/\S+)`).FindAllStringSubmatch(str, -1); match != nil {
+				if url := essentials.GetOriginUrl(match[0][1]); url != nil {
+					urlType = "qq"
+					res = "id=" + *m.getQQMusicID(url) + "&"
+				}
+			} else if match = regexp.MustCompile(`https://y.music.163.com/m/song/(\d+)`).FindAllStringSubmatch(str, -1); match != nil {
+				urlType = "163"
+				res = "id=" + match[0][1] + "&"
+			}
 		}
 	}
 
 	if urlType != "" {
 		re := regexp.MustCompile(`id=(\d+)&`)
-		match := re.FindAllStringSubmatch(str, -1)
+		match := re.FindAllStringSubmatch(res, -1)
 		if len(match) > 0 {
 			id, err := strconv.ParseInt(match[0][1], 10, 64)
 			if err == nil {
