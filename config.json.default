@@ -51,6 +51,11 @@
         "model": "qwen-max",
         "apiKey": ""
       },
+      "gemini": {
+        "enable": true,
+        "args": ["/gemini", "/g"],
+        "apiKey": ""
+      },
       "groupForward": true,
       "pangu": true
     }

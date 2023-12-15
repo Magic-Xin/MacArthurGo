@@ -19,6 +19,7 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 
 - ChatGPT
 - Alibaba QianWen
+- Google Gemini Pro (with picture search)
 - Music url parser
 - Bilibili url parser
 - Picture Search

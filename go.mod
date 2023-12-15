@@ -8,6 +8,7 @@ require (
 	github.com/gookit/config/v2 v2.2.4
 	github.com/gorilla/websocket v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.18
+	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/sashabaranov/go-openai v1.17.9
 	github.com/vinta/pangu v3.0.0+incompatible
 )
