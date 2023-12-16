@@ -150,7 +150,7 @@ func (c *ChatAI) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 	if (*ctx)["message_type"].(string) == "group" && c.groupForward {
 		var data []_struct.ForwardNode
-		originStr := append([]cqcode.ArrayMessage{*cqcode.Text((*ctx)["sender"].(map[string]any)["nickname"].(string) + "：")}, *message...)
+		originStr := append([]cqcode.ArrayMessage{*cqcode.Text("@" + (*ctx)["sender"].(map[string]any)["nickname"].(string) + "：")}, *message...)
 		data = append(data, *essentials.ConstructForwardNode(&originStr), *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(reply)}))
 		*send <- *essentials.SendGroupForward(ctx, &data, "")
 	} else {
