@@ -16,7 +16,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
 )
 
 type ChatGPT struct {
@@ -34,9 +36,10 @@ type QWen struct {
 }
 
 type Gemini struct {
-	Enabled bool
-	Args    []string
-	apiKey  string
+	Enabled  bool
+	Args     []string
+	apiKey   string
+	ReplyMap sync.Map
 }
 
 type ChatAI struct {
@@ -126,36 +129,94 @@ func (c *ChatAI) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		}
 	}
 
-	var reply string
+	var res *string
 	if essentials.CheckArgumentArray(ctx, &c.ChatGPT.Args) {
-		reply = *c.ChatGPT.RequireAnswer(str)
+		res = c.ChatGPT.RequireAnswer(str)
 	} else if essentials.CheckArgumentArray(ctx, &c.QWen.Args) {
-		reply = *c.QWen.RequireAnswer(str)
+		res = c.QWen.RequireAnswer(str)
 	} else if essentials.CheckArgumentArray(ctx, &c.Gemini.Args) {
-		reply = *c.Gemini.RequireAnswer(str, essentials.DecodeArrayMessage(ctx))
+		var action *[]byte
+		messageID := int64((*ctx)["message_id"].(float64))
+		res, action = c.Gemini.RequireAnswer(str, essentials.DecodeArrayMessage(ctx), messageID)
+		if action != nil {
+			*send <- *action
+			return
+		}
 	} else {
 		return
 	}
 
-	if reply == "" {
+	if res == nil {
 		return
 	}
 
 	if c.panGu {
-		reply = pangu.SpacingText(reply)
+		*res = pangu.SpacingText(*res)
 	}
 
 	if (*ctx)["message_type"].(string) == "group" && c.groupForward {
 		var data []_struct.ForwardNode
-		originStr := append([]cqcode.ArrayMessage{*cqcode.Text("@" + (*ctx)["sender"].(map[string]any)["nickname"].(string) + "：")}, *message...)
-		data = append(data, *essentials.ConstructForwardNode(&originStr), *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(reply)}))
+		originStr := append([]cqcode.ArrayMessage{*cqcode.Text("@" + (*ctx)["sender"].(map[string]any)["nickname"].(string) + ": ")}, *message...)
+		data = append(data, *essentials.ConstructForwardNode(&originStr), *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
 		*send <- *essentials.SendGroupForward(ctx, &data, "")
 	} else {
-		*send <- *essentials.SendMsg(ctx, reply, nil, false, false)
+		*send <- *essentials.SendMsg(ctx, *res, nil, false, false)
 	}
 }
 
-func (c *ChatAI) ReceiveEcho(_ *map[string]any, _ *chan []byte) {}
+func (c *ChatAI) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
+	if !c.Enabled {
+		return
+	}
+
+	echo := (*ctx)["echo"].(string)
+	split := strings.Split(echo, "|")
+
+	if split[0] == "gemini" && (*ctx)["data"] != nil {
+		if (*ctx)["status"] != "ok" {
+			contexts := (*ctx)["data"].(map[string]any)
+			*send <- *essentials.SendMsg(&contexts, "Gemini reply args error", nil, false, false)
+			return
+		}
+
+		var res *string
+		contexts := (*ctx)["data"].(map[string]any)
+		message := essentials.DecodeArrayMessage(&contexts)
+		data, ok := c.Gemini.ReplyMap.Load(split[1])
+		if !ok {
+			log.Println("Gemini reply map load error")
+			return
+		}
+
+		originMsg, originStr := data.(struct {
+			Data      []cqcode.ArrayMessage
+			OriginStr string
+		}).Data, data.(struct {
+			Data      []cqcode.ArrayMessage
+			OriginStr string
+		}).OriginStr
+
+		*message = append(originMsg, *message...)
+		res, _ = c.Gemini.RequireAnswer(originStr, message, 0)
+
+		if res == nil {
+			return
+		}
+
+		if c.panGu {
+			*res = pangu.SpacingText(*res)
+		}
+
+		if contexts["message_type"].(string) == "group" && c.groupForward {
+			var data []_struct.ForwardNode
+			originStr := append([]cqcode.ArrayMessage{*cqcode.Text("@" + contexts["sender"].(map[string]any)["nickname"].(string) + ": ")}, *message...)
+			data = append(data, *essentials.ConstructForwardNode(&originStr), *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
+			*send <- *essentials.SendGroupForward(&contexts, &data, "")
+		} else {
+			*send <- *essentials.SendMsg(&contexts, *res, nil, false, false)
+		}
+	}
+}
 
 func (c *ChatGPT) RequireAnswer(str string) *string {
 	if !c.Enabled {
@@ -260,21 +321,23 @@ func (q *QWen) RequireAnswer(str string) *string {
 	return &res
 }
 
-func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage) *string {
+func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64) (*string, *[]byte) {
 	if !g.Enabled || message == nil {
 		res := "Gemini disabled"
-		return &res
+		return &res, nil
 	}
 
 	var (
 		images []struct {
-			data    *[]byte
-			imgType string
+			Data    *[]byte
+			ImgType string
 		}
 		prompts []genai.Part
 		model   *genai.GenerativeModel
 		res     string
+		reply   int64
 	)
+
 	for _, msg := range *message {
 		if msg.Type == "image" && msg.Data["url"] != nil {
 			data, imgType, err := g.ImageProcessing(msg.Data["url"].(string))
@@ -283,10 +346,23 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage) *stri
 				continue
 			}
 			images = append(images, struct {
-				data    *[]byte
-				imgType string
-			}{data, imgType})
+				Data    *[]byte
+				ImgType string
+			}{Data: data, ImgType: imgType})
 		}
+		if msg.Type == "reply" && messageID != 0 {
+			reply = int64(msg.Data["id"].(float64))
+		}
+	}
+
+	if reply != 0 && messageID != 0 {
+		g.ReplyMap.Store(strconv.FormatInt(messageID, 10), struct {
+			Data      []cqcode.ArrayMessage
+			OriginStr string
+		}{Data: *message, OriginStr: str})
+
+		echo := fmt.Sprintf("gemini|%d", messageID)
+		return nil, essentials.SendAction("get_msg", _struct.GetMsg{Id: reply}, echo)
 	}
 
 	ctx := context.Background()
@@ -294,7 +370,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage) *stri
 	if err != nil {
 		log.Printf("Gemini client error: %v", err)
 		res = fmt.Sprintf("Gemini client error: %v", err)
-		return &res
+		return &res, nil
 	}
 	defer func(client *genai.Client) {
 		err = client.Close()
@@ -307,7 +383,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage) *stri
 		model = client.GenerativeModel("gemini-pro-vision")
 		res = "gemini-pro-vision: "
 		for _, img := range images {
-			prompts = append(prompts, genai.ImageData(img.imgType, *img.data))
+			prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
 		}
 	} else {
 		model = client.GenerativeModel("gemini-pro")
@@ -318,7 +394,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage) *stri
 	if err != nil {
 		log.Printf("Gemini generate error: %v", err)
 		res = fmt.Sprintf("Gemini generate error: %v", err)
-		return &res
+		return &res, nil
 	}
 
 	for _, c := range resp.Candidates {
@@ -329,7 +405,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage) *stri
 		}
 	}
 
-	return &res
+	return &res, nil
 }
 
 func (g *Gemini) ImageProcessing(url string) (*[]byte, string, error) {
