@@ -317,20 +317,20 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage) *stri
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	resq, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Printf("Gemini response error: %v", err)
 		res := fmt.Sprintf("Gemini response error: %v", err)
 		return &res
 	}
 	defer func(Body io.ReadCloser) {
-		err := resq.Body.Close()
+		err := resp.Body.Close()
 		if err != nil {
 			log.Printf("Gemini close error: %v", err)
 		}
-	}(resq.Body)
+	}(resp.Body)
 
-	body, err := io.ReadAll(resq.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("Gemini read body error: %v", err)
 		res := fmt.Sprintf("Gemini read body error: %v", err)
