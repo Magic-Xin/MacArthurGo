@@ -44,25 +44,25 @@ func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	for _, msg := range *message {
 		if msg.Type == "text" && msg.Data["text"] != nil {
 			str := msg.Data["text"].(string)
-			if strings.Contains(str, "https://music.163.com/") {
+			if strings.Contains(str, "//music.163.com/") {
 				urlType = "163"
 				res = str
-			} else if strings.Contains(str, "https://i.y.qq.com/") {
+			} else if strings.Contains(str, "//i.y.qq.com/") {
 				urlType = "qq"
 				res = str
-			} else if match := regexp.MustCompile(`(http://163cn.tv/\w+)`).FindAllStringSubmatch(str, -1); match != nil {
+			} else if match := regexp.MustCompile(`((http|https)://163cn.tv/\w+)`).FindAllStringSubmatch(str, -1); match != nil {
 				if url := essentials.GetOriginUrl(match[0][1]); url != nil {
 					urlType = "163"
 					res = *url
 				}
-			} else if match = regexp.MustCompile(`(https://c6.y.qq.com/\S+)`).FindAllStringSubmatch(str, -1); match != nil {
+			} else if match = regexp.MustCompile(`((http|https)://c6.y.qq.com/\S+)`).FindAllStringSubmatch(str, -1); match != nil {
 				if url := essentials.GetOriginUrl(match[0][1]); url != nil {
 					urlType = "qq"
 					res = "id=" + *m.getQQMusicID(url) + "&"
 				}
-			} else if match = regexp.MustCompile(`https://y.music.163.com/m/song/(\d+)`).FindAllStringSubmatch(str, -1); match != nil {
+			} else if match = regexp.MustCompile(`(http|https)://y.music.163.com/m/song/(\d+)`).FindAllStringSubmatch(str, -1); match != nil {
 				urlType = "163"
-				res = "id=" + match[0][1] + "&"
+				res = "id=" + match[0][2] + "&"
 			}
 		}
 	}
