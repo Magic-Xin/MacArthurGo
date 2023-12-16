@@ -346,14 +346,18 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage) *stri
 	}
 	ctx := i.(map[string]any)
 	if ctx["candidates"] != nil {
-		parts := ctx["candidates"].([]any)[0].(map[string]any)["content"].(map[string]any)["parts"].([]any)
-		res := model + ": "
-		for _, part := range parts {
-			if part.(map[string]any)["text"] != nil {
-				res += part.(map[string]any)["text"].(string)
+		if ctx["candidates"].([]any)[0].(map[string]any)["content"] != nil {
+			if ctx["candidates"].([]any)[0].(map[string]any)["content"].(map[string]any)["parts"] != nil {
+				parts := ctx["candidates"].([]any)[0].(map[string]any)["content"].(map[string]any)["parts"].([]any)
+				res := model + ": "
+				for _, part := range parts {
+					if part.(map[string]any)["text"] != nil {
+						res += part.(map[string]any)["text"].(string)
+					}
+				}
+				return &res
 			}
 		}
-		return &res
 	}
 
 	res := "Gemini json error"
