@@ -6,16 +6,13 @@ import (
 	"MacArthurGo/structs/cqcode"
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/google/generative-ai-go/genai"
 	"github.com/gookit/config/v2"
-	"github.com/nfnt/resize"
 	"github.com/sashabaranov/go-openai"
 	"github.com/vinta/pangu"
-	"image"
-	"image/jpeg"
-	"image/png"
+	"google.golang.org/api/option"
 	"io"
 	"log"
 	"net/http"
@@ -268,107 +265,77 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage) *stri
 		res := "Gemini disabled"
 		return &res
 	}
-	const TextApi = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key="
-	const VisionApi = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key="
 
 	var (
-		img   string
-		model string
+		images []struct {
+			data    *[]byte
+			imgType string
+		}
+		prompts []genai.Part
+		model   *genai.GenerativeModel
+		res     string
 	)
 	for _, msg := range *message {
 		if msg.Type == "image" && msg.Data["url"] != nil {
-			img = msg.Data["url"].(string)
+			data, imgType, err := g.ImageProcessing(msg.Data["url"].(string))
+			if err != nil {
+				log.Printf("Image processing error: %v", err)
+				continue
+			}
+			images = append(images, struct {
+				data    *[]byte
+				imgType string
+			}{data, imgType})
 		}
 	}
 
-	payload := map[string]any{
-		"contents": []map[string]any{},
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, option.WithAPIKey(g.apiKey))
+	if err != nil {
+		log.Printf("Gemini client error: %v", err)
+		res = fmt.Sprintf("Gemini client error: %v", err)
+		return &res
 	}
-	payload["contents"] = append(payload["contents"].([]map[string]any), map[string]any{"parts": []map[string]any{}})
-	var req *http.Request
-	if img != "" {
-		base64Img, imgType, err := g.ImageProcessing(img)
+	defer func(client *genai.Client) {
+		err = client.Close()
 		if err != nil {
-			log.Printf("Image processing error: %v", err)
-			res := fmt.Sprintf("Image processing error: %v", err)
-			return &res
+			log.Printf("Gemini client close error: %v", err)
 		}
+	}(client)
 
-		payload["contents"].([]map[string]any)[0]["parts"] = append(payload["contents"].([]map[string]any)[0]["parts"].([]map[string]any), map[string]any{"text": str},
-			map[string]any{"inline_data": map[string]any{"mime_type": imgType, "data": base64Img}})
-		jsonPayload, err := json.Marshal(payload)
-		if err != nil {
-			log.Printf("Gemini marshal error: %v", err)
-			res := fmt.Sprintf("Gemini marshal error: %v", err)
-			return &res
+	if len(images) != 0 {
+		model = client.GenerativeModel("gemini-pro-vision")
+		res = "gemini-pro-vision: "
+		for _, img := range images {
+			prompts = append(prompts, genai.ImageData(img.imgType, *img.data))
 		}
-		model = "gemini-pro-vision"
-		req, err = http.NewRequest("POST", VisionApi+g.apiKey, bytes.NewBuffer(jsonPayload))
 	} else {
-		payload["contents"].([]map[string]any)[0]["parts"] = append(payload["contents"].([]map[string]any)[0]["parts"].([]map[string]any), map[string]any{"text": str})
-		jsonPayload, err := json.Marshal(payload)
-		if err != nil {
-			log.Printf("Gemini marshal error: %v", err)
-			res := fmt.Sprintf("Gemini marshal error: %v", err)
-			return &res
-		}
-		model = "gemini-pro"
-		req, err = http.NewRequest("POST", TextApi+g.apiKey, bytes.NewBuffer(jsonPayload))
+		model = client.GenerativeModel("gemini-pro")
+		res = "gemini-pro: "
 	}
-
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	prompts = append(prompts, genai.Text(str))
+	resp, err := model.GenerateContent(ctx, prompts...)
 	if err != nil {
-		log.Printf("Gemini response error: %v", err)
-		res := fmt.Sprintf("Gemini response error: %v", err)
-		return &res
-	}
-	defer func(Body io.ReadCloser) {
-		err := resp.Body.Close()
-		if err != nil {
-			log.Printf("Gemini close error: %v", err)
-		}
-	}(resp.Body)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Gemini read body error: %v", err)
-		res := fmt.Sprintf("Gemini read body error: %v", err)
+		log.Printf("Gemini generate error: %v", err)
+		res = fmt.Sprintf("Gemini generate error: %v", err)
 		return &res
 	}
 
-	var i any
-	err = json.Unmarshal(body, &i)
-	if err != nil {
-		log.Printf("Gemini unmarshal error: %v", err)
-		res := fmt.Sprintf("Gemini unmarshal error: %v", err)
-		return &res
-	}
-	ctx := i.(map[string]any)
-	if ctx["candidates"] != nil {
-		if ctx["candidates"].([]any)[0].(map[string]any)["content"] != nil {
-			if ctx["candidates"].([]any)[0].(map[string]any)["content"].(map[string]any)["parts"] != nil {
-				parts := ctx["candidates"].([]any)[0].(map[string]any)["content"].(map[string]any)["parts"].([]any)
-				res := model + ": "
-				for _, part := range parts {
-					if part.(map[string]any)["text"] != nil {
-						res += part.(map[string]any)["text"].(string)
-					}
-				}
-				return &res
+	for _, c := range resp.Candidates {
+		if c.Content != nil {
+			for _, part := range (c.Content).Parts {
+				res += fmt.Sprintf("%s", part)
 			}
 		}
 	}
 
-	res := "Gemini json error"
 	return &res
 }
 
-func (g *Gemini) ImageProcessing(url string) (string, string, error) {
-	// Get image
+func (g *Gemini) ImageProcessing(url string) (*[]byte, string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", "", err
+		return nil, "", err
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -379,35 +346,8 @@ func (g *Gemini) ImageProcessing(url string) (string, string, error) {
 
 	imgData, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", "", err
+		return nil, "", err
 	}
 
-	// Resize image
-	img, _, err := image.Decode(bytes.NewReader(imgData))
-	if err != nil {
-		return "", "", err
-	}
-
-	resizedImg := resize.Resize(512, uint(img.Bounds().Dy()*512/img.Bounds().Dx()), img, resize.Lanczos3)
-
-	buf := new(bytes.Buffer)
-	var imgType string
-	switch imgFormat := http.DetectContentType(imgData); imgFormat {
-	case "image/jpeg":
-		err = jpeg.Encode(buf, resizedImg, &jpeg.Options{Quality: 100})
-		imgType = "image/jpeg"
-	case "image/png":
-		err = png.Encode(buf, resizedImg)
-		imgType = "image/png"
-	default:
-		return "", "", fmt.Errorf("unsupported image format: %s", imgFormat)
-	}
-
-	if err != nil {
-		return "", "", err
-	}
-
-	// Encode image to base64
-	base64Encoded := base64.StdEncoding.EncodeToString(imgData)
-	return base64Encoded, imgType, nil
+	return &imgData, http.DetectContentType(imgData)[6:], nil
 }
