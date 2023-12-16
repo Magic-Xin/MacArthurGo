@@ -88,14 +88,23 @@ func CheckArgumentArray(ctx *map[string]any, args *[]string) bool {
 	}
 
 	for _, arg := range *args {
-		if SplitArgument(ctx)[0] == arg {
-			return true
+		if split := SplitArgument(ctx); len(split) > 0 {
+			if SplitArgument(ctx)[0] == arg {
+				return true
+			}
 		}
+
 	}
 	return false
 }
 
 func SplitArgument(ctx *map[string]any) []string {
+	message := DecodeArrayMessage(ctx)
+	for _, msg := range *message {
+		if msg.Type == "text" {
+			return strings.Fields(msg.Data["text"].(string))
+		}
+	}
 	return strings.Fields((*ctx)["raw_message"].(string))
 }
 
