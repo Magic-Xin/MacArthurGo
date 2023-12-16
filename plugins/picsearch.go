@@ -80,16 +80,17 @@ func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 		return
 	}
 
-	echo := strings.Split((*ctx)["echo"].(string), "|")
+	echo := (*ctx)["echo"].(string)
+	split := strings.Split(echo, "|")
 
-	if echo[0] == "picSearch" && (*ctx)["data"] != nil {
-		*ctx = (*ctx)["data"].(map[string]any)
-		p.picSearch(ctx, send, true, (*ctx)["message_type"].(string) == "group")
+	if split[0] == "picSearch" && (*ctx)["data"] != nil {
+		contexts := (*ctx)["data"].(map[string]any)
+		p.picSearch(&contexts, send, true, (*ctx)["message_type"].(string) == "group")
 	} else if (*ctx)["status"].(string) == "failed" {
-		if echo[0] == "picForward" {
-			p.SecondTimesGroupForward(send, echo[1:])
-		} else if echo[0] == "picFailed" {
-			p.groupFailed(send, echo[1:])
+		if split[0] == "picForward" {
+			p.SecondTimesGroupForward(send, split[1:])
+		} else if split[0] == "picFailed" {
+			p.groupFailed(send, split[1:])
 		}
 	}
 }
@@ -228,9 +229,8 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 			wgResponse.Wait()
 		}
 		if c.Type == "reply" && !isEcho {
-			mid := int(c.Data["id"].(float64))
+			mid := int64(c.Data["id"].(float64))
 			*send <- *essentials.SendAction("get_msg", _struct.GetMsg{Id: mid}, "picSearch")
-			return
 		}
 	}
 	end := time.Since(start)
