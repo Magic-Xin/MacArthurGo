@@ -137,7 +137,7 @@ func (c *ChatAI) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	} else if essentials.CheckArgumentArray(ctx, &c.Gemini.Args) {
 		var action *[]byte
 		messageID := int64((*ctx)["message_id"].(float64))
-		res, action = c.Gemini.RequireAnswer(str, essentials.DecodeArrayMessage(ctx), messageID)
+		res, action = c.Gemini.RequireAnswer(str, message, messageID)
 		if action != nil {
 			*send <- *action
 			return
