@@ -13,6 +13,8 @@ import (
 	"github.com/sashabaranov/go-openai"
 	"github.com/vinta/pangu"
 	"google.golang.org/api/option"
+	"image/gif"
+	"image/jpeg"
 	"io"
 	"log"
 	"net/http"
@@ -424,6 +426,25 @@ func (g *Gemini) ImageProcessing(url string) (*[]byte, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
+	switch imgType := http.DetectContentType(imgData); imgType {
+	case "image/jpeg":
+		return &imgData, "jpeg", nil
+	case "image/png":
+		return &imgData, "png", nil
+	case "image/gif":
+		imgTemp, err := gif.Decode(bytes.NewReader(imgData))
+		if err != nil {
+			return nil, "", err
+		}
+		buf := new(bytes.Buffer)
+		err = jpeg.Encode(buf, imgTemp, nil)
+		if err != nil {
+			return nil, "", err
+		}
+		imgData = buf.Bytes()
 
-	return &imgData, http.DetectContentType(imgData)[6:], nil
+		return &imgData, "jpeg", nil
+	default:
+		return nil, "", fmt.Errorf("unsupported image type: %s", imgType)
+	}
 }
