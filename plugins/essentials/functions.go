@@ -79,7 +79,10 @@ func ConstructForwardNode(data *[]cqcode.ArrayMessage) *_struct.ForwardNode {
 }
 
 func CheckArgument(ctx *map[string]any, arg string) bool {
-	return SplitArgument(ctx)[0] == arg
+	if split := SplitArgument(ctx); len(split) > 0 {
+		return SplitArgument(ctx)[0] == arg
+	}
+	return false
 }
 
 func CheckArgumentArray(ctx *map[string]any, args *[]string) bool {
