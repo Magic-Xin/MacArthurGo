@@ -17,12 +17,19 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 
 ## Plugins
 
-- ChatGPT
-- Alibaba QianWen
-- Google Gemini Pro (with picture search)
+- Chat AI
+  - ChatGPT
+  - Alibaba QianWen
+  - Google Gemini Pro (with picture search)
 - Music url parser
-- Bilibili url parser
+  - Netease Cloud Music
+  - QQ Music
+- BiliBili
+  - Url parser (video, live)
+  - AI Summarize
 - Picture Search
+  - SauceNao
+  - Ascii2d
 - Poke
 - Roll
 - Repeat
