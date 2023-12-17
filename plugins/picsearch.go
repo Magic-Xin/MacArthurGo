@@ -2,7 +2,7 @@ package plugins
 
 import (
 	"MacArthurGo/plugins/essentials"
-	_struct "MacArthurGo/structs"
+	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"encoding/json"
 	"errors"
@@ -117,7 +117,7 @@ func (p *PicSearch) SecondTimesGroupForward(send *chan []byte, echo []string) {
 	res := (*selectRes)[0]["res"].(string)
 	result := append([]string{"sauceNAO 搜索结果被 QQ 拦截，已舍弃"}, strings.Split(res, "|")...)
 
-	var data []_struct.ForwardNode
+	var data []structs.ForwardNode
 	for _, r := range result {
 		if !strings.Contains(r, "SauceNAO") {
 			data = append(data, *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(r)}))
@@ -230,7 +230,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 		}
 		if c.Type == "reply" && !isEcho {
 			mid := int64(c.Data["id"].(float64))
-			*send <- *essentials.SendAction("get_msg", _struct.GetMsg{Id: mid}, "picSearch")
+			*send <- *essentials.SendAction("get_msg", structs.GetMsg{Id: mid}, "picSearch")
 		}
 	}
 	end := time.Since(start)
@@ -246,7 +246,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 		}
 
 		if p.groupForward {
-			var data []_struct.ForwardNode
+			var data []structs.ForwardNode
 			for _, r := range result {
 				data = append(data, *essentials.ConstructForwardNode(&r))
 			}

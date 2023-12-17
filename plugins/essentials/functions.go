@@ -1,7 +1,7 @@
 package essentials
 
 import (
-	_struct "MacArthurGo/structs"
+	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"crypto/md5"
 	"encoding/json"
@@ -18,7 +18,7 @@ func SendAction(action string, params any, echo string) *[]byte {
 		return nil
 	}
 
-	act := _struct.Action{Action: action, Params: params, Echo: echo}
+	act := structs.Action{Action: action, Params: params, Echo: echo}
 	jsonMsg, _ := json.Marshal(act)
 
 	return &jsonMsg
@@ -53,8 +53,8 @@ func SendMusic(ctx *map[string]any, urlType string, id int64) *[]byte {
 	return constructMessage(ctx, &[]cqcode.ArrayMessage{*cqcode.Music(urlType, id)})
 }
 
-func SendPrivateForward(ctx *map[string]any, data *[]_struct.ForwardNode, echo string) *[]byte {
-	params := _struct.PrivateForward{
+func SendPrivateForward(ctx *map[string]any, data *[]structs.ForwardNode, echo string) *[]byte {
+	params := structs.PrivateForward{
 		UserId:   int64((*ctx)["sender"].(map[string]any)["user_id"].(float64)),
 		Messages: *data,
 	}
@@ -62,8 +62,8 @@ func SendPrivateForward(ctx *map[string]any, data *[]_struct.ForwardNode, echo s
 	return SendAction("send_private_forward_msg", params, echo)
 }
 
-func SendGroupForward(ctx *map[string]any, data *[]_struct.ForwardNode, echo string) *[]byte {
-	params := _struct.GroupForward{
+func SendGroupForward(ctx *map[string]any, data *[]structs.ForwardNode, echo string) *[]byte {
+	params := structs.GroupForward{
 		GroupId:  int64((*ctx)["group_id"].(float64)),
 		Messages: *data,
 	}
@@ -71,8 +71,8 @@ func SendGroupForward(ctx *map[string]any, data *[]_struct.ForwardNode, echo str
 	return SendAction("send_group_forward_msg", params, echo)
 }
 
-func ConstructForwardNode(data *[]cqcode.ArrayMessage) *_struct.ForwardNode {
-	node := _struct.NewForwardNode()
+func ConstructForwardNode(data *[]cqcode.ArrayMessage) *structs.ForwardNode {
+	node := structs.NewForwardNode()
 	node.Data.Content = *data
 
 	return node
@@ -169,15 +169,15 @@ func Md5(origin *[]byte) string {
 
 func constructMessage(ctx *map[string]any, message *[]cqcode.ArrayMessage) *[]byte {
 	messageType := (*ctx)["message_type"].(string)
-	var act _struct.Action
+	var act structs.Action
 	if messageType == "private" {
 		userId := int64((*ctx)["sender"].(map[string]any)["user_id"].(float64))
-		msg := _struct.PrivateMessage{UserId: userId, Message: *message}
-		act = _struct.Action{Action: "send_private_msg", Params: msg}
+		msg := structs.PrivateMessage{UserId: userId, Message: *message}
+		act = structs.Action{Action: "send_private_msg", Params: msg}
 	} else {
 		groupId := int64((*ctx)["group_id"].(float64))
-		msg := _struct.GroupMessage{GroupId: groupId, Message: *message}
-		act = _struct.Action{Action: "send_group_msg", Params: msg}
+		msg := structs.GroupMessage{GroupId: groupId, Message: *message}
+		act = structs.Action{Action: "send_group_msg", Params: msg}
 	}
 
 	jsonMsg, _ := json.Marshal(act)

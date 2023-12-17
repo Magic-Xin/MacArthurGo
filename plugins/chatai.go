@@ -2,7 +2,7 @@ package plugins
 
 import (
 	"MacArthurGo/plugins/essentials"
-	_struct "MacArthurGo/structs"
+	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"bytes"
 	"context"
@@ -157,7 +157,7 @@ func (c *ChatAI) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 
 	if (*ctx)["message_type"].(string) == "group" && c.groupForward {
-		var data []_struct.ForwardNode
+		var data []structs.ForwardNode
 		originStr := append([]cqcode.ArrayMessage{*cqcode.Text("@" + (*ctx)["sender"].(map[string]any)["nickname"].(string) + ": ")}, *message...)
 		data = append(data, *essentials.ConstructForwardNode(&originStr), *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
 		*send <- *essentials.SendGroupForward(ctx, &data, "")
@@ -210,7 +210,7 @@ func (c *ChatAI) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 		}
 
 		if contexts["message_type"].(string) == "group" && c.groupForward {
-			var data []_struct.ForwardNode
+			var data []structs.ForwardNode
 			originStr := append([]cqcode.ArrayMessage{*cqcode.Text("@" + contexts["sender"].(map[string]any)["nickname"].(string) + ": ")}, *message...)
 			data = append(data, *essentials.ConstructForwardNode(&originStr), *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
 			*send <- *essentials.SendGroupForward(&contexts, &data, "")
@@ -364,7 +364,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		}{Data: *message, OriginStr: str})
 
 		echo := fmt.Sprintf("gemini|%d", messageID)
-		return nil, essentials.SendAction("get_msg", _struct.GetMsg{Id: reply}, echo)
+		return nil, essentials.SendAction("get_msg", structs.GetMsg{Id: reply}, echo)
 	}
 
 	ctx := context.Background()
