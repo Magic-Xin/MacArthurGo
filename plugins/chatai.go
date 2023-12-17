@@ -175,14 +175,13 @@ func (c *ChatAI) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 	split := strings.Split(echo, "|")
 
 	if split[0] == "gemini" && (*ctx)["data"] != nil {
+		contexts := (*ctx)["data"].(map[string]any)
 		if (*ctx)["status"] != "ok" {
-			contexts := (*ctx)["data"].(map[string]any)
 			*send <- *essentials.SendMsg(&contexts, "Gemini reply args error", nil, false, false)
 			return
 		}
 
 		var res *string
-		contexts := (*ctx)["data"].(map[string]any)
 		message := essentials.DecodeArrayMessage(&contexts)
 		data, ok := c.Gemini.ReplyMap.Load(split[1])
 		if !ok {

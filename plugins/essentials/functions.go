@@ -168,6 +168,10 @@ func Md5(origin *[]byte) string {
 }
 
 func constructMessage(ctx *map[string]any, message *[]cqcode.ArrayMessage) *[]byte {
+	if (*ctx)["message_type"] == nil {
+		return nil
+	}
+
 	messageType := (*ctx)["message_type"].(string)
 	var act structs.Action
 	if messageType == "private" {
