@@ -2,19 +2,25 @@ package plugins
 
 import (
 	"MacArthurGo/plugins/essentials"
-	_struct "MacArthurGo/structs"
+	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/generative-ai-go/genai"
 	"github.com/gookit/config/v2"
 	"github.com/sashabaranov/go-openai"
 	"github.com/vinta/pangu"
+	"google.golang.org/api/option"
+	"image/gif"
+	"image/jpeg"
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
 )
 
 type ChatGPT struct {
@@ -31,10 +37,18 @@ type QWen struct {
 	apiKey  string
 }
 
+type Gemini struct {
+	Enabled  bool
+	Args     []string
+	apiKey   string
+	ReplyMap sync.Map
+}
+
 type ChatAI struct {
 	essentials.Plugin
 	ChatGPT      *ChatGPT
 	QWen         *QWen
+	Gemini       *Gemini
 	groupForward bool
 	panGu        bool
 }
@@ -52,6 +66,12 @@ func init() {
 		model:   config.String("plugins.chatAI.qWen.model"),
 		apiKey:  config.String("plugins.chatAI.qWen.apiKey"),
 	}
+	gemini := Gemini{
+		Enabled: config.Bool("plugins.chatAI.gemini.enable"),
+		Args:    config.Strings("plugins.chatAI.gemini.args"),
+		apiKey:  config.String("plugins.chatAI.gemini.apiKey"),
+	}
+
 	var args []string
 	if chatGPT.Enabled {
 		args = append(args, chatGPT.Args...)
@@ -59,6 +79,10 @@ func init() {
 	if qWen.Enabled {
 		args = append(args, qWen.Args...)
 	}
+	if gemini.Enabled {
+		args = append(args, gemini.Args...)
+	}
+
 	chatAI := ChatAI{
 		Plugin: essentials.Plugin{
 			Name:    "ChatAI",
@@ -67,6 +91,7 @@ func init() {
 		},
 		ChatGPT:      &chatGPT,
 		QWen:         &qWen,
+		Gemini:       &gemini,
 		groupForward: config.Bool("plugins.chatAI.groupForward"),
 		panGu:        config.Bool("plugins.chatAI.pangu"),
 	}
@@ -85,36 +110,115 @@ func (c *ChatAI) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		return
 	}
 
-	var reply string
-	str := strings.Join(words[1:], "")
+	message := essentials.DecodeArrayMessage(ctx)
+	var (
+		rmArg bool
+		str   string
+	)
+	for _, msg := range *message {
+		if msg.Type == "text" && msg.Data["text"] != nil {
+			if !rmArg {
+				rmArg = true
+				t := msg.Data["text"].(string)
+				for _, arg := range c.Args {
+					t = strings.Replace(t, arg, "", -1)
+				}
+				msg.Data["text"] = t
+				str += t + " "
+				continue
+			}
+			str += msg.Data["text"].(string) + " "
+		}
+	}
+
+	var res *string
 	if essentials.CheckArgumentArray(ctx, &c.ChatGPT.Args) {
-		reply = *c.ChatGPT.RequireAnswer(str)
+		res = c.ChatGPT.RequireAnswer(str)
 	} else if essentials.CheckArgumentArray(ctx, &c.QWen.Args) {
-		reply = *c.QWen.RequireAnswer(str)
+		res = c.QWen.RequireAnswer(str)
+	} else if essentials.CheckArgumentArray(ctx, &c.Gemini.Args) {
+		var action *[]byte
+		messageID := int64((*ctx)["message_id"].(float64))
+		res, action = c.Gemini.RequireAnswer(str, message, messageID)
+		if action != nil {
+			*send <- *action
+			return
+		}
 	} else {
 		return
 	}
 
-	if reply == "" {
+	if res == nil {
 		return
 	}
 
 	if c.panGu {
-		reply = pangu.SpacingText(reply)
+		*res = pangu.SpacingText(*res)
 	}
 
 	if (*ctx)["message_type"].(string) == "group" && c.groupForward {
-		var data []_struct.ForwardNode
-		originStr := (*ctx)["sender"].(map[string]any)["nickname"].(string) + "：" + str
-		data = append(data, *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(originStr)}),
-			*essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(reply)}))
+		var data []structs.ForwardNode
+		originStr := append([]cqcode.ArrayMessage{*cqcode.Text("@" + (*ctx)["sender"].(map[string]any)["nickname"].(string) + ": ")}, *message...)
+		data = append(data, *essentials.ConstructForwardNode(&originStr), *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
 		*send <- *essentials.SendGroupForward(ctx, &data, "")
 	} else {
-		*send <- *essentials.SendMsg(ctx, reply, nil, false, false)
+		*send <- *essentials.SendMsg(ctx, *res, nil, false, false)
 	}
 }
 
-func (c *ChatAI) ReceiveEcho(_ *map[string]any, _ *chan []byte) {}
+func (c *ChatAI) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
+	if !c.Enabled {
+		return
+	}
+
+	echo := (*ctx)["echo"].(string)
+	split := strings.Split(echo, "|")
+
+	if split[0] == "gemini" && (*ctx)["data"] != nil {
+		if (*ctx)["status"] != "ok" {
+			contexts := (*ctx)["data"].(map[string]any)
+			*send <- *essentials.SendMsg(&contexts, "Gemini reply args error", nil, false, false)
+			return
+		}
+
+		var res *string
+		contexts := (*ctx)["data"].(map[string]any)
+		message := essentials.DecodeArrayMessage(&contexts)
+		data, ok := c.Gemini.ReplyMap.Load(split[1])
+		if !ok {
+			log.Println("Gemini reply map load error")
+			return
+		}
+
+		originMsg, originStr := data.(struct {
+			Data      []cqcode.ArrayMessage
+			OriginStr string
+		}).Data, data.(struct {
+			Data      []cqcode.ArrayMessage
+			OriginStr string
+		}).OriginStr
+
+		*message = append(originMsg, *message...)
+		res, _ = c.Gemini.RequireAnswer(originStr, message, 0)
+
+		if res == nil {
+			return
+		}
+
+		if c.panGu {
+			*res = pangu.SpacingText(*res)
+		}
+
+		if contexts["message_type"].(string) == "group" && c.groupForward {
+			var data []structs.ForwardNode
+			originStr := append([]cqcode.ArrayMessage{*cqcode.Text("@" + contexts["sender"].(map[string]any)["nickname"].(string) + ": ")}, *message...)
+			data = append(data, *essentials.ConstructForwardNode(&originStr), *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
+			*send <- *essentials.SendGroupForward(&contexts, &data, "")
+		} else {
+			*send <- *essentials.SendMsg(&contexts, *res, nil, false, false)
+		}
+	}
+}
 
 func (c *ChatGPT) RequireAnswer(str string) *string {
 	if !c.Enabled {
@@ -141,7 +245,8 @@ func (c *ChatGPT) RequireAnswer(str string) *string {
 		return &res
 	}
 
-	return &resp.Choices[0].Message.Content
+	res := c.model + ": " + resp.Choices[0].Message.Content
+	return &res
 }
 
 func (q *QWen) RequireAnswer(str string) *string {
@@ -210,10 +315,136 @@ func (q *QWen) RequireAnswer(str string) *string {
 	ctx := i.(map[string]any)
 	if ctx["output"] != nil {
 		if ctx["output"].(map[string]any)["text"] != nil {
-			res := ctx["output"].(map[string]any)["text"].(string)
+			res := q.model + ": " + ctx["output"].(map[string]any)["text"].(string)
 			return &res
 		}
 	}
 	res := "QWen json error"
 	return &res
+}
+
+func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64) (*string, *[]byte) {
+	if !g.Enabled || message == nil {
+		res := "Gemini disabled"
+		return &res, nil
+	}
+
+	var (
+		images []struct {
+			Data    *[]byte
+			ImgType string
+		}
+		prompts []genai.Part
+		model   *genai.GenerativeModel
+		res     string
+		reply   int64
+	)
+
+	for _, msg := range *message {
+		if msg.Type == "image" && msg.Data["url"] != nil {
+			data, imgType, err := g.ImageProcessing(msg.Data["url"].(string))
+			if err != nil {
+				log.Printf("Image processing error: %v", err)
+				continue
+			}
+			images = append(images, struct {
+				Data    *[]byte
+				ImgType string
+			}{Data: data, ImgType: imgType})
+		}
+		if msg.Type == "reply" && messageID != 0 {
+			reply = int64(msg.Data["id"].(float64))
+		}
+	}
+
+	if reply != 0 && messageID != 0 {
+		g.ReplyMap.Store(strconv.FormatInt(messageID, 10), struct {
+			Data      []cqcode.ArrayMessage
+			OriginStr string
+		}{Data: *message, OriginStr: str})
+
+		echo := fmt.Sprintf("gemini|%d", messageID)
+		return nil, essentials.SendAction("get_msg", structs.GetMsg{Id: reply}, echo)
+	}
+
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, option.WithAPIKey(g.apiKey))
+	if err != nil {
+		log.Printf("Gemini client error: %v", err)
+		res = fmt.Sprintf("Gemini client error: %v", err)
+		return &res, nil
+	}
+	defer func(client *genai.Client) {
+		err = client.Close()
+		if err != nil {
+			log.Printf("Gemini client close error: %v", err)
+		}
+	}(client)
+
+	if len(images) != 0 {
+		model = client.GenerativeModel("gemini-pro-vision")
+		res = "gemini-pro-vision: "
+		for _, img := range images {
+			prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
+		}
+	} else {
+		model = client.GenerativeModel("gemini-pro")
+		res = "gemini-pro: "
+	}
+	prompts = append(prompts, genai.Text(str))
+	resp, err := model.GenerateContent(ctx, prompts...)
+	if err != nil {
+		log.Printf("Gemini generate error: %v", err)
+		res = fmt.Sprintf("Gemini generate error: %v", err)
+		return &res, nil
+	}
+
+	for _, c := range resp.Candidates {
+		if c.Content != nil {
+			for _, part := range (c.Content).Parts {
+				res += fmt.Sprintf("%s", part)
+			}
+		}
+	}
+
+	return &res, nil
+}
+
+func (g *Gemini) ImageProcessing(url string) (*[]byte, string, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, "", err
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("Image fetch close error: %v", err)
+		}
+	}(resp.Body)
+
+	imgData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", err
+	}
+	switch imgType := http.DetectContentType(imgData); imgType {
+	case "image/jpeg":
+		return &imgData, "jpeg", nil
+	case "image/png":
+		return &imgData, "png", nil
+	case "image/gif":
+		imgTemp, err := gif.Decode(bytes.NewReader(imgData))
+		if err != nil {
+			return nil, "", err
+		}
+		buf := new(bytes.Buffer)
+		err = jpeg.Encode(buf, imgTemp, nil)
+		if err != nil {
+			return nil, "", err
+		}
+		imgData = buf.Bytes()
+
+		return &imgData, "jpeg", nil
+	default:
+		return nil, "", fmt.Errorf("unsupported image type: %s", imgType)
+	}
 }

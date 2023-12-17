@@ -32,28 +32,44 @@ func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		return
 	}
 
-	var urlType string
-	str := (*ctx)["raw_message"].(string)
-	if strings.Contains(str, "music.163.com") {
-		urlType = "163"
-	} else if strings.Contains(str, "i.y.qq.com") {
-		urlType = "qq"
-	} else if match := regexp.MustCompile(`(http://163cn.tv/\w+)`).FindAllStringSubmatch(str, -1); match != nil {
-		if url := essentials.GetOriginUrl(match[0][1]); url != nil {
-			urlType = "163"
-			str = *url
-		}
-	} else if match := regexp.MustCompile(`(https://c6.y.qq.com/\S+)`).FindAllStringSubmatch(str, -1); match != nil {
-		if url := essentials.GetOriginUrl(match[0][1]); url != nil {
-			urlType = "qq"
-			str = "id=" + *m.getQQMusicID(url) + "&"
+	var (
+		urlType string
+		res     string
+	)
+	message := essentials.DecodeArrayMessage(ctx)
+	if message == nil {
+		return
+	}
+
+	for _, msg := range *message {
+		if msg.Type == "text" && msg.Data["text"] != nil {
+			str := msg.Data["text"].(string)
+			if strings.Contains(str, "//music.163.com/") {
+				urlType = "163"
+				res = str
+			} else if strings.Contains(str, "//i.y.qq.com/") {
+				urlType = "qq"
+				res = str
+			} else if match := regexp.MustCompile(`((http|https)://163cn.tv/\w+)`).FindAllStringSubmatch(str, -1); match != nil {
+				if url := essentials.GetOriginUrl(match[0][1]); url != nil {
+					urlType = "163"
+					res = *url
+				}
+			} else if match = regexp.MustCompile(`((http|https)://c6.y.qq.com/\S+)`).FindAllStringSubmatch(str, -1); match != nil {
+				if url := essentials.GetOriginUrl(match[0][1]); url != nil {
+					urlType = "qq"
+					res = "id=" + *m.getQQMusicID(url) + "&"
+				}
+			} else if match = regexp.MustCompile(`(http|https)://y.music.163.com/m/song/(\d+)`).FindAllStringSubmatch(str, -1); match != nil {
+				urlType = "163"
+				res = "id=" + match[0][2] + "&"
+			}
 		}
 	}
 
 	if urlType != "" {
-		re := regexp.MustCompile(`id=(\d+)&`)
-		match := re.FindAllStringSubmatch(str, -1)
-		if len(match) > 0 {
+		match := regexp.MustCompile(`id=(\d+)&`).FindAllStringSubmatch(res, -1)
+		if match != nil {
 			id, err := strconv.ParseInt(match[0][1], 10, 64)
 			if err == nil {
 				*send <- *essentials.SendMusic(ctx, urlType, id)

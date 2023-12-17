@@ -6,6 +6,12 @@
   "waitingSeconds": 30,
   "admin": 0,
   "plugins": {
+    "repeat": {
+      "enable": true,
+      "times": 3,
+      "probability": 0.4,
+      "commonProbability": 0.001
+    },
     "bili": {
       "enable": true
     },
@@ -43,6 +49,11 @@
         "enable": true,
         "args": ["/qwen", "/q"],
         "model": "qwen-max",
+        "apiKey": ""
+      },
+      "gemini": {
+        "enable": true,
+        "args": ["/gemini", "/g"],
         "apiKey": ""
       },
       "groupForward": true,

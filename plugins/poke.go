@@ -2,10 +2,7 @@ package plugins
 
 import (
 	"MacArthurGo/plugins/essentials"
-	"MacArthurGo/structs/cqcode"
-	"encoding/json"
 	"github.com/gookit/config/v2"
-	"log"
 	"strconv"
 )
 
@@ -33,19 +30,16 @@ func (p *Poke) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 	words := essentials.SplitArgument(ctx)
 
-	var uid int64
+	var (
+		uid int64
+		err error
+	)
 	if len(words) < 2 {
 		uid = int64((*ctx)["user_id"].(float64))
 	} else {
-		msg, err := json.Marshal((*ctx)["message"])
-		if err != nil {
-			log.Printf("Marshal message error: %v", err)
-			return
-		}
-		am := cqcode.Unmarshal(msg)
-
-		if am != nil {
-			for _, m := range *am {
+		msg := essentials.DecodeArrayMessage(ctx)
+		if msg != nil {
+			for _, m := range *msg {
 				if m.Type == "at" {
 					uid, err = strconv.ParseInt(m.Data["qq"].(string), 10, 64)
 					if err != nil {
