@@ -60,5 +60,6 @@ func FromStr(str string) *[]ArrayMessage {
 		result = append(result, ArrayMessage{Type: str[match[2]:match[3]], Data: data})
 		begin = match[1]
 	}
+	result = append(result, *Text(str[begin:]))
 	return &result
 }
