@@ -48,7 +48,7 @@ func FromStr(str string) *[]ArrayMessage {
 		return c == ','
 	}
 	begin := 0
-	for _, match := range cqCodeRegex.FindAllStringIndex(str, -1) {
+	for _, match := range cqCodeRegex.FindAllStringSubmatchIndex(str, -1) {
 		if begin < match[0] {
 			result = append(result, *Text(str[begin:match[0]]))
 		}
