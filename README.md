@@ -33,6 +33,7 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - Poke
 - Roll
 - Repeat
+- Corpus reply
 
 ## TODO
 

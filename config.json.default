@@ -6,6 +6,9 @@
   "waitingSeconds": 30,
   "admin": 0,
   "plugins": {
+    "corpus": {
+      "enable": true
+    },
     "repeat": {
       "enable": true,
       "times": 3,
