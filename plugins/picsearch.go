@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -430,7 +431,7 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 
 func (p *PicSearch) checkArgs(ctx *map[string]any) bool {
 	for _, arg := range p.Args {
-		if strings.Contains((*ctx)["raw_message"].(string), arg) {
+		if match := regexp.MustCompile(`(` + arg + `$|` + arg + `\W)`).FindStringIndex((*ctx)["raw_message"].(string)); match != nil {
 			return true
 		}
 	}

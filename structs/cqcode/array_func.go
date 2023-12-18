@@ -2,6 +2,8 @@ package cqcode
 
 import (
 	"encoding/json"
+	"regexp"
+	"strings"
 )
 
 func Text(text string) *ArrayMessage {
@@ -37,4 +39,27 @@ func Unmarshal(message []byte) *[]ArrayMessage {
 	}
 
 	return &am
+}
+
+func FromStr(str string) *[]ArrayMessage {
+	var result []ArrayMessage
+	cqCodeRegex := regexp.MustCompile(`\[CQ:([^,[\]]+)((?:,[^,=[\]]+=[^,[\]]*)*)]`)
+	splitFn := func(c rune) bool {
+		return c == ','
+	}
+	begin := 0
+	for _, match := range cqCodeRegex.FindAllStringSubmatchIndex(str, -1) {
+		if begin < match[0] {
+			result = append(result, *Text(str[begin:match[0]]))
+		}
+		data := make(map[string]any)
+		for _, kv := range strings.FieldsFunc(str[match[4]:match[5]], splitFn) {
+			parts := strings.SplitN(kv, "=", 2)
+			data[parts[0]] = parts[1]
+		}
+		result = append(result, ArrayMessage{Type: str[match[2]:match[3]], Data: data})
+		begin = match[1]
+	}
+	result = append(result, *Text(str[begin:]))
+	return &result
 }

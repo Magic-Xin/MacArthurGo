@@ -42,8 +42,8 @@ func CQImage(file string) string {
 	return cq.toString()
 }
 
-// FromStr Deprecated
-func FromStr(str string) *[]CQCode {
+// CQFromStr FromStr Deprecated
+func CQFromStr(str string) *[]CQCode {
 	var result []CQCode
 	cqCodeRegex := regexp.MustCompile(`\[CQ:([^,[\]]+)((?:,[^,=[\]]+=[^,[\]]*)*)]`)
 	splitFn := func(c rune) bool {
