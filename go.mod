@@ -10,7 +10,7 @@ require (
 	github.com/gorilla/websocket v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.19
 	github.com/sashabaranov/go-openai v1.17.9
-	github.com/tidwall/gjson v1.14.4
+	github.com/tidwall/gjson v1.17.0
 	github.com/vinta/pangu v3.0.0+incompatible
 	google.golang.org/api v0.154.0
 )
