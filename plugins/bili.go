@@ -89,7 +89,7 @@ func (b *Bili) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		return
 	}
 
-	const biliShort = `(https://b23.tv/\w+)`
+	const biliShort = `(https?://b23.tv/\w+)`
 	const video = `www.bilibili.com/video/(\w+)`
 	const live = `live.bilibili.com/(\d+)`
 
@@ -162,7 +162,7 @@ func (b *Bili) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 				}
 			}
 
-			const biliShort = `(https://b23.tv/\w+)`
+			const biliShort = `(https?://b23.tv/\w+)`
 			const video = `www.bilibili.com/video/(\w+)`
 
 			if match := regexp.MustCompile(biliShort).FindAllStringSubmatch(text, -1); match != nil {
