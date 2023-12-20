@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  COMMIT_ID: "${{ github.sha }}"
+  COMMIT_ID: $(git rev-parse --short "$GITHUB_SHA")
   NAME: MacArthurGo
   CGO_ENABLED: 1
 
@@ -24,6 +24,8 @@ jobs:
         goos: [ linux, windows-6.0, darwin-10.14, android ]
         goarch: [ "386", amd64, arm64 ]
         exclude:
+          - goos: windows-6.0
+            goarch: arm64
           - goos: darwin-10.14
             goarch: "386"
           - goos: android
@@ -138,7 +140,7 @@ jobs:
 
       - run: |
           cat > version.json << 'EOF'
-          {"version": "${COMMIT_ID::7}", "build_time": "${{ env.BUILDTIME }}"}
+          {"version": "${COMMIT_ID}", "build_time": "${{ env.BUILDTIME }}"}
           EOF
         working-directory: bin
 
