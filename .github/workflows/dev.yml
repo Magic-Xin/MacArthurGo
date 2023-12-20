@@ -12,6 +12,8 @@ concurrency:
 
 env:
   COMMIT_ID: "${{ github.sha }}"
+  NAME: MacArthurGo
+  CGO_ENABLED: 1
 
 jobs:
   Build:
@@ -19,12 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: [ linux, windows, darwin ]
+        goos: [ linux, windows-6.3, darwin-10.14 ]
         goarch: [ "386", amd64, arm64, arm ]
         exclude:
-          - goos: darwin
+          - goos: darwin-10.14
             goarch: "386"
-          - goos: darwin
+          - goos: darwin-10.14
             goarch: arm
         include:
           - goos: android
@@ -72,15 +74,10 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          NAME: MacArthurGo
-          BINDIR: bin
-          CGO_ENABLED: 1
         run: |
-          mkdir bin
-          mkdir out
-          xgo --targets=${GOOS}/${GOARCH} -ldflags="${LDFLAGS}" --out ${BINDIR}/${NAME} ./
-          if [ $GOOS != "windows" ]; then chmod +x ${BINDIR}/${NAME}-*; fi
-          if [ $GOOS != "darwin" ]; then ${upx} --lzma --best ${BINDIR}/${NAME}-*; fi
+          xgo --targets=${GOOS}/${GOARCH} -ldflags="${LDFLAGS}" --out bin/${NAME} ./
+          if [ $GOOS != "windows-6.3" ]; then chmod +x bin/${NAME}-*; fi
+          if [ $GOOS != "darwin-10.14" ]; then ${upx} --lzma --best bin/${NAME}-*; fi
 
       - name: Build Android
         if: ${{ matrix.goos=='android' }}
@@ -88,15 +85,11 @@ jobs:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          NAME: MacArthurGo
-          BINDIR: bin
-          CGO_ENABLED: 1
         run: |
-          mkdir bin
           CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
-          CC=${CC} go build -ldflags "${LDFLAGS}" -o ${BINDIR}/${NAME}-${GOOS}-${GOARCH} ./
-          chmod +x ${BINDIR}/${NAME}-${GOOS}-${GOARCH}
-          ${upx} --lzma --best ${BINDIR}/${NAME}-${GOOS}-${GOARCH}
+          CC=${CC} go build -ldflags "${LDFLAGS}" -o bin/${NAME}-${GOOS}-${GOARCH} ./
+          chmod +x bin/${NAME}-${GOOS}-${GOARCH}
+          ${upx} --lzma --best bin/${NAME}-${GOOS}-${GOARCH}
 
 
       - name: Upload To Artifact
