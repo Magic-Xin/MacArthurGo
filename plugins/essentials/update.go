@@ -27,7 +27,7 @@ func init() {
 			Enabled: true,
 			Args:    []string{"/update"},
 		},
-		Url:   config.String("plugins.updateUrl"),
+		Url:   config.String("updateUrl"),
 		Admin: config.Int64("admin"),
 	}
 
@@ -42,7 +42,7 @@ func (u *Update) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 
 	words := SplitArgument(ctx)
-	if len(words) < 0 {
+	if len(words) == 0 {
 		return
 	}
 	if words[0] != u.Args[0] {
@@ -60,10 +60,10 @@ func (u *Update) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 
 	if len(words) == 1 {
-		message := []cqcode.ArrayMessage{*cqcode.Text("本地版本:\n分支: " + base.Branch + "\n" + "版本: " + base.Version + "\n" + "编译时间: " + base.BuildTime + "\n"),
-			*cqcode.Text("最新版本 (dev):\n版本: " + version + "\n" + "上传时间: " + uploadTime + "\n")}
+		message := []cqcode.ArrayMessage{*cqcode.Text("本地版本:\n分支: " + base.Branch + "\n" + "版本: " + base.Version + "\n" + "编译时间: " + base.BuildTime),
+			*cqcode.Text("\n\n最新版本 (dev):\n版本: " + version + "\n" + "上传时间: " + uploadTime)}
 		if base.Version != version {
-			message = append(message, *cqcode.Text(fmt.Sprintf("有更新！\n请 admin 使用 /update %s 更新到最新版本\n注意：自动更新有风险，请确保可以手动处理未知问题", version)))
+			message = append(message, *cqcode.Text(fmt.Sprintf("\n\n有更新！\n请 admin 使用 /update %s 更新到最新版本\n注意：自动更新有风险，请确保可以手动处理未知问题", version)))
 		} else {
 			message = append(message, *cqcode.Text("版本一致，无需更新"))
 		}
@@ -88,7 +88,7 @@ func (u *Update) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 			*send <- *SendMsg(ctx, fmt.Sprintf("更新失败: %v", err), nil, false, true)
 			return
 		}
-		*send <- *SendMsg(ctx, "更新成功", nil, false, true)
+		*send <- *SendMsg(ctx, "更新成功, 请手动重启程序", nil, false, true)
 	}
 }
 
@@ -146,7 +146,10 @@ func (u *Update) doUpdate(url string) error {
 
 	err = selfupdate.Apply(resp.Body, selfupdate.Options{})
 	if err != nil {
-		log.Printf("Update error: %v", err)
+		if rerr := selfupdate.RollbackError(err); rerr != nil {
+			fmt.Printf("Failed to rollback from bad update: %v\n", rerr)
+			return rerr
+		}
 	}
 	return err
 }
