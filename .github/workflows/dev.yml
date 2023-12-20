@@ -19,12 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: [ linux, windows-6.3, darwin-10.14 ]
+        goos: [ linux, windows, darwin ]
         goarch: [ "386", amd64, arm64, arm ]
         exclude:
-          - goos: darwin-10.14
+          - goos: darwin
             goarch: "386"
-          - goos: darwin-10.14
+          - goos: darwin
             goarch: arm
         include:
           - goos: android
@@ -79,8 +79,8 @@ jobs:
           mkdir bin
           mkdir out
           xgo --targets=${GOOS}/${GOARCH} -ldflags="${LDFLAGS}" --out ${BINDIR}/${NAME} ./
-          if [ $GOOS != "windows-6.3" ]; then chmod +x ${BINDIR}/${NAME}-*; fi
-          if [ $GOOS != "darwin-10.14" ]; then ${upx} --lzma --best ${BINDIR}/${NAME}-*; fi
+          if [ $GOOS != "windows" ]; then chmod +x ${BINDIR}/${NAME}-*; fi
+          if [ $GOOS != "darwin" ]; then ${upx} --lzma --best ${BINDIR}/${NAME}-*; fi
 
       - name: Build Android
         if: ${{ matrix.goos=='android' }}
