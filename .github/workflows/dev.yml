@@ -73,11 +73,8 @@ jobs:
           
       - name: Build
         if: ${{ matrix.goos!='android' }}
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
         run: |
-          xgo --targets=${GOOS}/${GOARCH} -ldflags="${LDFLAGS}" --out bin/${NAME} ./
+          xgo --targets=${{ matrix.goos }}/${{ matrix.goarch }} -ldflags="${LDFLAGS}" --out bin/${NAME} ./
 
       - name: Build Android
         if: ${{ matrix.goos=='android' }}
@@ -92,7 +89,7 @@ jobs:
       - name: Chmod and compress
         run: |
           chmod +x ${NAME}-*
-          if [ $GOOS != "darwin-10.14" ]; then ${{ env.upx }} --lzma --best ${NAME}-*; fi
+          if [ ${{ matrix.goos }} != "darwin-10.14" ]; then ${{ env.upx }} --lzma --best ${NAME}-*; fi
         working-directory: bin
 
       - name: Upload To Artifact
