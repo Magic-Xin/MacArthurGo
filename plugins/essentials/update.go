@@ -65,7 +65,7 @@ func (u *Update) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		if base.Version != version {
 			message = append(message, *cqcode.Text(fmt.Sprintf("\n\n有更新！\n请 admin 使用 /update %s 更新到最新版本\n注意：自动更新有风险，请确保可以手动处理未知问题", version)))
 		} else {
-			message = append(message, *cqcode.Text("版本一致，无需更新"))
+			message = append(message, *cqcode.Text("\n\n版本一致，无需更新"))
 		}
 		*send <- *SendMsg(ctx, "", &message, false, false)
 	}
