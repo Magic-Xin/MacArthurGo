@@ -89,25 +89,13 @@ jobs:
       - name: Rename Windows
         if: ${{ matrix.goos=='windows-6.0' }}
         run: |
-          mv MacArthurGo-windows-6.0-${{ matrix.goarch }}.exe MacArthurGo-windows-${{ matrix.goarch }}-${{ env.SHASHORT }}.exe
+          mv MacArthurGo-windows-6.0-${{ matrix.goarch }}.exe MacArthurGo-windows-${{ matrix.goarch }}.exe
         working-directory: bin
 
       - name: Rename Darwin
         if: ${{ matrix.goos=='darwin-10.14' }}
         run: |
-          mv MacArthurGo-darwin-10.14-${{ matrix.goarch }} MacArthurGo-darwin-${{ matrix.goarch }}-${{ env.SHASHORT }}
-        working-directory: bin
-
-      - name: Rename Linux
-        if: ${{ matrix.goos=='linux' }}
-        run: |
-          mv MacArthurGo-linux-${{ matrix.goarch }} MacArthurGo-linux-${{ matrix.goarch }}-${{ env.SHASHORT }}
-        working-directory: bin
-
-      - name: Rename Android
-        if: ${{ matrix.goos=='android' }}
-        run: |
-          mv MacArthurGo-android-${{ matrix.goarch }} MacArthurGo-android-${{ matrix.goarch }}-${{ env.SHASHORT }}
+          mv MacArthurGo-darwin-10.14-${{ matrix.goarch }} MacArthurGo-darwin-${{ matrix.goarch }}
         working-directory: bin
 
       - name: Chmod and compress
