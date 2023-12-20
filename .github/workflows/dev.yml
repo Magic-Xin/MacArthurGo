@@ -114,7 +114,7 @@ jobs:
           path: bin/
 
       - name: Display structure of downloaded files
-        run: ls -R
+        run: ls
         working-directory: bin
 
       - name: Delete current release assets
@@ -124,6 +124,12 @@ jobs:
           tag: Prerelease-${{ github.ref_name }}
           deleteOnlyFromDrafts: false
 
+      - name: Set Env
+        run: |
+          echo "BUILDTIME=$(date +'%Y-%m-%dT%H:%M:%SZ' -u)" >> $GITHUB_ENV
+          echo "SHASHORT=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
+        shell: bash
+
       - name: Tag Repo
         uses: richardsimko/update-tag@v1.0.6
         with:
@@ -132,11 +138,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - run: |
-          echo "BUILDTIME=$(TZ=Asia/Shanghai date)" >> $GITHUB_ENV
           cat > release.txt << 'EOF'
-          Release created at  ${{ env.BUILDTIME }}
+          Release created at UTC ${{ env.BUILDTIME }}
           Synchronize ${{ github.ref_name }} branch code updates, keeping only the latest version
-          <br>
+          EOF
+
+      - run: |
+          cat > version.json << 'EOF'
+          {"version": "${{ env.SHASHORT }}", "build_time": "${{ env.BUILDTIME }}"}
+          EOF
 
       - name: Upload Prerelease
         uses: softprops/action-gh-release@v1
