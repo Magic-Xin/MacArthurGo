@@ -21,10 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: [ linux, windows-6.3, darwin-10.14, android ]
+        goos: [ linux, windows-6.0, darwin-10.14, android ]
         goarch: [ "386", amd64, arm64 ]
         exclude:
-          - goos: windows-6.3
+          - goos: windows-6.0
             goarch: arm64
           - goos: darwin-10.14
             goarch: "386"
@@ -37,6 +37,7 @@ jobs:
 
       - name: Set Environment
         run: |
+          mkdir -p bin
           echo "SHASHORT=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
           echo "BUILDTIME=$(date +'%Y-%m-%dT%H:%M:%SZ' -u)" >> $GITHUB_ENV
 
@@ -77,8 +78,6 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           xgo --targets=${GOOS}/${GOARCH} -ldflags="${LDFLAGS}" --out bin/${NAME} ./
-          chmod +x bin/${NAME}-*
-          if [ $GOOS != "darwin-10.14" ]; then ${upx} --lzma --best bin/${NAME}-*; fi
 
       - name: Build Android
         if: ${{ matrix.goos=='android' }}
@@ -89,9 +88,12 @@ jobs:
         run: |
           CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
           CC=${CC} go build -ldflags "${LDFLAGS}" -o bin/${NAME}-${GOOS}-${GOARCH} ./
-          chmod +x bin/${NAME}-${GOOS}-${GOARCH}
-          ${upx} --lzma --best bin/${NAME}-${GOOS}-${GOARCH}
 
+      - name: Chmod and compress
+        run: |
+          chmod +x ${NAME}-*
+          if [ $GOOS != "darwin-10.14" ]; then ${{ env.upx }} --lzma --best ${NAME}-*; fi
+        working-directory: bin
 
       - name: Upload To Artifact
         if: ${{  success() }}
