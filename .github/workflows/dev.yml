@@ -24,8 +24,6 @@ jobs:
         goos: [ linux, windows-6.0, darwin-10.14, android ]
         goarch: [ "386", amd64, arm64 ]
         exclude:
-          - goos: windows-6.0
-            goarch: arm64
           - goos: darwin-10.14
             goarch: "386"
           - goos: android
@@ -88,9 +86,8 @@ jobs:
 
       - name: Chmod and compress
         run: |
-          chmod +x ${NAME}-*
-          if [ ${{ matrix.goos }} != "darwin-10.14" ]; then ${{ env.upx }} --lzma --best ${NAME}-*; fi
-        working-directory: bin
+          chmod +x bin/${NAME}-*
+          if [ ${{ matrix.goos }} != "darwin-10.14" ]; then ${{ env.upx }} --lzma --best bin/${NAME}-*; fi
 
       - name: Upload To Artifact
         if: ${{  success() }}
