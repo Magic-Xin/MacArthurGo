@@ -124,7 +124,7 @@ jobs:
       - name: Set Env
         run: |
           echo "UPLOADTIME=$(date +'%Y-%m-%dT%H:%M:%SZ' -u)" >> $GITHUB_ENV
-          echo "SHASHORT=${{ env.COMMIT_ID::7 }}" >> "$GITHUB_ENV"
+          echo "SHASHORT=${{ env.COMMIT_ID }}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Tag Repo
@@ -142,7 +142,7 @@ jobs:
 
       - run: |
           cat > version.json << 'EOF'
-          {"version": "${{ env.SHASHORT }}", "upload_time": "${{ env.UPLOADTIME }}"}
+          {"version": "${SHASHORT::7}", "upload_time": "${{ env.UPLOADTIME }}"}
           EOF
         working-directory: bin
 
