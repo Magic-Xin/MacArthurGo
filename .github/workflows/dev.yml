@@ -89,13 +89,25 @@ jobs:
       - name: Rename Windows
         if: ${{ matrix.goos=='windows-6.0' }}
         run: |
-          mv MacArthurGo-windows-6.0-${{ matrix.goarch }}.exe MacArthurGo-windows-${{ matrix.goarch }}.exe
+          mv MacArthurGo-windows-6.0-${{ matrix.goarch }}.exe MacArthurGo-windows-${{ matrix.goarch }}-${{ env.SHASHORT }}.exe
         working-directory: bin
 
       - name: Rename Darwin
         if: ${{ matrix.goos=='darwin-10.14' }}
         run: |
-          mv MacArthurGo-darwin-10.14-${{ matrix.goarch }} MacArthurGo-darwin-${{ matrix.goarch }}
+          mv MacArthurGo-darwin-10.14-${{ matrix.goarch }} MacArthurGo-darwin-${{ matrix.goarch }}-${{ env.SHASHORT }}
+        working-directory: bin
+
+      - name: Rename Linux
+        if: ${{ matrix.goos=='linux' }}
+        run: |
+          mv MacArthurGo-linux-${{ matrix.goarch }} MacArthurGo-linux-${{ matrix.goarch }}-${{ env.SHASHORT }}
+        working-directory: bin
+
+      - name: Rename Android
+        if: ${{ matrix.goos=='android' }}
+        run: |
+          mv MacArthurGo-android-${{ matrix.goarch }} MacArthurGo-android-${{ matrix.goarch }}-${{ env.SHASHORT }}
         working-directory: bin
 
       - name: Chmod and compress
@@ -145,7 +157,7 @@ jobs:
 
       - run: |
           cat > release.txt << 'EOF'
-          Release created at UTC ${{ env.UPLOADTIME }}
+          Release created at ${{ env.UPLOADTIME }}
           Synchronize ${{ github.ref_name }} branch code updates, keeping only the latest version
           EOF
 
