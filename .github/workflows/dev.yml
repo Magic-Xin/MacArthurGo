@@ -11,8 +11,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  COMMIT_ID: "${{ github.sha }}"
   NAME: MacArthurGo
   CGO_ENABLED: 1
+  TIME: "$(date +'%Y-%m-%dT%H:%M:%SZ' -u)"
 
 jobs:
   Build:
@@ -37,6 +39,7 @@ jobs:
       - name: Set Environment
         run: |
           mkdir -p bin
+          echo ${{ env.TIME }}
           echo "SHASHORT=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
           echo "BUILDTIME=$(date +'%Y-%m-%dT%H:%M:%SZ' -u)" >> $GITHUB_ENV
 
@@ -121,7 +124,7 @@ jobs:
       - name: Set Env
         run: |
           echo "UPLOADTIME=$(date +'%Y-%m-%dT%H:%M:%SZ' -u)" >> $GITHUB_ENV
-          echo "SHASHORT=$(git rev-parse --short "$GITHUB_SHA")" >> "$GITHUB_ENV"
+          echo "SHASHORT=${{ env.COMMIT_ID::7 }}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Tag Repo
