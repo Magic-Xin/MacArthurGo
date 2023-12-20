@@ -21,15 +21,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: [ linux, windows-6.3, darwin-10.14 ]
-        goarch: [ "386", amd64, arm64, arm ]
+        goos: [ linux, windows-6.3, darwin-10.14, android ]
+        goarch: [ "386", amd64, arm64 ]
         exclude:
           - goos: darwin-10.14
             goarch: "386"
-          - goos: darwin-10.14
-            goarch: arm
-        include:
           - goos: android
+            goarch: "386"
+          - goos: windows-6.3
             goarch: arm64
     steps:
       - uses: actions/checkout@v3
