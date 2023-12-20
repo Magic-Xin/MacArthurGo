@@ -86,6 +86,18 @@ jobs:
           CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
           CC=${CC} go build -ldflags "${LDFLAGS}" -o bin/${{ env.NAME }}-${GOOS}-${GOARCH} ./
 
+      - name: Rename Windows
+        if: ${{ matrix.goos=='windows-6.0' }}
+        run: |
+          mv MacArthurGo-windows-6.0-${{ matrix.goarch }}.exe MacArthurGo-windows-${{ matrix.goarch }}.exe
+        working-directory: bin
+
+      - name: Rename Darwin
+        if: ${{ matrix.goos=='darwin-10.14' }}
+        run: |
+          mv MacArthurGo-darwin-10.14-${{ matrix.goarch }} MacArthurGo-darwin-${{ matrix.goarch }}
+        working-directory: bin
+
       - name: Chmod and compress
         run: |
           chmod +x bin/${{ env.NAME }}-*
