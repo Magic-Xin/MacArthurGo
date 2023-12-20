@@ -139,7 +139,7 @@ jobs:
 
       - run: |
           cat > version.json << 'EOF'
-          {"version": "${{ env.COMMIT_ID:0:7 }}", "upload_time": "${{ env.UPLOADTIME }}"}
+          {"version": "${{ env.COMMIT_ID }}", "upload_time": "${{ env.UPLOADTIME }}"}
           EOF
         working-directory: bin
 
