@@ -6,8 +6,12 @@ on:
     branches:
       - "dev"
 
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  Build:
     name: Build binary CI
     runs-on: ubuntu-latest
     strategy:
@@ -93,8 +97,54 @@ jobs:
 
 
       - name: Upload To Artifact
+        if: ${{  success() }}
         uses: actions/upload-artifact@main
         with:
           name: ${{ matrix.goos }}-${{ matrix.goarch }}-${{ env.SHASHORT }}
           path: |
             bin/*
+
+  Upload-Prerelease:
+    permissions: write-all
+    needs: [Build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@main
+        with:
+          path: bin/
+
+      - name: Display structure of downloaded files
+        run: ls -R
+        working-directory: bin
+
+      - name: Delete current release assets
+        uses: 8Mi-Tech/delete-release-assets-action@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: Prerelease-${{ github.ref_name }}
+          deleteOnlyFromDrafts: false
+
+      - name: Tag Repo
+        uses: richardsimko/update-tag@v1.0.6
+        with:
+          tag_name: Prerelease-${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: |
+          echo "BUILDTIME=$(TZ=Asia/Shanghai date)" >> $GITHUB_ENV
+          cat > release.txt << 'EOF'
+          Release created at  ${{ env.BUILDTIME }}
+          Synchronize ${{ github.ref_name }} branch code updates, keeping only the latest version
+          <br>
+
+      - name: Upload Prerelease
+        uses: softprops/action-gh-release@v1
+        if: ${{  success() }}
+        with:
+          tag_name: Prerelease-${{ github.ref_name }}
+          files: |
+            bin/*
+          prerelease: true
+          generate_release_notes: true
+          body_path: release.txt
