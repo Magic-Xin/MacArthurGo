@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
+env:
+  COMMIT_ID: "${{ github.sha }}"
+
 jobs:
   Build:
     name: Build binary CI
@@ -17,12 +20,12 @@ jobs:
     strategy:
       matrix:
         goos: [ linux, windows-6.3, darwin-10.14 ]
-        goarch: [ "386", amd64, arm64 ]
+        goarch: [ "386", amd64, arm64, arm ]
         exclude:
           - goos: darwin-10.14
             goarch: "386"
-          - goos: windows-6.3
-            goarch: arm64
+          - goos: darwin-10.14
+            goarch: arm
         include:
           - goos: android
             goarch: arm64
@@ -114,7 +117,7 @@ jobs:
           path: bin/
 
       - name: Display structure of downloaded files
-        run: ls
+        run: ls -R
         working-directory: bin
 
       - name: Delete current release assets
@@ -145,8 +148,9 @@ jobs:
 
       - run: |
           cat > version.json << 'EOF'
-          {"version": "${{ env.SHASHORT }}", "build_time": "${{ env.BUILDTIME }}"}
+          {"version": "${COMMIT_ID::7}", "build_time": "${{ env.BUILDTIME }}"}
           EOF
+        working-directory: bin
 
       - name: Upload Prerelease
         uses: softprops/action-gh-release@v1
@@ -155,6 +159,7 @@ jobs:
           tag_name: Prerelease-${{ github.ref_name }}
           files: |
             bin/*
+            bin/*/*
           prerelease: true
           generate_release_notes: true
           body_path: release.txt
