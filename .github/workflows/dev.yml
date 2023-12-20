@@ -77,6 +77,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           xgo --targets=${GOOS}/${GOARCH} -ldflags="${LDFLAGS}" --out bin/${NAME} ./
+          chmod +x bin/${NAME}-*
           if [ $GOOS != "darwin-10.14" ]; then ${upx} --lzma --best bin/${NAME}-*; fi
 
       - name: Build Android
