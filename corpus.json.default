@@ -1,0 +1,19 @@
+[
+    {
+        "regexp": "^a$",
+        "reply": "reply all",
+        "scene": "all",
+        "users": [123456],
+        "groups": [123456, 654321]
+    },
+    {
+        "regexp": "^g$",
+        "reply": "reply group",
+        "scene": "group"
+    },
+    {
+        "regexp": "^p$",
+        "reply": "reply private",
+        "scene": "private"
+    },
+]
