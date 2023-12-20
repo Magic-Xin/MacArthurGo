@@ -14,7 +14,6 @@ env:
   COMMIT_ID: "${{ github.sha }}"
   NAME: MacArthurGo
   CGO_ENABLED: 1
-  TIME: "$(date +'%Y-%m-%dT%H:%M:%SZ' -u)"
 
 jobs:
   Build:
@@ -44,7 +43,7 @@ jobs:
 
       - name: Set LDFLAGS
         run: |
-          echo "LDFLAGS=-w -s -X 'MacArthurGo/base.Version=${SHASHORT}' -X 'MacArthurGo/base.Branch=Beta/dev' -X 'MacArthurGo/base.BuildTime=${{ env.TIME }}'" >> $GITHUB_ENV
+          echo "LDFLAGS=-w -s -X 'MacArthurGo/base.Version=${SHASHORT}' -X 'MacArthurGo/base.Branch=Beta/dev' -X 'MacArthurGo/base.BuildTime=${{ env.BUILDTIME }}'" >> $GITHUB_ENV
 
       - name: Setup UPX
         run: |
@@ -122,7 +121,7 @@ jobs:
 
       - name: Set Env
         run: |
-          echo "SHASHORT=$(git rev-parse --short "${{ env.COMMIT_ID }}")" >> "$GITHUB_ENV"
+          echo "UPLOADTIME=$(date +'%Y-%m-%dT%H:%M:%SZ' -u)" >> $GITHUB_ENV
         shell: bash
 
       - name: Tag Repo
@@ -134,13 +133,13 @@ jobs:
 
       - run: |
           cat > release.txt << 'EOF'
-          Release created at UTC ${{ env.TIME }}
+          Release created at UTC ${{ env.UPLOADTIME }}
           Synchronize ${{ github.ref_name }} branch code updates, keeping only the latest version
           EOF
 
       - run: |
           cat > version.json << 'EOF'
-          {"version": "${{ env.SHASHORT }}", "upload_time": "${{ env.TIME }}"}
+          {"version": "${{ env.COMMIT_ID }}", "upload_time": "${{ env.UPLOADTIME }}"}
           EOF
         working-directory: bin
 
