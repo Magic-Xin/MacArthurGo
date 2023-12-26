@@ -9,6 +9,7 @@ require (
 	github.com/gookit/config/v2 v2.2.4
 	github.com/gorilla/websocket v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.19
+	github.com/minio/selfupdate v0.6.0
 	github.com/sashabaranov/go-openai v1.17.9
 	github.com/tidwall/gjson v1.17.0
 	github.com/vinta/pangu v3.0.0+incompatible
@@ -34,7 +35,6 @@ require (
 	github.com/gookit/color v1.5.4 // indirect
 	github.com/gookit/goutil v0.6.14 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
-	github.com/minio/selfupdate v0.6.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
