@@ -37,10 +37,10 @@ android-arm64:
 	CC=${CC} CGO_ENABLED=1 GOOS=android GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-android-arm64 ./
 
 windows-386:
-	xgo --targets=windows-6.3/386 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	xgo --targets=windows-6.0/386 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
 
 windows-amd64:
-	xgo --targets=windows-6.3/amd64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	xgo --targets=windows-6.0/amd64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
 
 darwin_releases=$(addsuffix .tar, $(DARWIN_PLATFORM_LIST))
 
