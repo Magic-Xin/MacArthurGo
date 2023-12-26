@@ -7,11 +7,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/google/generative-ai-go/genai"
 	"github.com/gookit/config/v2"
 	"github.com/sashabaranov/go-openai"
 	"github.com/vinta/pangu"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"image/gif"
 	"image/jpeg"
@@ -391,16 +393,46 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		res = "gemini-pro: "
 	}
 	prompts = append(prompts, genai.Text(str))
-	resp, err := model.GenerateContent(ctx, prompts...)
-	if err != nil {
+
+	model.SafetySettings = []*genai.SafetySetting{
+		{
+			Category:  genai.HarmCategoryHarassment,
+			Threshold: genai.HarmBlockNone,
+		},
+		{
+			Category:  genai.HarmCategoryHateSpeech,
+			Threshold: genai.HarmBlockNone,
+		},
+		{
+			Category:  genai.HarmCategorySexuallyExplicit,
+			Threshold: genai.HarmBlockNone,
+		},
+		{
+			Category:  genai.HarmCategoryDangerousContent,
+			Threshold: genai.HarmBlockNone,
+		},
+	}
+
+	iter := model.GenerateContentStream(ctx, prompts...)
+	if iter == nil {
 		log.Printf("Gemini generate error: %v", err)
 		res = fmt.Sprintf("Gemini generate error: %v", err)
 		return &res, nil
 	}
 
-	for _, c := range resp.Candidates {
-		if c.Content != nil {
-			for _, part := range (c.Content).Parts {
+	for {
+		resp, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			log.Printf("Gemini iterator error: %v", err)
+			res += fmt.Sprintf("Gemini iterator error: %v", err)
+			return &res, nil
+		}
+
+		for _, cand := range resp.Candidates {
+			for _, part := range cand.Content.Parts {
 				res += fmt.Sprintf("%s", part)
 			}
 		}

@@ -103,12 +103,13 @@ func CheckArgumentArray(ctx *map[string]any, args *[]string) bool {
 
 func SplitArgument(ctx *map[string]any) []string {
 	message := DecodeArrayMessage(ctx)
+	var res string
 	for _, msg := range *message {
 		if msg.Type == "text" {
-			return strings.Fields(msg.Data["text"].(string))
+			res += msg.Data["text"].(string) + " "
 		}
 	}
-	return strings.Fields((*ctx)["raw_message"].(string))
+	return strings.Fields(res)
 }
 
 func GetUniversalImgURL(url string) (string, string) {

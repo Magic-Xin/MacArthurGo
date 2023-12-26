@@ -14,6 +14,8 @@
     {
         "regexp": "^p$",
         "reply": "reply private",
+        "is_reply": true,
+        "is_at": false,
         "scene": "private"
     },
 ]

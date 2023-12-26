@@ -37,14 +37,15 @@ android-arm64:
 	CC=${CC} CGO_ENABLED=1 GOOS=android GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-android-arm64 ./
 
 windows-386:
-	xgo --targets=windows-6.3/386 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	xgo --targets=windows-6.0/386 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
 
 windows-amd64:
-	xgo --targets=windows-6.3/amd64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	xgo --targets=windows-6.0/amd64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
 
 darwin_releases=$(addsuffix .tar, $(DARWIN_PLATFORM_LIST))
 
 $(darwin_releases): %.tar : %
+	mv $(BINDIR)/MacArthurGo-* $(BINDIR)/MacArthurGo-$(basename $@)
 	chmod +x $(BINDIR)/MacArthurGo-*
 	cd $(BINDIR) && tar -zcvf ../$(OUTDIR)/$(NAME)-$(basename $@).tar.gz MacArthurGo-*
 	rm -rf $(BINDIR)/MacArthurGo-*
@@ -60,6 +61,7 @@ $(linux_releases): %.tar : %
 windows_releases=$(addsuffix .zip, $(WINDOWS_PLATFORM_LIST))
 
 $(windows_releases): %.zip : %
+	mv $(BINDIR)/MacArthurGo-* $(BINDIR)/MacArthurGo-$(basename $@).exe
 	-${upx} --lzma --best $(BINDIR)/MacArthurGo-*
 	cd $(BINDIR) && zip -v9 ../$(OUTDIR)/$(NAME)-$(basename $@).zip MacArthurGo-*
 	rm -rf $(BINDIR)/MacArthurGo-*

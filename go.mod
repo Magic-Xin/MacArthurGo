@@ -9,6 +9,7 @@ require (
 	github.com/gookit/config/v2 v2.2.4
 	github.com/gorilla/websocket v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.19
+	github.com/minio/selfupdate v0.6.0
 	github.com/sashabaranov/go-openai v1.17.9
 	github.com/tidwall/gjson v1.17.0
 	github.com/vinta/pangu v3.0.0+incompatible
@@ -16,6 +17,7 @@ require (
 )
 
 require (
+	aead.dev/minisign v0.2.0 // indirect
 	cloud.google.com/go/ai v0.3.0 // indirect
 	cloud.google.com/go/compute v1.23.3 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect

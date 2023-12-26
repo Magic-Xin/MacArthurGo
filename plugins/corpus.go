@@ -19,6 +19,8 @@ type Corpus struct {
 type CorpusData struct {
 	Regexp  string  `json:"regexp"`
 	Reply   string  `json:"reply"`
+	IsReply bool    `json:"is_reply"`
+	IsAt    bool    `json:"is_at"`
 	Scene   string  `json:"scene"`
 	Users   []int64 `json:"users"`
 	Groups  []int64 `json:"groups"`
@@ -101,7 +103,7 @@ func (c *Corpus) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 			}
 
 			if v.Message != nil {
-				*send <- *essentials.SendMsg(ctx, "", v.Message, false, false)
+				*send <- *essentials.SendMsg(ctx, "", v.Message, v.IsAt, v.IsReply)
 			}
 			break
 		}
