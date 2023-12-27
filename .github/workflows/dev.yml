@@ -146,6 +146,7 @@ jobs:
       - run: |
           cat > release.txt << 'EOF'
           Release created at ${{ env.UPLOADTIME }}
+          Commit: ${{ env.COMMIT_ID }}
           Synchronize ${{ github.ref_name }} branch code updates, keeping only the latest version
           EOF
 
