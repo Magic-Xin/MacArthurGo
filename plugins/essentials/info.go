@@ -2,9 +2,13 @@ package essentials
 
 import (
 	"MacArthurGo/base"
+	"fmt"
 	"log"
 	"reflect"
+	"runtime"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type LoginInfo struct {
@@ -19,7 +23,7 @@ func init() {
 		Plugin: Plugin{
 			Name:    "info",
 			Enabled: true,
-			Args:    []string{"/test", "/help", "/info"},
+			Args:    []string{"/info", "/help"},
 		},
 	}
 	PluginArray = append(PluginArray, &PluginInterface{Interface: &info})
@@ -34,7 +38,22 @@ func (l *LoginInfo) ReceiveAll(_ *map[string]any, send *chan []byte) {
 
 func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	if CheckArgument(ctx, l.Args[0]) {
-		*send <- *SendMsg(ctx, "战斗，爽！", nil, false, true)
+		var mem runtime.MemStats
+		runtime.ReadMemStats(&mem)
+
+		message := "MacArthurGo 运行信息\n\n"
+
+		message += "分支: " + base.Branch + "\n" + "版本: " + base.Version + "\n" + "编译时间: " + base.BuildTime + "\n"
+		message += "已运行时间: " + l.timeToString(time.Now().Unix()-base.Config.StartTime) + "\n\n"
+
+		message += "内存使用情况:\n"
+		message += "TotalAlloc = " + strconv.FormatUint(mem.TotalAlloc/1024/1024, 10) + " MB\n"
+		message += "HeapAlloc = " + strconv.FormatUint(mem.HeapAlloc/1024/1024, 10) + " MB\n"
+		message += "HeapSys = " + strconv.FormatUint(mem.HeapSys/1024/1024, 10) + " MB\n"
+		message += "HeapIdle = " + strconv.FormatUint(mem.HeapIdle/1024/1024, 10) + " MB\n"
+		message += "HeapReleased = " + strconv.FormatUint(mem.HeapReleased/1024/1024, 10) + " MB\n"
+
+		*send <- *SendMsg(ctx, message, nil, false, true)
 	}
 	if CheckArgument(ctx, l.Args[1]) {
 		result := []string{"插件				触发指令"}
@@ -75,9 +94,6 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 		*send <- *SendMsg(ctx, strings.Join(result, "\n"), nil, false, false)
 	}
-	if CheckArgument(ctx, l.Args[2]) {
-		*send <- *SendMsg(ctx, "分支: "+base.Branch+"\n"+"版本: "+base.Version+"\n"+"编译时间: "+base.BuildTime, nil, false, false)
-	}
 }
 
 func (l *LoginInfo) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
@@ -95,4 +111,16 @@ func (l *LoginInfo) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 		},
 	}
 	*send <- *SendMsg(&sendCtx, "MacArthurGo 已上线", nil, false, false)
+}
+
+func (l *LoginInfo) timeToString(time int64) string {
+	if time/60 == 0 {
+		return fmt.Sprintf("%d秒", time)
+	} else if time/3600 == 0 {
+		return fmt.Sprintf("%d分钟%d秒", time/60, time%60)
+	} else if time/86400 == 0 {
+		return fmt.Sprintf("%d小时%d分钟%d秒", time/3600, time%3600/60, time%3600%60)
+	}
+
+	return fmt.Sprintf("%d天%d小时%d分钟%d秒", time/86400, time%86400/3600, time%86400%3600/60, time%86400%3600%60)
 }

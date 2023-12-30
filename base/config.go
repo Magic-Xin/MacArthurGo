@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 )
 
 var Config config
@@ -13,6 +14,7 @@ var Config config
 type config struct {
 	Mutex      sync.RWMutex `json:"-"`
 	ConfigPath string       `json:"-"`
+	StartTime  int64        `json:"-"`
 
 	Debug          bool    `json:"debug"`
 	Address        string  `json:"address"`
@@ -112,7 +114,10 @@ func init() {
 		log.Printf("Decode config failed: %v", err)
 		panic(nil)
 	}
+
 	Config.ConfigPath = configPath
+	Config.StartTime = time.Now().Unix()
+
 	log.Printf("Config \"%s\" loaded! Initializing...", configPath)
 }
 
