@@ -48,12 +48,10 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 		message += "内存使用情况:\n"
 		message += "TotalAlloc = " + strconv.FormatUint(mem.TotalAlloc/1024/1024, 10) + " MB\n"
-		message += "HeapAlloc = " + strconv.FormatUint(mem.HeapAlloc/1024/1024, 10) + " MB\n"
-		message += "HeapSys = " + strconv.FormatUint(mem.HeapSys/1024/1024, 10) + " MB\n"
 		message += "HeapIdle = " + strconv.FormatUint(mem.HeapIdle/1024/1024, 10) + " MB\n"
 		message += "HeapReleased = " + strconv.FormatUint(mem.HeapReleased/1024/1024, 10) + " MB\n"
 
-		*send <- *SendMsg(ctx, message, nil, false, true)
+		*send <- *SendMsg(ctx, message, nil, false, false)
 	}
 	if CheckArgument(ctx, l.Args[1]) {
 		result := []string{"插件				触发指令"}
