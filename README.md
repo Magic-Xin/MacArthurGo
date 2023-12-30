@@ -16,7 +16,11 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 **Attention: Cannot guarantee the availability of the Dev version**
 
 ## Plugins
-
+- Essential Plugins
+  - Help
+  - Info
+  - Database (sqlite3)
+  - Update (dev version only)
 - Chat AI
   - ChatGPT
   - Alibaba QianWen
@@ -36,9 +40,7 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - Corpus reply
 
 ## TODO
-
-- Random setu
-- ...Add more
+- [ ] Add more plugins
 
 ## Thanks to the following projects or services
 - [cq-picsearcher-bot](https://github.com/Tsuk1ko/cq-picsearcher-bot)
