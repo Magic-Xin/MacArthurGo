@@ -16,7 +16,7 @@
       "commonProbability": 0.001
     },
     "bili": {
-      "enable": true，
+      "enable": true,
       "ai_summarize": {
         "enable": true,
         "args": ["/summarize", "/sum"],
