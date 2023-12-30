@@ -37,6 +37,7 @@ func main() {
 	}
 
 	conn, err := websocket.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
+	// FIXME retry times not working
 	if err != nil {
 		if base.Config.RetryTimes == 0 {
 			for err != nil {
