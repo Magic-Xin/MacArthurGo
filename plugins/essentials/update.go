@@ -5,7 +5,6 @@ import (
 	"MacArthurGo/structs/cqcode"
 	"encoding/json"
 	"fmt"
-	"github.com/gookit/config/v2"
 	"github.com/minio/selfupdate"
 	"io"
 	"log"
@@ -16,8 +15,7 @@ import (
 
 type Update struct {
 	Plugin
-	Url   string
-	Admin int64
+	Url string
 }
 
 func init() {
@@ -27,8 +25,7 @@ func init() {
 			Enabled: true,
 			Args:    []string{"/update"},
 		},
-		Url:   config.String("updateUrl"),
-		Admin: config.Int64("admin"),
+		Url: base.Config.UpdateUrl,
 	}
 
 	PluginArray = append(PluginArray, &PluginInterface{Interface: &update})
@@ -70,7 +67,7 @@ func (u *Update) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		*send <- *SendMsg(ctx, "", &message, false, false)
 	}
 	if len(words) == 2 {
-		if int64((*ctx)["sender"].(map[string]any)["user_id"].(float64)) != u.Admin {
+		if (int64((*ctx)["sender"].(map[string]any)["user_id"].(float64))) == base.Config.Admin {
 			*send <- *SendMsg(ctx, "没有更新权限", nil, false, true)
 		}
 

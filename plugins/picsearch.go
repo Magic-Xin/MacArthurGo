@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
@@ -9,7 +10,6 @@ import (
 	"fmt"
 	"github.com/FloatTech/floatbox/web"
 	xpath "github.com/antchfx/htmlquery"
-	"github.com/gookit/config/v2"
 	"io"
 	"log"
 	"net/http"
@@ -34,14 +34,14 @@ func init() {
 	pSearch := PicSearch{
 		Plugin: essentials.Plugin{
 			Name:    "搜图",
-			Enabled: config.Bool("plugins.picSearch.enable"),
-			Args:    config.Strings("plugins.picSearch.args"),
+			Enabled: base.Config.Plugins.PicSearch.Enable,
+			Args:    base.Config.Plugins.PicSearch.Args,
 		},
-		groupForward:      config.Bool("plugins.picSearch.groupForward"),
-		allowPrivate:      config.Bool("plugins.picSearch.allowPrivate"),
-		handleBannedHosts: config.Bool("plugins.picSearch.handleBannedHosts"),
-		searchFeedback:    config.String("plugins.picSearch.searchFeedback"),
-		sauceNAOToken:     config.String("plugins.picSearch.sauceNAOToken"),
+		groupForward:      base.Config.Plugins.PicSearch.GroupForward,
+		allowPrivate:      base.Config.Plugins.PicSearch.AllowPrivate,
+		handleBannedHosts: base.Config.Plugins.PicSearch.HandleBannedHosts,
+		searchFeedback:    base.Config.Plugins.PicSearch.SearchFeedback,
+		sauceNAOToken:     base.Config.Plugins.PicSearch.SauceNAOToken,
 	}
 
 	sqlTable := `CREATE TABLE IF NOT EXISTS picsearch(uid TEXT PRIMARY KEY NOT NULL, res TEXT NOT NULL, created NUMERIC NOT NULL);`
@@ -52,7 +52,7 @@ func init() {
 	}
 
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &pSearch})
-	go essentials.DeleteExpired("DELETE FROM picsearch WHERE (? - created) > ?", config.Int64("plugins.picSearch.expirationTime"), config.Int64("plugins.picSearch.intervalTime"))
+	go essentials.DeleteExpired("DELETE FROM picsearch WHERE (? - created) > ?", base.Config.Plugins.PicSearch.ExpirationTime, base.Config.Plugins.PicSearch.IntervalTime)
 }
 
 func (p *PicSearch) ReceiveAll(_ *map[string]any, _ *chan []byte) {}

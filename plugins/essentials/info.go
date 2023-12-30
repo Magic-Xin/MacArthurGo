@@ -2,7 +2,6 @@ package essentials
 
 import (
 	"MacArthurGo/base"
-	"github.com/gookit/config/v2"
 	"log"
 	"reflect"
 	"strings"
@@ -12,7 +11,6 @@ type LoginInfo struct {
 	Plugin
 	NickName string
 	UserId   int64
-	Admin    int64
 	Login    bool
 }
 
@@ -23,7 +21,6 @@ func init() {
 			Enabled: true,
 			Args:    []string{"/test", "/help", "/info"},
 		},
-		Admin: config.Int64("admin"),
 	}
 	PluginArray = append(PluginArray, &PluginInterface{Interface: &info})
 }
@@ -94,7 +91,7 @@ func (l *LoginInfo) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 	sendCtx := map[string]any{
 		"message_type": "private",
 		"sender": map[string]any{
-			"user_id": float64(l.Admin),
+			"user_id": float64(base.Config.Admin),
 		},
 	}
 	*send <- *SendMsg(&sendCtx, "MacArthurGo 已上线", nil, false, false)

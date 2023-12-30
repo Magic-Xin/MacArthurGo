@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
@@ -10,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/generative-ai-go/genai"
-	"github.com/gookit/config/v2"
 	"github.com/sashabaranov/go-openai"
 	"github.com/vinta/pangu"
 	"google.golang.org/api/iterator"
@@ -57,21 +57,21 @@ type ChatAI struct {
 
 func init() {
 	chatGPT := ChatGPT{
-		Enabled: config.Bool("plugins.chatAI.chatGPT.enable"),
-		Args:    config.Strings("plugins.chatAI.chatGPT.args"),
-		model:   config.String("plugins.chatAI.chatGPT.model"),
-		apiKey:  config.String("plugins.chatAI.chatGPT.apiKey"),
+		Enabled: base.Config.Plugins.ChatAI.ChatGPT.Enable,
+		Args:    base.Config.Plugins.ChatAI.ChatGPT.Args,
+		model:   base.Config.Plugins.ChatAI.ChatGPT.Model,
+		apiKey:  base.Config.Plugins.ChatAI.ChatGPT.APIKey,
 	}
 	qWen := QWen{
-		Enabled: config.Bool("plugins.chatAI.qWen.enable"),
-		Args:    config.Strings("plugins.chatAI.qWen.args"),
-		model:   config.String("plugins.chatAI.qWen.model"),
-		apiKey:  config.String("plugins.chatAI.qWen.apiKey"),
+		Enabled: base.Config.Plugins.ChatAI.QWen.Enable,
+		Args:    base.Config.Plugins.ChatAI.QWen.Args,
+		model:   base.Config.Plugins.ChatAI.QWen.Model,
+		apiKey:  base.Config.Plugins.ChatAI.QWen.APIKey,
 	}
 	gemini := Gemini{
-		Enabled: config.Bool("plugins.chatAI.gemini.enable"),
-		Args:    config.Strings("plugins.chatAI.gemini.args"),
-		apiKey:  config.String("plugins.chatAI.gemini.apiKey"),
+		Enabled: base.Config.Plugins.ChatAI.Gemini.Enable,
+		Args:    base.Config.Plugins.ChatAI.Gemini.Args,
+		apiKey:  base.Config.Plugins.ChatAI.Gemini.APIKey,
 	}
 
 	var args []string
@@ -88,14 +88,14 @@ func init() {
 	chatAI := ChatAI{
 		Plugin: essentials.Plugin{
 			Name:    "ChatAI",
-			Enabled: config.Bool("plugins.chatAI.enable"),
+			Enabled: base.Config.Plugins.ChatAI.Enable,
 			Args:    args,
 		},
 		ChatGPT:      &chatGPT,
 		QWen:         &qWen,
 		Gemini:       &gemini,
-		groupForward: config.Bool("plugins.chatAI.groupForward"),
-		panGu:        config.Bool("plugins.chatAI.pangu"),
+		groupForward: base.Config.Plugins.ChatAI.GroupForward,
+		panGu:        base.Config.Plugins.ChatAI.Pangu,
 	}
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &chatAI})
 }

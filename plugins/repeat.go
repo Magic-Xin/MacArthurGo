@@ -1,9 +1,9 @@
 package plugins
 
 import (
+	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"encoding/json"
-	"github.com/gookit/config/v2"
 	"log"
 	"math/rand"
 	"strconv"
@@ -15,19 +15,18 @@ type Repeat struct {
 	Times             int64
 	Probability       float64
 	CommonProbability float64
+	repeatMap         sync.Map
 }
-
-var repeatMap sync.Map
 
 func init() {
 	repeat := Repeat{
 		Plugin: essentials.Plugin{
 			Name:    "随机复读",
-			Enabled: config.Bool("plugins.repeat.enable"),
+			Enabled: base.Config.Plugins.Repeat.Enable,
 		},
-		Times:             config.Int64("plugins.repeat.times"),
-		Probability:       config.Float("plugins.repeat.probability"),
-		CommonProbability: config.Float("plugins.repeat.commonProbability"),
+		Times:             base.Config.Plugins.Repeat.Times,
+		Probability:       base.Config.Plugins.Repeat.Probability,
+		CommonProbability: base.Config.Plugins.Repeat.CommonProbability,
 	}
 
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &repeat})
@@ -56,22 +55,22 @@ func (r *Repeat) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 	groupId := strconv.FormatInt(int64((*ctx)["group_id"].(float64)), 10)
 	md5 := essentials.Md5(&msg)
-	cache, ok := repeatMap.Load(groupId)
+	cache, ok := r.repeatMap.Load(groupId)
 	if !ok {
-		repeatMap.Store(groupId, []any{md5, 1})
+		r.repeatMap.Store(groupId, []any{md5, 1})
 		return
 	}
 
 	if cache.([]any)[0].(string) == md5 {
 		if cache.([]any)[1].(int) >= int(r.Times) && r.getRand(false) {
-			repeatMap.Store(groupId, []any{md5, 1})
+			r.repeatMap.Store(groupId, []any{md5, 1})
 			*send <- *essentials.SendMsg(ctx, "", message, false, false)
 			return
 		} else {
-			repeatMap.Store(groupId, []any{md5, cache.([]any)[1].(int) + 1})
+			r.repeatMap.Store(groupId, []any{md5, cache.([]any)[1].(int) + 1})
 		}
 	} else {
-		repeatMap.Store(groupId, []any{md5, 1})
+		r.repeatMap.Store(groupId, []any{md5, 1})
 	}
 
 	if r.getRand(true) {

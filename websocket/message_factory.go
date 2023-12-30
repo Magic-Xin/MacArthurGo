@@ -23,6 +23,9 @@ func MessageFactory(msg *[]byte, send *chan []byte) {
 		if ctx["raw_message"].(string) == "" {
 			return
 		}
+		if essentials.BanList.IsBanned(int64((ctx)["sender"].(map[string]any)["user_id"].(float64))) {
+			return
+		}
 
 		for _, p := range essentials.PluginArray {
 			go p.Interface.ReceiveMessage(&ctx, send)

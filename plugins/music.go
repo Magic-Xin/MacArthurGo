@@ -1,8 +1,8 @@
 package plugins
 
 import (
+	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
-	"github.com/gookit/config/v2"
 	"io"
 	"log"
 	"net/http"
@@ -19,7 +19,7 @@ func init() {
 	music := Music{
 		essentials.Plugin{
 			Name:    "音乐链接解析",
-			Enabled: config.Bool("plugins.music.enable"),
+			Enabled: base.Config.Plugins.Music.Enable,
 		},
 	}
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &music})

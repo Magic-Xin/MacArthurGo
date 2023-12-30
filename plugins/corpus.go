@@ -1,10 +1,10 @@
 package plugins
 
 import (
+	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs/cqcode"
 	"encoding/json"
-	"github.com/gookit/config/v2"
 	"log"
 	"os"
 	"regexp"
@@ -57,7 +57,7 @@ func init() {
 	corpus := Corpus{
 		Plugin: essentials.Plugin{
 			Name:    "语料库回复",
-			Enabled: config.Bool("plugins.corpus.enable"),
+			Enabled: base.Config.Plugins.Corpus.Enable,
 		},
 		Data: &data,
 	}

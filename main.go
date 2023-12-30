@@ -6,7 +6,6 @@ import (
 	_ "MacArthurGo/plugins"
 	"MacArthurGo/websocket"
 	"fmt"
-	"github.com/gookit/config/v2"
 	"io"
 	"log"
 	"os"
@@ -37,17 +36,17 @@ func main() {
 		base.BuildTime = buildTime.In(tz).Format("2006-01-02 15:04:05")
 	}
 
-	conn, err := websocket.InitWebsocketConnection(config.String("address"), config.String("authToken"))
+	conn, err := websocket.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
 	if err != nil {
-		if config.Int("retryTimes") == 0 {
+		if base.Config.RetryTimes == 0 {
 			for err != nil {
-				time.Sleep(time.Duration(config.Int("waitingSeconds")) * time.Second)
-				conn, err = websocket.InitWebsocketConnection(config.String("address"), config.String("authToken"))
+				time.Sleep(time.Duration(base.Config.RetryTimes) * time.Second)
+				conn, err = websocket.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
 			}
 		} else {
-			for i, n := 0, config.Int("retryTimes"); (i < n) && (err != nil); i++ {
-				time.Sleep(time.Duration(config.Int("waitingSeconds")) * time.Second)
-				conn, err = websocket.InitWebsocketConnection(config.String("address"), config.String("authToken"))
+			for i, n := int64(0), base.Config.RetryTimes; (i < n) && (err != nil); i++ {
+				time.Sleep(time.Duration(base.Config.WaitingSeconds) * time.Second)
+				conn, err = websocket.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
 			}
 		}
 	}
