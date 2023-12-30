@@ -6,8 +6,6 @@ import (
 )
 
 func MessageFactory(msg *[]byte, send *chan []byte) {
-	//TODO 语言库回复
-	//TODO setu
 	var i any
 	err := json.Unmarshal(*msg, &i)
 	if err != nil {
