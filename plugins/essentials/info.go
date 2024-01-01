@@ -47,9 +47,9 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		message += "已运行时间: " + l.timeToString(time.Now().Unix()-base.Config.StartTime) + "\n\n"
 
 		message += "内存使用情况:\n"
-		message += "TotalAlloc = " + strconv.FormatUint(mem.TotalAlloc/1024/1024, 10) + " MB\n"
-		message += "HeapIdle = " + strconv.FormatUint(mem.HeapIdle/1024/1024, 10) + " MB\n"
-		message += "HeapReleased = " + strconv.FormatUint(mem.HeapReleased/1024/1024, 10) + " MB\n"
+		message += "Alloc = " + strconv.FormatUint(mem.Alloc/1024/1024, 10) + " MB\n"
+		message += "Sys = " + strconv.FormatUint(mem.Sys/1024/1024, 10) + " MB\n"
+		message += "HeapAlloc = " + strconv.FormatUint(mem.HeapAlloc/1024/1024, 10) + " MB\n"
 
 		*send <- *SendMsg(ctx, message, nil, false, false)
 	}
