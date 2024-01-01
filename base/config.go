@@ -23,6 +23,7 @@ type config struct {
 	WaitingSeconds int64   `json:"waitingSeconds"`
 	Admin          int64   `json:"admin"`
 	UpdateUrl      string  `json:"updateUrl"`
+	UpdateInterval int64   `json:"updateInterval"`
 	BannedList     []int64 `json:"bannedList"`
 	Plugins        struct {
 		Corpus struct {
