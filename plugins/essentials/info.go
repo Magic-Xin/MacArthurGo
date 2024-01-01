@@ -115,10 +115,10 @@ func (l *LoginInfo) timeToString(time int64) string {
 	if time/60 == 0 {
 		return fmt.Sprintf("%d秒", time)
 	} else if time/3600 == 0 {
-		return fmt.Sprintf("%d分钟%d秒", time/60, time%60)
+		return fmt.Sprintf("%d分%d秒", time/60, time%60)
 	} else if time/86400 == 0 {
-		return fmt.Sprintf("%d小时%d分钟%d秒", time/3600, time%3600/60, time%3600%60)
+		return fmt.Sprintf("%d小时%d分%d秒", time/3600, time%3600/60, time%3600%60)
 	}
 
-	return fmt.Sprintf("%d天%d小时%d分钟%d秒", time/86400, time%86400/3600, time%86400%3600/60, time%86400%3600%60)
+	return fmt.Sprintf("%d天%d小时%d分%d秒", time/86400, time%86400/3600, time%86400%3600/60, time%86400%3600%60)
 }
