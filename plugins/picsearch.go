@@ -102,7 +102,11 @@ func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 }
 
 func (p *PicSearch) SecondTimesGroupForward(send *chan []byte, echo []string) {
-	id, _ := strconv.ParseFloat(echo[2], 64)
+	id, err := strconv.ParseFloat(echo[2], 64)
+	if err != nil {
+		log.Printf("Parse float error: %v", err)
+		return
+	}
 	ctx := &map[string]any{
 		"message_type": echo[1],
 		"sender": map[string]any{
@@ -275,9 +279,21 @@ func (p *PicSearch) sauceNAO(img string, response chan []cqcode.ArrayMessage, li
 
 	reqUrl := api + "&api_key=" + p.sauceNAOToken + "&url=" + img
 	client := web.NewTLS12Client()
-	req, _ := http.NewRequest("GET", reqUrl, nil)
-	resp, _ := client.Do(req)
-	body, _ := io.ReadAll(resp.Body)
+	req, err := http.NewRequest("GET", reqUrl, nil)
+	if err != nil {
+		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		return
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		return
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		return
+	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
@@ -286,7 +302,7 @@ func (p *PicSearch) sauceNAO(img string, response chan []cqcode.ArrayMessage, li
 	}(resp.Body)
 
 	var i any
-	err := json.Unmarshal(body, &i)
+	err = json.Unmarshal(body, &i)
 	if err != nil {
 		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
 		return
@@ -305,7 +321,11 @@ func (p *PicSearch) sauceNAO(img string, response chan []cqcode.ArrayMessage, li
 		results := ctx["results"].([]any)[0]
 		header := results.(map[string]any)["header"].(map[string]any)
 		data := results.(map[string]any)["data"].(map[string]any)
-		similarity, _ = strconv.ParseFloat(header["similarity"].(string), 64)
+		similarity, err = strconv.ParseFloat(header["similarity"].(string), 64)
+		if err != nil {
+			response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+			return
+		}
 		thumbNail = header["thumbnail"].(string)
 		if data["member_name"] != nil {
 			author = data["member_name"].(string)
@@ -357,7 +377,11 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 	data.Set("uri", img) // 图片链接
 	fromData := strings.NewReader(data.Encode())
 
-	reqC, _ := http.NewRequest("POST", api, fromData)
+	reqC, err := http.NewRequest("POST", api, fromData)
+	if err != nil {
+		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		return
+	}
 	reqC.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	reqC.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:6.0) Gecko/20100101 Firefox/6.0")
 	respC, err := client.Do(reqC)
@@ -367,7 +391,11 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 	}
 
 	urlB := strings.ReplaceAll(respC.Request.URL.String(), "color", "bovw")
-	reqB, _ := http.NewRequest("GET", urlB, nil)
+	reqB, err := http.NewRequest("GET", urlB, nil)
+	if err != nil {
+		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		return
+	}
 	reqB.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:6.0) Gecko/20100101 Firefox/6.0")
 	respB, err := client.Do(reqB)
 	if err != nil {
