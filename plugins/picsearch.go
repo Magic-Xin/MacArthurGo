@@ -55,7 +55,7 @@ func init() {
 	go essentials.DeleteExpired("DELETE FROM picsearch WHERE (? - created) > ?", base.Config.Plugins.PicSearch.ExpirationTime, base.Config.Plugins.PicSearch.IntervalTime)
 }
 
-func (p *PicSearch) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
+func (p *PicSearch) ReceiveAll(*map[string]any, *chan []byte) {}
 
 func (p *PicSearch) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	if !p.Enabled {
