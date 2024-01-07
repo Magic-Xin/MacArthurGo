@@ -1,9 +1,9 @@
 package plugins
 
 import (
+	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"fmt"
-	"github.com/gookit/config/v2"
 	"math/rand"
 	"strconv"
 	"time"
@@ -17,8 +17,8 @@ func init() {
 	roll := Roll{
 		essentials.Plugin{
 			Name:    "随机",
-			Enabled: config.Bool("plugins.roll.enable"),
-			Args:    config.Strings("plugins.roll.args"),
+			Enabled: base.Config.Plugins.Roll.Enable,
+			Args:    base.Config.Plugins.Roll.Args,
 		},
 	}
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &roll})

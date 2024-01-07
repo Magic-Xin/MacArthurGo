@@ -6,8 +6,6 @@ import (
 )
 
 func MessageFactory(msg *[]byte, send *chan []byte) {
-	//TODO 语言库回复
-	//TODO setu
 	var i any
 	err := json.Unmarshal(*msg, &i)
 	if err != nil {
@@ -21,6 +19,9 @@ func MessageFactory(msg *[]byte, send *chan []byte) {
 
 	if ctx["post_type"] == "message" {
 		if ctx["raw_message"].(string) == "" {
+			return
+		}
+		if essentials.BanList.IsBanned(int64((ctx)["sender"].(map[string]any)["user_id"].(float64))) {
 			return
 		}
 

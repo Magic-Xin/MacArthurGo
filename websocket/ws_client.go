@@ -1,8 +1,8 @@
 package websocket
 
 import (
+	"MacArthurGo/base"
 	"fmt"
-	"github.com/gookit/config/v2"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
@@ -44,7 +44,7 @@ func (c *Client) ReadPump() {
 		}
 		go MessageFactory(&message, &c.Send)
 
-		if config.Bool("debug") {
+		if base.Config.Debug {
 			log.Println(string(message))
 		}
 	}
@@ -69,7 +69,7 @@ func (c *Client) WritePump() {
 				return
 			}
 
-			if config.Bool("debug") {
+			if base.Config.Debug {
 				log.Println(string(message))
 			}
 

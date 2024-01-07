@@ -1,8 +1,8 @@
 package plugins
 
 import (
+	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
-	"github.com/gookit/config/v2"
 	"strconv"
 )
 
@@ -14,8 +14,8 @@ func init() {
 	poke := Poke{
 		essentials.Plugin{
 			Name:    "戳一戳",
-			Enabled: config.Bool("plugins.poke.enable"),
-			Args:    config.Strings("plugins.poke.args"),
+			Enabled: base.Config.Plugins.Poke.Enable,
+			Args:    base.Config.Plugins.Poke.Args,
 		},
 	}
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &poke})

@@ -5,18 +5,21 @@
   "retryTimes": 0,
   "waitingSeconds": 30,
   "admin": 0,
+  "updateUrl": "https://github.com/Magic-Xin/MacArthurGo/releases/download/Prerelease-dev/",
+  "updateInterval": 86400,
+  "bannedList": [],
   "plugins": {
     "corpus": {
-      "enable": true
+      "enable": false
     },
     "repeat": {
-      "enable": true,
+      "enable": false,
       "times": 3,
       "probability": 0.4,
       "commonProbability": 0.001
     },
     "bili": {
-      "enable": true，
+      "enable": false,
       "ai_summarize": {
         "enable": true,
         "args": ["/summarize", "/sum"],
@@ -24,18 +27,18 @@
       }
     },
     "poke": {
-      "enable": true,
+      "enable": false,
       "args": ["/poke", "/p"]
     },
     "roll": {
-      "enable": true,
+      "enable": false,
       "args": ["/roll", "/r"]
     },
     "music": {
-      "enable": true
+      "enable": false
     },
     "picSearch":{
-      "enable": true,
+      "enable": false,
       "args": ["/search", "/s"],
       "groupForward": true,
       "allowPrivate": true,
@@ -46,7 +49,7 @@
       "sauceNAOToken": ""
     },
     "chatAI": {
-      "enable": true,
+      "enable": false,
       "chatGPT": {
         "enable": true,
         "args": ["/chatgpt", "/c"],
