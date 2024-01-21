@@ -50,3 +50,4 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - [go-cqhttp](https://github.com/Mrs4s/go-cqhttp)
 - [OpenShamrock](https://github.com/whitechi73/OpenShamrock)
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
+- [go-proxy-bingai](https://github.com/Harry-zklcdc/go-proxy-bingai)
