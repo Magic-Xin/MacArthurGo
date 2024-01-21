@@ -46,11 +46,20 @@ type Gemini struct {
 	ReplyMap sync.Map
 }
 
+type NewBing struct {
+	Enabled bool
+	Args    []string
+	model   string
+	apiUrl  string
+	apiKey  string
+}
+
 type ChatAI struct {
 	essentials.Plugin
 	ChatGPT      *ChatGPT
 	QWen         *QWen
 	Gemini       *Gemini
+	NewBing      *NewBing
 	groupForward bool
 	panGu        bool
 }
@@ -73,6 +82,13 @@ func init() {
 		Args:    base.Config.Plugins.ChatAI.Gemini.Args,
 		apiKey:  base.Config.Plugins.ChatAI.Gemini.APIKey,
 	}
+	newBing := NewBing{
+		Enabled: base.Config.Plugins.ChatAI.NewBing.Enable,
+		Args:    base.Config.Plugins.ChatAI.NewBing.Args,
+		model:   base.Config.Plugins.ChatAI.NewBing.Model,
+		apiUrl:  base.Config.Plugins.ChatAI.NewBing.APIUrl,
+		apiKey:  base.Config.Plugins.ChatAI.NewBing.APIKey,
+	}
 
 	var args []string
 	if chatGPT.Enabled {
@@ -84,6 +100,9 @@ func init() {
 	if gemini.Enabled {
 		args = append(args, gemini.Args...)
 	}
+	if newBing.Enabled {
+		args = append(args, newBing.Args...)
+	}
 
 	chatAI := ChatAI{
 		Plugin: essentials.Plugin{
@@ -94,6 +113,7 @@ func init() {
 		ChatGPT:      &chatGPT,
 		QWen:         &qWen,
 		Gemini:       &gemini,
+		NewBing:      &newBing,
 		groupForward: base.Config.Plugins.ChatAI.GroupForward,
 		panGu:        base.Config.Plugins.ChatAI.Pangu,
 	}
@@ -134,11 +154,11 @@ func (c *ChatAI) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 
 	var res *string
-	if essentials.CheckArgumentArray(ctx, &c.ChatGPT.Args) {
+	if essentials.CheckArgumentArray(ctx, &c.ChatGPT.Args) && c.ChatGPT.Enabled {
 		res = c.ChatGPT.RequireAnswer(str)
-	} else if essentials.CheckArgumentArray(ctx, &c.QWen.Args) {
+	} else if essentials.CheckArgumentArray(ctx, &c.QWen.Args) && c.QWen.Enabled {
 		res = c.QWen.RequireAnswer(str)
-	} else if essentials.CheckArgumentArray(ctx, &c.Gemini.Args) {
+	} else if essentials.CheckArgumentArray(ctx, &c.Gemini.Args) && c.Gemini.Enabled {
 		var action *[]byte
 		messageID := int64((*ctx)["message_id"].(float64))
 		res, action = c.Gemini.RequireAnswer(str, message, messageID)
@@ -146,6 +166,9 @@ func (c *ChatAI) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 			*send <- *action
 			return
 		}
+	} else if essentials.CheckArgumentArray(ctx, &c.NewBing.Args) && c.NewBing.Enabled {
+		*send <- *essentials.SendMsg(ctx, "NewBing 回复生成中，速度较慢请勿重复发送请求", nil, false, true)
+		res = c.NewBing.RequireAnswer(str)
 	} else {
 		return
 	}
@@ -222,10 +245,6 @@ func (c *ChatAI) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 }
 
 func (c *ChatGPT) RequireAnswer(str string) *string {
-	if !c.Enabled {
-		res := "ChatGPT disabled"
-		return &res
-	}
 	client := openai.NewClient(c.apiKey)
 	resp, err := client.CreateChatCompletion(
 		context.Background(),
@@ -251,11 +270,6 @@ func (c *ChatGPT) RequireAnswer(str string) *string {
 }
 
 func (q *QWen) RequireAnswer(str string) *string {
-	if !q.Enabled {
-		res := "QWen disabled"
-		return &res
-	}
-
 	const api = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
 
 	payload := map[string]interface{}{
@@ -325,11 +339,6 @@ func (q *QWen) RequireAnswer(str string) *string {
 }
 
 func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64) (*string, *[]byte) {
-	if !g.Enabled || message == nil {
-		res := "Gemini disabled"
-		return &res, nil
-	}
-
 	var (
 		images []struct {
 			Data    *[]byte
@@ -478,4 +487,32 @@ func (g *Gemini) ImageProcessing(url string) (*[]byte, string, error) {
 	default:
 		return nil, "", fmt.Errorf("unsupported image type: %s", imgType)
 	}
+}
+
+func (n *NewBing) RequireAnswer(str string) *string {
+	config := openai.DefaultConfig(n.apiKey)
+	config.BaseURL = n.apiUrl
+
+	client := openai.NewClientWithConfig(config)
+	resp, err := client.CreateChatCompletion(
+		context.Background(),
+		openai.ChatCompletionRequest{
+			Model: n.model,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: str,
+				},
+			},
+		},
+	)
+
+	if err != nil {
+		log.Printf("NewBing chat completion error: %v", err)
+		res := fmt.Sprintf("NewBing chat completion error: %v", err)
+		return &res
+	}
+
+	res := n.model + ": " + resp.Choices[0].Message.Content
+	return &res
 }
