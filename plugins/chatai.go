@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	binglib "github.com/Harry-zklcdc/bing-lib"
 	"github.com/google/generative-ai-go/genai"
 	"github.com/sashabaranov/go-openai"
 	"github.com/vinta/pangu"
@@ -20,6 +21,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,8 +52,6 @@ type NewBing struct {
 	Enabled bool
 	Args    []string
 	model   string
-	apiUrl  string
-	apiKey  string
 }
 
 type ChatAI struct {
@@ -86,8 +86,6 @@ func init() {
 		Enabled: base.Config.Plugins.ChatAI.NewBing.Enable,
 		Args:    base.Config.Plugins.ChatAI.NewBing.Args,
 		model:   base.Config.Plugins.ChatAI.NewBing.Model,
-		apiUrl:  base.Config.Plugins.ChatAI.NewBing.APIUrl,
-		apiKey:  base.Config.Plugins.ChatAI.NewBing.APIKey,
 	}
 
 	var args []string
@@ -490,29 +488,24 @@ func (g *Gemini) ImageProcessing(url string) (*[]byte, string, error) {
 }
 
 func (n *NewBing) RequireAnswer(str string) *string {
-	config := openai.DefaultConfig(n.apiKey)
-	config.BaseURL = n.apiUrl
+	const cookie = "1f1e33"
 
-	client := openai.NewClientWithConfig(config)
-	resp, err := client.CreateChatCompletion(
-		context.Background(),
-		openai.ChatCompletionRequest{
-			Model: n.model,
-			Messages: []openai.ChatCompletionMessage{
-				{
-					Role:    openai.ChatMessageRoleUser,
-					Content: str,
-				},
-			},
-		},
-	)
-
+	c := binglib.NewChat(cookie)
+	err := c.NewConversation()
 	if err != nil {
-		log.Printf("NewBing chat completion error: %v", err)
-		res := fmt.Sprintf("NewBing chat completion error: %v", err)
+		log.Printf("NewBing new conversation error: %v", err)
+		res := fmt.Sprintf("NewBing new conversation error: %v", err)
+		return &res
+	}
+	c.SetStyle(n.model)
+	r, err := c.Chat("", str)
+	if err != nil {
+		log.Printf("NewBing chat error: %v", err)
+		res := fmt.Sprintf("NewBing chat error: %v", err)
 		return &res
 	}
 
-	res := n.model + ": " + resp.Choices[0].Message.Content
-	return &res
+	r = n.model + ": " + regexp.MustCompile(`\(\^\d\^\)|\[\^[^\]]*\^\]`).ReplaceAllString(r, "")
+
+	return &r
 }

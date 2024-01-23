@@ -88,8 +88,6 @@ type config struct {
 				Enable bool     `json:"enable"`
 				Args   []string `json:"args"`
 				Model  string   `json:"model"`
-				APIUrl string   `json:"apiUrl"`
-				APIKey string   `json:"apiKey"`
 			} `json:"newBing"`
 			GroupForward bool `json:"groupForward"`
 			Pangu        bool `json:"pangu"`
