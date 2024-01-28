@@ -13,8 +13,8 @@ cloud.google.com/go/longrunning v0.5.4/go.mod h1:zqNVncI0BOP8ST6XQD1+VcvuShMmq7+
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/FloatTech/floatbox v0.0.0-20231107124407-e38535efa2a2 h1:O4kptIzgYzNwZlBARZFv8EkA40yB6M5LGxxIF7NKLR8=
 github.com/FloatTech/floatbox v0.0.0-20231107124407-e38535efa2a2/go.mod h1:TeTlp+hTxpJti4JSdmUqzxGEr4wUBOVct9YWBepilpc=
-github.com/Harry-zklcdc/bing-lib v1.2.8 h1:foITSxp5oVwE/DHiKzLABEwIdWnFzDUJDD2Xcm9QnSw=
-github.com/Harry-zklcdc/bing-lib v1.2.8/go.mod h1:Ruq9Ka/DqdYpKrX0vPUKikH3hn8RDZ8F+rAePRSyKAg=
+github.com/Harry-zklcdc/bing-lib v1.2.9 h1:lrbVwAG6yqHbKY4hBogkKHpQkizQVaHY9Lqsq2eqDL0=
+github.com/Harry-zklcdc/bing-lib v1.2.9/go.mod h1:Ruq9Ka/DqdYpKrX0vPUKikH3hn8RDZ8F+rAePRSyKAg=
 github.com/RomiChan/syncx v0.0.0-20221202055724-5f842c53020e h1:wR3MXQ3VbUlPKOOUwLOYgh/QaJThBTYtsl673O3lqSA=
 github.com/RomiChan/syncx v0.0.0-20221202055724-5f842c53020e/go.mod h1:vD7Ra3Q9onRtojoY5sMCLQ7JBgjUsrXDnDKyFxqpf9w=
 github.com/antchfx/htmlquery v1.3.0 h1:5I5yNFOVI+egyia5F2s/5Do2nFWxJz41Tr3DyfKD25E=

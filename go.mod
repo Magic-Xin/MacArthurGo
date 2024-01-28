@@ -4,7 +4,7 @@ go 1.21.4
 
 require (
 	github.com/FloatTech/floatbox v0.0.0-20231107124407-e38535efa2a2
-	github.com/Harry-zklcdc/bing-lib v1.2.8
+	github.com/Harry-zklcdc/bing-lib v1.2.9
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/google/generative-ai-go v0.5.0
 	github.com/gorilla/websocket v1.5.1
