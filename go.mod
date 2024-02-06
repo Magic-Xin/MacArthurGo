@@ -4,7 +4,7 @@ go 1.21.4
 
 require (
 	github.com/FloatTech/floatbox v0.0.0-20231107124407-e38535efa2a2
-	github.com/Harry-zklcdc/bing-lib v1.4.1
+	github.com/Harry-zklcdc/bing-lib v1.4.2
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/google/generative-ai-go v0.6.0
 	github.com/gorilla/websocket v1.5.1
@@ -14,7 +14,7 @@ require (
 	github.com/tidwall/gjson v1.17.0
 	github.com/tidwall/pretty v1.2.1
 	github.com/vinta/pangu v3.0.0+incompatible
-	google.golang.org/api v0.161.0
+	google.golang.org/api v0.162.0
 )
 
 require (
@@ -50,9 +50,9 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto v0.0.0-20240125205218-1f4bbc51befe // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240125205218-1f4bbc51befe // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240125205218-1f4bbc51befe // indirect
+	google.golang.org/genproto v0.0.0-20240205150955-31a09d347014 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240205150955-31a09d347014 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240205150955-31a09d347014 // indirect
 	google.golang.org/grpc v1.61.0 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
 )
