@@ -1,6 +1,6 @@
 module MacArthurGo
 
-go 1.21.4
+go 1.22.0
 
 require (
 	github.com/FloatTech/floatbox v0.0.0-20231107124407-e38535efa2a2
