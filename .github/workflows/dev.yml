@@ -95,7 +95,7 @@ jobs:
 #        run: |
 #          mv MacArthurGo-darwin-10.14-${{ matrix.goarch }} MacArthurGo-darwin-${{ matrix.goarch }}
 #        working-directory: bin
-#
+
       - name: Build
         env:
           GOOS: ${{ matrix.goos }}
