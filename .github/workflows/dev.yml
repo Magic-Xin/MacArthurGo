@@ -26,6 +26,10 @@ jobs:
         exclude:
           - goos: darwin
             goarch: "386"
+          - goos: android
+            goarch: "386"
+          - goos: android
+            goarch: amd64
     steps:
       - uses: actions/checkout@v3
 
