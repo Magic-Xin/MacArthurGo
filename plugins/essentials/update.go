@@ -94,7 +94,7 @@ func (u *Update) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 			*send <- *SendMsg(ctx, "版本不一致，无法更新", nil, false, true)
 		}
 
-		updateUrl := base.Config.UpdateUrl + "MacArthurGo-" + runtime.GOOS + "-" + runtime.GOARCH + "-" + u.version
+		updateUrl := base.Config.UpdateUrl + "MacArthurGo-" + runtime.GOOS + "-" + runtime.GOARCH
 
 		if runtime.GOOS == "windows" {
 			updateUrl += ".exe"
