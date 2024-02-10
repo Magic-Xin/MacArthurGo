@@ -24,6 +24,26 @@ func SendAction(action string, params any, echo string) *[]byte {
 	return &jsonMsg
 }
 
+func SendFile(ctx *map[string]any, file string, name string) *[]byte {
+	if file == "" || ctx == nil {
+		return nil
+	}
+
+	var act structs.Action
+	if (*ctx)["message_type"] == "group" {
+		groupId := int64((*ctx)["group_id"].(float64))
+		params := structs.GroupFile{GroupId: groupId, File: file, Name: name}
+		act = structs.Action{Action: "upload_group_file", Params: params}
+	} else {
+		userId := int64((*ctx)["sender"].(map[string]any)["user_id"].(float64))
+		params := structs.PrivateFile{UserId: userId, File: file, Name: name}
+		act = structs.Action{Action: "upload_private_file", Params: params}
+	}
+
+	jsonMsg, _ := json.Marshal(act)
+	return &jsonMsg
+}
+
 func SendMsg(ctx *map[string]any, message string, messageArray *[]cqcode.ArrayMessage, at bool, reply bool) *[]byte {
 	if (message == "" && messageArray == nil) || ctx == nil {
 		return nil
