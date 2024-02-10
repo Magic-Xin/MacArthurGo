@@ -8,8 +8,8 @@ require (
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/google/generative-ai-go v0.7.0
 	github.com/gorilla/websocket v1.5.1
-	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/minio/selfupdate v0.6.0
+	github.com/ncruces/go-sqlite3 v0.12.2
 	github.com/sashabaranov/go-openai v1.19.3
 	github.com/tidwall/gjson v1.17.0
 	github.com/tidwall/pretty v1.2.1
@@ -34,7 +34,9 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.0 // indirect
+	github.com/ncruces/julianday v1.0.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/tetratelabs/wazero v1.6.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.48.0 // indirect
