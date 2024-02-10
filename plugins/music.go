@@ -68,7 +68,7 @@ func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 
 	if urlType != "" {
-		match := regexp.MustCompile(`id=(\d+)&`).FindAllStringSubmatch(res, -1)
+		match := regexp.MustCompile(`id=(\d+)`).FindAllStringSubmatch(res, -1)
 		if match != nil {
 			id, err := strconv.ParseInt(match[0][1], 10, 64)
 			if err == nil {
