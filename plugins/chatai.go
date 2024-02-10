@@ -113,7 +113,7 @@ func init() {
 		Gemini:       &gemini,
 		NewBing:      &newBing,
 		groupForward: base.Config.Plugins.ChatAI.GroupForward,
-		panGu:        base.Config.Plugins.ChatAI.Pangu,
+		panGu:        base.Config.Plugins.ChatAI.PanGu,
 	}
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &chatAI})
 }
