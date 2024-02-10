@@ -44,15 +44,17 @@ func init() {
 		sauceNAOToken:     base.Config.Plugins.PicSearch.SauceNAOToken,
 	}
 
-	sqlTable := `CREATE TABLE IF NOT EXISTS picsearch(uid TEXT PRIMARY KEY NOT NULL, res TEXT NOT NULL, created NUMERIC NOT NULL);`
-	_, err := essentials.DB.Exec(sqlTable)
+	key := &[]string{"uid", "res", "created"}
+	value := &[]string{"TEXT PRIMARY KEY NOT NULL", "TEXT NOT NULL", "NUMERIC NOT NULL"}
+	err := essentials.CreateDB("picSearch", key, value)
+
 	if err != nil {
-		log.Printf("SQL exec error: %v", err)
+		log.Printf("Database picSearch create error: %v", err)
 		return
 	}
 
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &pSearch})
-	go essentials.DeleteExpired("DELETE FROM picsearch WHERE (? - created) > ?", base.Config.Plugins.PicSearch.ExpirationTime, base.Config.Plugins.PicSearch.IntervalTime)
+	go essentials.DeleteExpired("picSearch", "created", base.Config.Plugins.PicSearch.ExpirationTime, base.Config.Plugins.PicSearch.IntervalTime)
 }
 
 func (p *PicSearch) ReceiveAll(*map[string]any, *chan []byte) {}
@@ -115,7 +117,7 @@ func (p *PicSearch) SecondTimesGroupForward(send *chan []byte, echo []string) {
 		"group_id": id,
 	}
 
-	selectRes := essentials.SelectDB("SELECT res FROM picsearch WHERE uid=?", echo[0])
+	selectRes := essentials.SelectDB("picSearch", "res", fmt.Sprintf("uid='%s'", echo[0]))
 	if selectRes == nil {
 		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", nil, false, false)
 		return
@@ -152,7 +154,7 @@ func (p *PicSearch) groupFailed(send *chan []byte, echo []string) {
 
 	*send <- *essentials.SendMsg(ctx, "合并转发失败，将独立发送搜索结果", nil, false, false)
 
-	selectRes := essentials.SelectDB("SELECT res FROM picsearch WHERE uid=?", echo[0])
+	selectRes := essentials.SelectDB("picSearch", "res", fmt.Sprintf("uid='%s'", echo[0]))
 	if selectRes == nil {
 		*send <- *essentials.SendMsg(ctx, "数据库查询失败，搜图结果丢失", nil, false, false)
 		return
@@ -194,7 +196,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 			}
 			fileUrl := c.Data["url"].(string)
 			fileUrl, key = essentials.GetUniversalImgURL(fileUrl)
-			selectRes := essentials.SelectDB("SELECT res FROM picsearch WHERE uid=?", key)
+			selectRes := essentials.SelectDB("picSearch", "res", fmt.Sprintf("uid='%s'", key))
 			if selectRes != nil {
 				if len(*selectRes) > 0 {
 					res := (*selectRes)[0]["res"].(string)
@@ -251,7 +253,11 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 			if err != nil {
 				log.Printf("Search result mashal error: %v", err)
 			} else {
-				essentials.InsertDB("picsearch", &[]string{"uid", "res", "created"}, key, string(jsonMsg), time.Now().Unix())
+				err = essentials.InsertDB("picSearch", &[]string{"uid", "res", "created"},
+					&[]string{key, string(jsonMsg), strconv.FormatInt(time.Now().Unix(), 10)})
+				if err != nil {
+					log.Printf("Insert picSearch error: %v", err)
+				}
 			}
 		}
 
