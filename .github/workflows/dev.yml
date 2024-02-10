@@ -13,7 +13,7 @@ concurrency:
 env:
   COMMIT_ID: "${{ github.sha }}"
   NAME: MacArthurGo
-  CGO_ENABLED: 1
+  CGO_ENABLED: 0
 
 jobs:
   Build:
@@ -21,17 +21,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: [ linux, windows-6.0, darwin-10.14, android ]
+        goos: [ linux, windows, darwin, android ]
         goarch: [ "386", amd64, arm64 ]
         exclude:
-          - goos: windows-6.0
-            goarch: arm64
-          - goos: darwin-10.14
+          - goos: darwin
             goarch: "386"
-          - goos: android
-            goarch: "386"
-          - goos: android
-            goarch: amd64
     steps:
       - uses: actions/checkout@v3
 
@@ -57,46 +51,53 @@ jobs:
         with:
           go-version: '1.22.0'
 
-      - name: Set up xgo
-        if: ${{ matrix.goos!='android' }}
-        run: |
-          docker pull techknowlogick/xgo:latest
-          go install src.techknowlogick.com/xgo@latest
-
-      - name: Set up NDK
-        uses: nttld/setup-ndk@v1
-        if: ${{ matrix.goos=='android' }}
-        id: setup-ndk
-        with:
-          ndk-version: r26b
-          add-to-path: true
-          
+#      - name: Set up xgo
+#        if: ${{ matrix.goos!='android' }}
+#        run: |
+#          docker pull techknowlogick/xgo:latest
+#          go install src.techknowlogick.com/xgo@latest
+#
+#      - name: Set up NDK
+#        uses: nttld/setup-ndk@v1
+#        if: ${{ matrix.goos=='android' }}
+#        id: setup-ndk
+#        with:
+#          ndk-version: r26b
+#          add-to-path: true
+#
+#      - name: Build
+#        if: ${{ matrix.goos!='android' }}
+#        run: |
+#          xgo --targets=${{ matrix.goos }}/${{ matrix.goarch }} -ldflags="${LDFLAGS}" --out bin/${{ env.NAME }} ./
+#
+#      - name: Build Android
+#        if: ${{ matrix.goos=='android' }}
+#        env:
+#          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+#          GOOS: ${{ matrix.goos }}
+#          GOARCH: ${{ matrix.goarch }}
+#        run: |
+#          CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
+#          CC=${CC} go build -ldflags "${LDFLAGS}" -o bin/${{ env.NAME }}-${GOOS}-${GOARCH} ./
+#
+#      - name: Rename Windows
+#        if: ${{ matrix.goos=='windows-6.0' }}
+#        run: |
+#          mv MacArthurGo-windows-6.0-${{ matrix.goarch }}.exe MacArthurGo-windows-${{ matrix.goarch }}.exe
+#        working-directory: bin
+#
+#      - name: Rename Darwin
+#        if: ${{ matrix.goos=='darwin-10.14' }}
+#        run: |
+#          mv MacArthurGo-darwin-10.14-${{ matrix.goarch }} MacArthurGo-darwin-${{ matrix.goarch }}
+#        working-directory: bin
+#
       - name: Build
-        if: ${{ matrix.goos!='android' }}
-        run: |
-          xgo --targets=${{ matrix.goos }}/${{ matrix.goarch }} -ldflags="${LDFLAGS}" --out bin/${{ env.NAME }} ./
-
-      - name: Build Android
-        if: ${{ matrix.goos=='android' }}
         env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
-          CC=${CC} go build -ldflags "${LDFLAGS}" -o bin/${{ env.NAME }}-${GOOS}-${GOARCH} ./
-
-      - name: Rename Windows
-        if: ${{ matrix.goos=='windows-6.0' }}
-        run: |
-          mv MacArthurGo-windows-6.0-${{ matrix.goarch }}.exe MacArthurGo-windows-${{ matrix.goarch }}.exe
-        working-directory: bin
-
-      - name: Rename Darwin
-        if: ${{ matrix.goos=='darwin-10.14' }}
-        run: |
-          mv MacArthurGo-darwin-10.14-${{ matrix.goarch }} MacArthurGo-darwin-${{ matrix.goarch }}
-        working-directory: bin
+          go build -ldflags="${LDFLAGS}" -o bin/${{ env.NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} ./
 
       - name: Chmod and compress
         run: |
