@@ -75,7 +75,7 @@ func (u *Update) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 
 	if len(words) == 2 {
-		if (int64((*ctx)["sender"].(map[string]any)["user_id"].(float64))) == base.Config.Admin {
+		if (int64((*ctx)["sender"].(map[string]any)["user_id"].(float64))) != base.Config.Admin {
 			*send <- *SendMsg(ctx, "没有更新权限", nil, false, true)
 			return
 		}
