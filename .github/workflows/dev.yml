@@ -104,9 +104,10 @@ jobs:
           go build -ldflags="${LDFLAGS}" -o bin/${{ env.NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} ./
 
       - name: Chmod and compress
+        if: ${{ matrix.goos!='darwin' }}
         run: |
           chmod +x bin/${{ env.NAME }}-*
-          if [ ${{ matrix.goos }} != "darwin-10.14" ]; then ${{ env.upx }} --lzma --best bin/${{ env.NAME }}-*; fi
+          if [ ${{ matrix.goos }} != "windows" ] && [ ${{ matrix.goarch }} != "arm64" ]; then ${{ env.upx }} --lzma --best bin/${{ env.NAME }}-*; fi
 
       - name: Upload To Artifact
         if: ${{  success() }}
