@@ -2,7 +2,6 @@ NAME=MacArthurGo
 BINDIR=bin
 OUTDIR=out
 LDFLAGS=-s -w -X MacArthurGo/base.Version=$(shell git describe --tags --always --dirty)  -X MacArthurGo/base.Branch=Release -X MacArthurGo/base.BuildTime=$(shell date +'%Y-%m-%dT%H:%M:%SZ' -u)
-CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
 
 DARWIN_PLATFORM_LIST = \
 	darwin-amd64 \
@@ -19,33 +18,32 @@ WINDOWS_PLATFORM_LIST = \
     windows-amd64
 
 darwin-amd64:
-	xgo --targets=darwin-10.14/amd64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-darwin-amd64 ./
 
 darwin-arm64:
-	xgo --targets=darwin-10.14/arm64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-darwin-arm64 ./
 
 linux-386:
-	xgo --targets=linux/386 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	CGO_ENABLED=0 GOOS=linux GOARCH=386 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-linux-386 ./
 
 linux-amd64:
-	xgo --targets=linux/amd64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-linux-amd64 ./
 
 linux-arm64:
-	xgo --targets=linux/arm64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-linux-arm64 ./
 
 android-arm64:
-	CC=${CC} CGO_ENABLED=1 GOOS=android GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-android-arm64 ./
+	CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-android-arm64 ./
 
 windows-386:
-	xgo --targets=windows-6.0/386 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	CGO_ENABLED=0 GOOS=windows GOARCH=386 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-windows-386 ./
 
 windows-amd64:
-	xgo --targets=windows-6.0/amd64 -ldflags="${LDFLAGS}" --out $(BINDIR)/MacArthurGo ./
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-windows-amd64 ./
 
 darwin_releases=$(addsuffix .tar, $(DARWIN_PLATFORM_LIST))
 
 $(darwin_releases): %.tar : %
-	mv $(BINDIR)/MacArthurGo-* $(BINDIR)/MacArthurGo-$(basename $@)
 	chmod +x $(BINDIR)/MacArthurGo-*
 	cd $(BINDIR) && tar -zcvf ../$(OUTDIR)/$(NAME)-$(basename $@).tar.gz MacArthurGo-*
 	rm -rf $(BINDIR)/MacArthurGo-*
