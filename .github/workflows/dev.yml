@@ -33,7 +33,7 @@ jobs:
           - goos: android
             goarch: amd64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set Environment
         run: |
