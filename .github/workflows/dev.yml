@@ -31,7 +31,7 @@ jobs:
           - goos: android
             goarch: amd64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set Environment
         run: |
@@ -51,7 +51,7 @@ jobs:
           echo "upx=../upx-4.2.1-amd64_linux/upx" >> $GITHUB_ENV
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: '1.22.0'
 
@@ -102,11 +102,17 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           go build -ldflags="${LDFLAGS}" -o bin/${{ env.NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} ./
-
-      - name: Chmod and compress
-        if: ${{ matrix.goos!='darwin' }}
-        run: |
           chmod +x bin/${{ env.NAME }}-*
+
+      - name: Rename Windows
+        if: ${{ matrix.goos == 'windows' }}
+        run: |
+          mv MacArthurGo-windows-${{ matrix.goarch }} MacArthurGo-windows-${{ matrix.goarch }}.exe
+        working-directory: bin
+
+      - name: UPX Compress
+        if: ${{ matrix.goos != 'darwin' }}
+        run: |
           if [ ${{ matrix.goos }} != "windows" ] && [ ${{ matrix.goarch }} != "arm64" ]; then ${{ env.upx }} --lzma --best bin/${{ env.NAME }}-*; fi
 
       - name: Upload To Artifact
@@ -143,7 +149,7 @@ jobs:
         shell: bash
 
       - name: Tag Repo
-        uses: richardsimko/update-tag@v1.0.6
+        uses: richardsimko/update-tag@v1.0.11
         with:
           tag_name: Prerelease-${{ github.ref_name }}
         env:
