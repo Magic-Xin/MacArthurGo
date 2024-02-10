@@ -29,6 +29,10 @@ type config struct {
 		Corpus struct {
 			Enable bool `json:"enable"`
 		} `json:"corpus"`
+		OriginPic struct {
+			Enable bool     `json:"enable"`
+			Args   []string `json:"args"`
+		} `json:"originPic"`
 		Repeat struct {
 			Enable            bool    `json:"enable"`
 			Times             int64   `json:"times"`
@@ -41,7 +45,7 @@ type config struct {
 				Enable       bool     `json:"enable"`
 				Args         []string `json:"args"`
 				GroupForward bool     `json:"groupForward"`
-			} `json:"ai_summarize"`
+			} `json:"aiSummarize"`
 		} `json:"bili"`
 		Poke struct {
 			Enable bool     `json:"enable"`
@@ -90,7 +94,7 @@ type config struct {
 				Model  string   `json:"model"`
 			} `json:"newBing"`
 			GroupForward bool `json:"groupForward"`
-			Pangu        bool `json:"pangu"`
+			PanGu        bool `json:"panGu"`
 		} `json:"chatAI"`
 	} `json:"plugins"`
 }
