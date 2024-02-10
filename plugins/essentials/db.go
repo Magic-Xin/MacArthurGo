@@ -2,46 +2,70 @@ package essentials
 
 import (
 	"database/sql"
-	_ "github.com/mattn/go-sqlite3"
+	"errors"
+	_ "github.com/ncruces/go-sqlite3/driver"
+	_ "github.com/ncruces/go-sqlite3/embed"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 )
 
-var DB *sql.DB
+var db *sql.DB
 
 func init() {
 	var err error
-	DB, err = sql.Open("sqlite3", "./cache.db")
+	db, err = sql.Open("sqlite3", "./cache.db")
 	if err != nil {
 		log.Printf("Open database error: %v", err)
 	}
 }
 
-func InsertDB(table string, key *[]string, value ...any) {
-	if len(*key) != len(value) {
-		log.Printf("Database insert error: key length not equal to value length")
-		return
+func CreateDB(table string, key *[]string, value *[]string) error {
+	if len(*key) != len(*value) {
+		return errors.New("key length not equal to value length")
 	}
-	placeHolder := make([]string, len(*key))
-	for i := range placeHolder {
-		placeHolder[i] = "?"
+
+	cmd := "CREATE TABLE IF NOT EXISTS " + table + "("
+	for i, k := range *key {
+		if i > 0 {
+			cmd += ","
+		}
+		cmd += k + " " + (*value)[i]
 	}
-	stmt, err := DB.Prepare("INSERT INTO " + table + "(" + strings.Join(*key, ", ") +
-		") VALUES (" + strings.Join(placeHolder, ", ") + ")")
+	cmd += ")"
+
+	_, err := db.Exec(cmd)
 	if err != nil {
-		log.Printf("Database insert prepare error: %v", err)
-		return
+		return err
 	}
-	_, err = stmt.Exec(value...)
-	if err != nil {
-		log.Printf("Database insert exec error: %v", err)
-		return
-	}
+	return nil
 }
 
-func SelectDB(arg string, params ...any) *[]map[string]any {
-	query, err := DB.Query(arg, params...)
+func InsertDB(table string, key *[]string, value *[]string) error {
+	if len(*key) != len(*value) {
+		return errors.New("key length not equal to value length")
+	}
+
+	cmd := "INSERT INTO " + table + "(" + strings.Join(*key, ", ") + ") VALUES ("
+	for i, v := range *value {
+		if i > 0 {
+			cmd += ", "
+		}
+		cmd += "'" + v + "'"
+	}
+	cmd += ")"
+
+	_, err := db.Exec(cmd)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func SelectDB(table string, target string, arg string) *[]map[string]any {
+	cmd := "SELECT " + target + " FROM " + table + " WHERE " + arg
+	query, err := db.Query(cmd)
 	if err != nil {
 		log.Printf("Database query error: %v", err)
 		return nil
@@ -83,7 +107,7 @@ func SelectDB(arg string, params ...any) *[]map[string]any {
 }
 
 func UpdateDB(arg string, params ...any) {
-	stmt, err := DB.Prepare(arg)
+	stmt, err := db.Prepare(arg)
 	if err != nil {
 		log.Printf("Database update prepare error: %v", err)
 		return
@@ -95,19 +119,15 @@ func UpdateDB(arg string, params ...any) {
 	}
 }
 
-func DeleteExpired(arg string, expiration int64, interval int64) {
+func DeleteExpired(table string, arg string, expiration int64, interval int64) {
 	for {
-		stmt, err := DB.Prepare(arg)
+		cmd := "DELETE FROM " + table + " WHERE " + strconv.FormatInt(time.Now().Unix(), 10) + " - " + arg + " > " + strconv.FormatInt(expiration, 10)
+		_, err := db.Exec(cmd)
 		if err != nil {
-			log.Printf("Database delete prepare error: %v", err)
+			log.Printf("Database delete error: %v", err)
 			return
 		}
 
-		_, err = stmt.Exec(time.Now().Unix(), expiration)
-		if err != nil {
-			log.Printf("Database delete exec error: %v", err)
-			return
-		}
 		time.Sleep(time.Duration(interval) * time.Second)
 	}
 }

@@ -95,7 +95,9 @@ func (b *Bili) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 	rawMsg := (*ctx)["raw_message"].(string)
 	if match := regexp.MustCompile(biliShort).FindAllStringSubmatch(rawMsg, -1); match != nil {
-		rawMsg = *essentials.GetOriginUrl("https://" + match[0][1])
+		if orgUrl := essentials.GetOriginUrl("https://" + match[0][1]); orgUrl != nil {
+			rawMsg = *orgUrl
+		}
 	}
 
 	if essentials.CheckArgumentArray(ctx, &b.AiSummarize.Args) {
@@ -166,7 +168,9 @@ func (b *Bili) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 			const video = `www.bilibili.com/video/(\w+)`
 
 			if match := regexp.MustCompile(biliShort).FindAllStringSubmatch(text, -1); match != nil {
-				text = *essentials.GetOriginUrl("https://" + match[0][1])
+				if orgUrl := essentials.GetOriginUrl("https://" + match[0][1]); orgUrl != nil {
+					text = *orgUrl
+				}
 			}
 
 			if match := regexp.MustCompile(video).FindAllStringSubmatch(text, -1); match != nil {

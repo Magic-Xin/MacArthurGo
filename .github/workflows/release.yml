@@ -15,31 +15,31 @@ jobs:
     permissions:
       contents: write
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Setup UPX
       run: |
         cd ..
-        wget https://github.com/upx/upx/releases/download/v4.2.1/upx-4.2.1-amd64_linux.tar.xz
-        tar xf upx-4.2.1-amd64_linux.tar.xz
-        echo "upx=../upx-4.2.1-amd64_linux/upx" >> $GITHUB_ENV
+        wget https://github.com/upx/upx/releases/download/v4.2.2/upx-4.2.2-amd64_linux.tar.xz
+        tar xf upx-4.2.2-amd64_linux.tar.xz
+        echo "upx=../upx-4.2.2-amd64_linux/upx" >> $GITHUB_ENV
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
-        go-version: '1.21'
+        go-version: '1.22.0'
 
-    - name: Set up xgo
-      run: |
-        docker pull techknowlogick/xgo:latest
-        go install src.techknowlogick.com/xgo@latest
-
-    - name: Set up NDK
-      uses: nttld/setup-ndk@v1
-      id: setup-ndk
-      with:
-        ndk-version: r26b
-        add-to-path: true
+#    - name: Set up xgo
+#      run: |
+#        docker pull techknowlogick/xgo:latest
+#        go install src.techknowlogick.com/xgo@latest
+#
+#    - name: Set up NDK
+#      uses: nttld/setup-ndk@v1
+#      id: setup-ndk
+#      with:
+#        ndk-version: r26b
+#        add-to-path: true
 
     - name: Build
       run: |

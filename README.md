@@ -25,6 +25,7 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
   - ChatGPT
   - Alibaba QianWen
   - Google Gemini Pro (with picture search)
+  - New Bing Chat
 - Music url parser
   - Netease Cloud Music
   - QQ Music
@@ -49,3 +50,4 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - [go-cqhttp](https://github.com/Mrs4s/go-cqhttp)
 - [OpenShamrock](https://github.com/whitechi73/OpenShamrock)
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
+- [go-proxy-bingai](https://github.com/Harry-zklcdc/go-proxy-bingai)

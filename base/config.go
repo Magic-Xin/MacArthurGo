@@ -84,6 +84,11 @@ type config struct {
 				Args   []string `json:"args"`
 				APIKey string   `json:"apiKey"`
 			} `json:"gemini"`
+			NewBing struct {
+				Enable bool     `json:"enable"`
+				Args   []string `json:"args"`
+				Model  string   `json:"model"`
+			} `json:"newBing"`
 			GroupForward bool `json:"groupForward"`
 			Pangu        bool `json:"pangu"`
 		} `json:"chatAI"`

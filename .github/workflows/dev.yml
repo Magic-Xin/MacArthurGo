@@ -13,7 +13,7 @@ concurrency:
 env:
   COMMIT_ID: "${{ github.sha }}"
   NAME: MacArthurGo
-  CGO_ENABLED: 1
+  CGO_ENABLED: 0
 
 jobs:
   Build:
@@ -21,19 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: [ linux, windows-6.0, darwin-10.14, android ]
+        goos: [ linux, windows, darwin, android ]
         goarch: [ "386", amd64, arm64 ]
         exclude:
-          - goos: windows-6.0
-            goarch: arm64
-          - goos: darwin-10.14
+          - goos: darwin
             goarch: "386"
           - goos: android
             goarch: "386"
           - goos: android
             goarch: amd64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set Environment
         run: |
@@ -48,60 +46,74 @@ jobs:
       - name: Setup UPX
         run: |
           cd ..
-          wget https://github.com/upx/upx/releases/download/v4.2.1/upx-4.2.1-amd64_linux.tar.xz
-          tar xf upx-4.2.1-amd64_linux.tar.xz
-          echo "upx=../upx-4.2.1-amd64_linux/upx" >> $GITHUB_ENV
+          wget https://github.com/upx/upx/releases/download/v4.2.2/upx-4.2.2-amd64_linux.tar.xz
+          tar xf upx-4.2.2-amd64_linux.tar.xz
+          echo "upx=../upx-4.2.2-amd64_linux/upx" >> $GITHUB_ENV
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.22.0'
 
-      - name: Set up xgo
-        if: ${{ matrix.goos!='android' }}
-        run: |
-          docker pull techknowlogick/xgo:latest
-          go install src.techknowlogick.com/xgo@latest
+#      - name: Set up xgo
+#        if: ${{ matrix.goos!='android' }}
+#        run: |
+#          docker pull techknowlogick/xgo:latest
+#          go install src.techknowlogick.com/xgo@latest
+#
+#      - name: Set up NDK
+#        uses: nttld/setup-ndk@v1
+#        if: ${{ matrix.goos=='android' }}
+#        id: setup-ndk
+#        with:
+#          ndk-version: r26b
+#          add-to-path: true
+#
+#      - name: Build
+#        if: ${{ matrix.goos!='android' }}
+#        run: |
+#          xgo --targets=${{ matrix.goos }}/${{ matrix.goarch }} -ldflags="${LDFLAGS}" --out bin/${{ env.NAME }} ./
+#
+#      - name: Build Android
+#        if: ${{ matrix.goos=='android' }}
+#        env:
+#          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+#          GOOS: ${{ matrix.goos }}
+#          GOARCH: ${{ matrix.goarch }}
+#        run: |
+#          CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
+#          CC=${CC} go build -ldflags "${LDFLAGS}" -o bin/${{ env.NAME }}-${GOOS}-${GOARCH} ./
+#
+#      - name: Rename Windows
+#        if: ${{ matrix.goos=='windows-6.0' }}
+#        run: |
+#          mv MacArthurGo-windows-6.0-${{ matrix.goarch }}.exe MacArthurGo-windows-${{ matrix.goarch }}.exe
+#        working-directory: bin
+#
+#      - name: Rename Darwin
+#        if: ${{ matrix.goos=='darwin-10.14' }}
+#        run: |
+#          mv MacArthurGo-darwin-10.14-${{ matrix.goarch }} MacArthurGo-darwin-${{ matrix.goarch }}
+#        working-directory: bin
 
-      - name: Set up NDK
-        uses: nttld/setup-ndk@v1
-        if: ${{ matrix.goos=='android' }}
-        id: setup-ndk
-        with:
-          ndk-version: r26b
-          add-to-path: true
-          
       - name: Build
-        if: ${{ matrix.goos!='android' }}
-        run: |
-          xgo --targets=${{ matrix.goos }}/${{ matrix.goarch }} -ldflags="${LDFLAGS}" --out bin/${{ env.NAME }} ./
-
-      - name: Build Android
-        if: ${{ matrix.goos=='android' }}
         env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android33-clang
-          CC=${CC} go build -ldflags "${LDFLAGS}" -o bin/${{ env.NAME }}-${GOOS}-${GOARCH} ./
+          go build -ldflags="${LDFLAGS}" -o bin/${{ env.NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} ./
+          chmod +x bin/${{ env.NAME }}-*
 
       - name: Rename Windows
-        if: ${{ matrix.goos=='windows-6.0' }}
+        if: ${{ matrix.goos == 'windows' }}
         run: |
-          mv MacArthurGo-windows-6.0-${{ matrix.goarch }}.exe MacArthurGo-windows-${{ matrix.goarch }}.exe
+          mv MacArthurGo-windows-${{ matrix.goarch }} MacArthurGo-windows-${{ matrix.goarch }}.exe
         working-directory: bin
 
-      - name: Rename Darwin
-        if: ${{ matrix.goos=='darwin-10.14' }}
+      - name: UPX Compress
+        if: ${{ matrix.goos != 'darwin' }}
         run: |
-          mv MacArthurGo-darwin-10.14-${{ matrix.goarch }} MacArthurGo-darwin-${{ matrix.goarch }}
-        working-directory: bin
-
-      - name: Chmod and compress
-        run: |
-          chmod +x bin/${{ env.NAME }}-*
-          if [ ${{ matrix.goos }} != "darwin-10.14" ]; then ${{ env.upx }} --lzma --best bin/${{ env.NAME }}-*; fi
+          if [ ${{ matrix.goos }} != "windows" ] && [ ${{ matrix.goarch }} != "arm64" ]; then ${{ env.upx }} --lzma --best bin/${{ env.NAME }}-*; fi
 
       - name: Upload To Artifact
         if: ${{  success() }}
@@ -137,7 +149,7 @@ jobs:
         shell: bash
 
       - name: Tag Repo
-        uses: richardsimko/update-tag@v1.0.6
+        uses: richardsimko/update-tag@v1.0.11
         with:
           tag_name: Prerelease-${{ github.ref_name }}
         env:

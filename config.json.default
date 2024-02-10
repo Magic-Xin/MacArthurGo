@@ -67,6 +67,11 @@
         "args": ["/gemini", "/g"],
         "apiKey": ""
       },
+      "newBing": {
+        "enable": true,
+        "args": ["/bing", "/b"],
+        "model": "Creative-g4t",
+      },
       "groupForward": true,
       "pangu": true
     }
