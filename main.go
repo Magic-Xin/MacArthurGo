@@ -15,7 +15,11 @@ import (
 )
 
 func main() {
-	tz, _ := time.LoadLocation("Asia/Shanghai")
+	tz, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		tz = time.FixedZone("Asia/Shanghai", 8*60*60)
+	}
+
 	fileName := fmt.Sprintf(time.Now().In(tz).Format("20060102150405"))
 	logPath := filepath.Join(".", "log")
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
