@@ -4,7 +4,7 @@ go 1.22.0
 
 require (
 	github.com/FloatTech/floatbox v0.0.0-20231107124407-e38535efa2a2
-	github.com/Harry-zklcdc/bing-lib v1.4.2
+	github.com/Harry-zklcdc/bing-lib v1.4.6
 	github.com/antchfx/htmlquery v1.3.0
 	github.com/google/generative-ai-go v0.7.0
 	github.com/gorilla/websocket v1.5.1
@@ -14,13 +14,13 @@ require (
 	github.com/tidwall/gjson v1.17.0
 	github.com/tidwall/pretty v1.2.1
 	github.com/vinta/pangu v3.0.0+incompatible
-	google.golang.org/api v0.163.0
+	google.golang.org/api v0.164.0
 )
 
 require (
 	aead.dev/minisign v0.2.1 // indirect
 	cloud.google.com/go/ai v0.3.2 // indirect
-	cloud.google.com/go/compute v1.23.4 // indirect
+	cloud.google.com/go/compute v1.24.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/longrunning v0.5.5 // indirect
 	github.com/RomiChan/syncx v0.0.0-20221202055724-5f842c53020e // indirect
