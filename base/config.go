@@ -28,6 +28,15 @@ type config struct {
 	Plugins        struct {
 		Corpus struct {
 			Enable bool `json:"enable"`
+			Rules  []struct {
+				Regexp  string  `json:"regexp"`
+				Reply   string  `json:"reply"`
+				IsReply bool    `json:"isReply"`
+				IsAt    bool    `json:"isAt"`
+				Scene   string  `json:"scene"`
+				Users   []int64 `json:"users"`
+				Groups  []int64 `json:"groups"`
+			} `json:"rules"`
 		} `json:"corpus"`
 		OriginPic struct {
 			Enable bool     `json:"enable"`
