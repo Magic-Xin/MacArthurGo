@@ -165,7 +165,10 @@ func (u *Update) getVersion() error {
 		log.Printf("Parse upload time error: %v", err)
 		return err
 	}
-	tz, _ := time.LoadLocation("Asia/Shanghai")
+	tz, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		tz = time.FixedZone("Asia/Shanghai", 8*60*60)
+	}
 	u.uploadTime = uploadTime.In(tz)
 	u.version = i.(map[string]any)["version"].(string)[:7]
 

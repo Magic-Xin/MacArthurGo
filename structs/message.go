@@ -2,6 +2,18 @@ package structs
 
 import "MacArthurGo/structs/cqcode"
 
+type PrivateFile struct {
+	UserId int64  `json:"user_id"`
+	File   string `json:"file"`
+	Name   string `json:"name"`
+}
+
+type GroupFile struct {
+	GroupId int64  `json:"group_id"`
+	File    string `json:"file"`
+	Name    string `json:"name"`
+}
+
 type PrivateMessage struct {
 	UserId  int64                 `json:"user_id"`
 	Message []cqcode.ArrayMessage `json:"message"`

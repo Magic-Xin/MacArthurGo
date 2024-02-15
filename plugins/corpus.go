@@ -4,54 +4,45 @@ import (
 	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs/cqcode"
-	"encoding/json"
-	"log"
-	"os"
 	"regexp"
 	"strings"
 )
 
 type Corpus struct {
 	essentials.Plugin
-	Data *[]CorpusData
+	rules *[]Rules
 }
 
-type CorpusData struct {
-	Regexp  string  `json:"regexp"`
-	Reply   string  `json:"reply"`
-	IsReply bool    `json:"is_reply"`
-	IsAt    bool    `json:"is_at"`
-	Scene   string  `json:"scene"`
-	Users   []int64 `json:"users"`
-	Groups  []int64 `json:"groups"`
+type Rules struct {
+	Regexp  string
+	Reply   string
+	IsReply bool
+	IsAt    bool
+	Scene   string
+	Users   []int64
+	Groups  []int64
 	Message *[]cqcode.ArrayMessage
 }
 
 func init() {
-	f, err := os.Open("corpus.json")
-	if err != nil {
-		log.Printf("Open corpus.json failed: %v", err)
-		return
-	}
-	defer func(f *os.File) {
-		err = f.Close()
-		if err != nil {
-			log.Printf("Close corpus.json failed: %v", err)
+	var rules []Rules
+	for _, v := range base.Config.Plugins.Corpus.Rules {
+		rule := Rules{
+			Regexp:  v.Regexp,
+			Reply:   v.Reply,
+			IsReply: v.IsReply,
+			IsAt:    v.IsAt,
+			Scene:   v.Scene,
+			Users:   v.Users,
+			Groups:  v.Groups,
 		}
-	}(f)
 
-	var data []CorpusData
-	err = json.NewDecoder(f).Decode(&data)
-	if err != nil {
-		log.Printf("Decode corpus.json failed: %v", err)
-		return
-	}
-
-	for i, v := range data {
 		cq := cqcode.FromStr(v.Reply)
 		if cq != nil {
-			data[i].Message = cq
+			rule.Message = cq
 		}
+
+		rules = append(rules, rule)
 	}
 
 	corpus := Corpus{
@@ -59,7 +50,7 @@ func init() {
 			Name:    "语料库回复",
 			Enabled: base.Config.Plugins.Corpus.Enable,
 		},
-		Data: &data,
+		rules: &rules,
 	}
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &corpus})
 }
@@ -82,7 +73,7 @@ func (c *Corpus) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		}
 	}
 
-	for _, v := range *c.Data {
+	for _, v := range *c.rules {
 		if match := regexp.MustCompile(v.Regexp).MatchString(text); match {
 			if v.Scene != "a" && v.Scene != "all" {
 				if !strings.HasPrefix((*ctx)["message_type"].(string), v.Scene) {
