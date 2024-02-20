@@ -1,8 +1,10 @@
-## Introduction
+## MacArthurGo
+[![Go Report Card](https://goreportcard.com/badge/github.com/Magic-Xin/MacArthurGo)](https://goreportcard.com/report/github.com/Magic-Xin/MacArthurGo)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/Magic-Xin/MacArthurGo)
 [![Build Release](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/release.yml/badge.svg)](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/release.yml)
 [![Build Dev](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/dev.yml/badge.svg?branch=dev)](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/dev.yml)
 
-MacArthurGo is a chatbot developed for the **OneBot V11** protocol using Golang. It provides plugin loading to support various functions.
+**MacArthurGo** is a chatbot developed for the **OneBot V11** protocol using Golang. It provides plugin loading to support various functions.
 
 If you have any comments or suggestions, you are welcome to discuss and provide feedback in the [issues](https://github.com/Magic-Xin/MacArthurGo/issues) section
 
@@ -10,7 +12,7 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 
 ## How to use
 
-- Stable version: Download the compressed package and `config.json.default` for the corresponding system and architecture from the [release](https://github.com/Magic-Xin/MacArthurGo/releases),fill in the `config.json.default` and rename to `config.json` then run the program. 
+- Stable version: Download the compressed package and `config.json.default` for the corresponding system and architecture from the [release](https://github.com/Magic-Xin/MacArthurGo/releases), fill in the `config.json.default` and rename to `config.json` then run the program. 
 - Dev version: Download compressed package from the newest [github actions](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/dev.yml)
 
 **Attention: Cannot guarantee the availability of the Dev version**
@@ -50,7 +52,7 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - [go-cqhttp](https://github.com/Mrs4s/go-cqhttp)
 - [OpenShamrock](https://github.com/whitechi73/OpenShamrock)
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
-- [go-proxy-bingai](https://github.com/Harry-zklcdc/go-proxy-bingai)
+- [bing-lib](https://github.com/Harry-zklcdc/bing-lib)
 
 ## Special thanks
 ![JetBrains](https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.svg)
