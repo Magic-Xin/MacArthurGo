@@ -51,3 +51,8 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - [OpenShamrock](https://github.com/whitechi73/OpenShamrock)
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
 - [go-proxy-bingai](https://github.com/Harry-zklcdc/go-proxy-bingai)
+
+## Special thanks
+![JetBrains](https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.svg)
+
+**Special thanks to [JetBrains](https://jb.gg/OpenSourceSupport) for providing the open source license for this project.**
