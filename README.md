@@ -1,6 +1,6 @@
 ## MacArthurGo
 [![Go Report Card](https://goreportcard.com/badge/github.com/Magic-Xin/MacArthurGo)](https://goreportcard.com/report/github.com/Magic-Xin/MacArthurGo)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/Magic-Xin/MacArthurGo)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/Magic-Xin/MacArthurGo)](https://github.com/Magic-Xin/MacArthurGo/releases/latest)
 [![Build Release](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/release.yml/badge.svg)](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/release.yml)
 [![Build Dev](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/dev.yml/badge.svg?branch=dev)](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/dev.yml)
 
