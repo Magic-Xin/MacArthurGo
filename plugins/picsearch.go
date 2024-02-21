@@ -201,13 +201,12 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 
 			fileUrl := c.Data["url"].(string)
 			fileUrl, key = essentials.GetUniversalImgURL(fileUrl)
-
-			if !isPurge {
-				selectRes := essentials.SelectDB("picSearch", "res", fmt.Sprintf("uid='%s'", key))
-				if selectRes != nil {
-					if len(*selectRes) > 0 {
+			selectRes := essentials.SelectDB("picSearch", "res", fmt.Sprintf("uid='%s'", key))
+			if selectRes != nil {
+				if len(*selectRes) > 0 {
+					cached = true
+					if !isPurge {
 						res := (*selectRes)[0]["res"].(string)
-						cached = true
 						result = append(result, []cqcode.ArrayMessage{*cqcode.Text("本次搜图结果来自数据库缓存")})
 						var cachedMsg [][]cqcode.ArrayMessage
 						err := json.Unmarshal([]byte(res), &cachedMsg)
@@ -265,6 +264,17 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 					&[]string{key, string(jsonMsg), strconv.FormatInt(time.Now().Unix(), 10)})
 				if err != nil {
 					log.Printf("Insert picSearch error: %v", err)
+				}
+			}
+		} else if isPurge {
+			result = append(result, []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))})
+			jsonMsg, err := json.Marshal(result)
+			if err != nil {
+				log.Printf("Search result mashal error: %v", err)
+			} else {
+				err = essentials.UpdateDB("picSearch", "uid", key, &[]string{"res", "created"}, &[]string{string(jsonMsg), strconv.FormatInt(time.Now().Unix(), 10)})
+				if err != nil {
+					log.Printf("Update picSearch error: %v", err)
 				}
 			}
 		}
