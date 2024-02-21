@@ -226,16 +226,12 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 				wgResponse.Done()
 			}()
 
-			for i := 0; i < 2; i++ {
-				wg.Add(1)
-				limiter <- true
-				switch i {
-				case 0:
-					go p.sauceNAO(fileUrl, response, limiter, wg)
-				case 1:
-					go p.ascii2d(fileUrl, response, limiter, wg)
-				}
-			}
+			wg.Add(2)
+			limiter <- true
+			go p.sauceNAO(fileUrl, response, limiter, wg)
+			limiter <- true
+			go p.ascii2d(fileUrl, response, limiter, wg)
+
 			wg.Wait()
 			close(response)
 			wgResponse.Wait()
