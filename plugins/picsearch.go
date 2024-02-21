@@ -65,18 +65,18 @@ func (p *PicSearch) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 
 	if (*ctx)["message_type"].(string) == "group" {
-		if p.checkArgs(ctx) {
-			p.picSearch(ctx, send, false, true)
+		if p.checkArgs(ctx, &p.Args) {
+			p.picSearch(ctx, send, false, true, p.checkArgs(ctx, &[]string{"purge"}))
 		}
 	} else if p.allowPrivate {
-		if p.checkArgs(ctx) {
-			p.picSearch(ctx, send, false, false)
+		if p.checkArgs(ctx, &p.Args) {
+			p.picSearch(ctx, send, false, false, p.checkArgs(ctx, &[]string{"purge"}))
 		} else {
 			words := essentials.SplitArgument(ctx)
 			if len(words) == 0 {
-				p.picSearch(ctx, send, false, false)
+				p.picSearch(ctx, send, false, false, p.checkArgs(ctx, &[]string{"purge"}))
 			} else if !strings.HasPrefix(words[0], "/") {
-				p.picSearch(ctx, send, false, false)
+				p.picSearch(ctx, send, false, false, p.checkArgs(ctx, &[]string{"purge"}))
 			}
 		}
 
@@ -93,7 +93,7 @@ func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 
 	if split[0] == "picSearch" && (*ctx)["data"] != nil {
 		contexts := (*ctx)["data"].(map[string]any)
-		p.picSearch(&contexts, send, true, contexts["message_type"].(string) == "group")
+		p.picSearch(&contexts, send, true, contexts["message_type"].(string) == "group", p.checkArgs(&contexts, &[]string{"purge"}))
 	} else if (*ctx)["status"].(string) == "failed" {
 		if split[0] == "picForward" {
 			p.SecondTimesGroupForward(send, split[1:])
@@ -170,7 +170,7 @@ func (p *PicSearch) groupFailed(send *chan []byte, echo []string) {
 	}
 }
 
-func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho bool, isGroup bool) {
+func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho bool, isGroup bool, isPurge bool) {
 	if !isGroup && !p.allowPrivate {
 		return
 	}
@@ -194,22 +194,26 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 				*send <- *essentials.SendMsg(ctx, p.searchFeedback, nil, false, true)
 				isStart = true
 			}
+
 			fileUrl := c.Data["url"].(string)
 			fileUrl, key = essentials.GetUniversalImgURL(fileUrl)
-			selectRes := essentials.SelectDB("picSearch", "res", fmt.Sprintf("uid='%s'", key))
-			if selectRes != nil {
-				if len(*selectRes) > 0 {
-					res := (*selectRes)[0]["res"].(string)
-					cached = true
-					result = append(result, []cqcode.ArrayMessage{*cqcode.Text("本次搜图结果来自数据库缓存")})
-					var cachedMsg [][]cqcode.ArrayMessage
-					err := json.Unmarshal([]byte(res), &cachedMsg)
-					if err != nil {
-						log.Printf("Unmarshal cached message error: %v", err)
+
+			if !isPurge {
+				selectRes := essentials.SelectDB("picSearch", "res", fmt.Sprintf("uid='%s'", key))
+				if selectRes != nil {
+					if len(*selectRes) > 0 {
+						res := (*selectRes)[0]["res"].(string)
+						cached = true
+						result = append(result, []cqcode.ArrayMessage{*cqcode.Text("本次搜图结果来自数据库缓存")})
+						var cachedMsg [][]cqcode.ArrayMessage
+						err := json.Unmarshal([]byte(res), &cachedMsg)
+						if err != nil {
+							log.Printf("Unmarshal cached message error: %v", err)
+							continue
+						}
+						result = append(result, cachedMsg[:len(cachedMsg)-1]...)
 						continue
 					}
-					result = append(result, cachedMsg[:len(cachedMsg)-1]...)
-					continue
 				}
 			}
 
@@ -464,8 +468,8 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 	<-limiter
 }
 
-func (p *PicSearch) checkArgs(ctx *map[string]any) bool {
-	for _, arg := range p.Args {
+func (p *PicSearch) checkArgs(ctx *map[string]any, args *[]string) bool {
+	for _, arg := range *args {
 		if match := regexp.MustCompile(`(` + arg + `$|` + arg + `\W)`).FindStringIndex((*ctx)["raw_message"].(string)); match != nil {
 			return true
 		}
