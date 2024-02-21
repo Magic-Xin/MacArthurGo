@@ -106,17 +106,22 @@ func SelectDB(table string, target string, arg string) *[]map[string]any {
 	return &result
 }
 
-func UpdateDB(arg string, params ...any) {
-	stmt, err := db.Prepare(arg)
-	if err != nil {
-		log.Printf("Database update prepare error: %v", err)
-		return
+func UpdateDB(table string, target string, targetValue string, key *[]string, keyValue *[]string) error {
+	cmd := "UPDATE " + table + " SET "
+	for i, k := range *key {
+		if i > 0 {
+			cmd += ", "
+		}
+		cmd += k + " = '" + (*keyValue)[i] + "'"
 	}
-	_, err = stmt.Exec(params...)
+	cmd += " WHERE " + target + " = '" + targetValue + "'"
+
+	_, err := db.Exec(cmd)
 	if err != nil {
-		log.Printf("Database update exec error: %v", err)
-		return
+		return err
 	}
+
+	return nil
 }
 
 func DeleteExpired(table string, arg string, expiration int64, interval int64) {
