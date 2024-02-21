@@ -95,8 +95,9 @@ func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 		contexts := (*ctx)["data"].(map[string]any)
 		if len(split) == 2 {
 			p.picSearch(&contexts, send, true, contexts["message_type"].(string) == "group", split[1] == "purge")
+		} else {
+			p.picSearch(&contexts, send, true, contexts["message_type"].(string) == "group", false)
 		}
-		p.picSearch(&contexts, send, true, contexts["message_type"].(string) == "group", false)
 	} else if (*ctx)["status"].(string) == "failed" {
 		if split[0] == "picForward" {
 			p.SecondTimesGroupForward(send, split[1:])
