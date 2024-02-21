@@ -93,7 +93,10 @@ func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 
 	if split[0] == "picSearch" && (*ctx)["data"] != nil {
 		contexts := (*ctx)["data"].(map[string]any)
-		p.picSearch(&contexts, send, true, contexts["message_type"].(string) == "group", p.checkArgs(&contexts, &[]string{"purge"}))
+		if len(split) == 2 {
+			p.picSearch(&contexts, send, true, contexts["message_type"].(string) == "group", split[1] == "purge")
+		}
+		p.picSearch(&contexts, send, true, contexts["message_type"].(string) == "group", false)
 	} else if (*ctx)["status"].(string) == "failed" {
 		if split[0] == "picForward" {
 			p.SecondTimesGroupForward(send, split[1:])
@@ -242,7 +245,11 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 		}
 		if c.Type == "reply" && !isEcho {
 			mid := int64(c.Data["id"].(float64))
-			*send <- *essentials.SendAction("get_msg", structs.GetMsg{Id: mid}, "picSearch")
+			echo := "picSearch"
+			if isPurge {
+				echo += "|purge"
+			}
+			*send <- *essentials.SendAction("get_msg", structs.GetMsg{Id: mid}, echo)
 		}
 	}
 	end := time.Since(start)
