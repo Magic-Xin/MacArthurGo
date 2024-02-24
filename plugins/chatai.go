@@ -20,11 +20,14 @@ import (
 	"image/jpeg"
 	"io"
 	"log"
+	"math/rand"
+	"net"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 type ChatGPT struct {
@@ -491,6 +494,7 @@ func (n *NewBing) RequireAnswer(str string) *string {
 	const cookie = "1f1e33"
 
 	c := binglib.NewChat(cookie)
+	c.SetXFF(n.GetRandomIP())
 	err := c.NewConversation()
 	if err != nil {
 		log.Printf("NewBing new conversation error: %v", err)
@@ -508,4 +512,36 @@ func (n *NewBing) RequireAnswer(str string) *string {
 	r = n.model + ": " + regexp.MustCompile(`\(\^\d\^\)|\[\^[^\]]*\^\]`).ReplaceAllString(r, "")
 
 	return &r
+}
+
+func (n *NewBing) GetRandomIP() string {
+	seed := time.Now().UnixNano()
+	rng := rand.New(rand.NewSource(seed))
+
+	ipToUint32 := func(ip net.IP) uint32 {
+		ip = ip.To4()
+		var result uint32
+		result += uint32(ip[0]) << 24
+		result += uint32(ip[1]) << 16
+		result += uint32(ip[2]) << 8
+		result += uint32(ip[3])
+		return result
+	}
+	uint32ToIP := func(intIP uint32) string {
+		ip := fmt.Sprintf("%d.%d.%d.%d", byte(intIP>>24), byte(intIP>>16), byte(intIP>>8), byte(intIP))
+		return ip
+	}
+
+	randomIndex := rng.Intn(len(*n.ipRange))
+
+	startIP := (*n.ipRange)[randomIndex][0]
+	endIP := (*n.ipRange)[randomIndex][1]
+
+	startIPInt := ipToUint32(net.ParseIP(startIP))
+	endIPInt := ipToUint32(net.ParseIP(endIP))
+
+	randomIPInt := rng.Uint32()%(endIPInt-startIPInt+1) + startIPInt
+	randomIP := uint32ToIP(randomIPInt)
+
+	return randomIP
 }
