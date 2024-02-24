@@ -535,7 +535,12 @@ func (n *NewBing) RequireAnswer(str string) *string {
 		return &res
 	}
 	c.SetStyle(n.model)
-	r, err := c.Chat("", str)
+
+	prompt, msg := c.MsgComposer([]binglib.Message{
+		{Role: "user", Content: str},
+	})
+
+	r, err := c.Chat(prompt, msg)
 	if err != nil {
 		log.Printf("NewBing chat error: %v", err)
 		res := fmt.Sprintf("NewBing chat error: %v", err)
