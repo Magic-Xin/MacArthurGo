@@ -56,6 +56,7 @@ type NewBing struct {
 	Args    []string
 	model   string
 	ipRange *[][]string
+	chat    *binglib.Chat
 }
 
 type ChatAI struct {
@@ -122,6 +123,7 @@ func init() {
 			{"13.80.0.0", "13.81.255.255"},       // Azure Cloud WestEurope 131070
 			{"20.73.0.0", "20.73.255.255"},       // Azure Cloud WestEurope 65534
 		},
+		chat: binglib.NewChat(base.Config.Plugins.ChatAI.NewBing.Token),
 	}
 
 	var args []string
@@ -524,14 +526,13 @@ func (g *Gemini) ImageProcessing(url string) (*[]byte, string, error) {
 }
 
 func (n *NewBing) RequireAnswer(str string) *string {
-	const cookie = "1f1e33"
-
-	c := binglib.NewChat(cookie)
+	c := n.chat.Clone()
 	c.SetXFF(n.GetRandomIP())
+	c.SetCookies(n.chat.GetCookies())
 	err := c.NewConversation()
 	if err != nil {
-		log.Printf("NewBing new conversation error: %v", err)
 		res := fmt.Sprintf("NewBing new conversation error: %v", err)
+		log.Println(res)
 		return &res
 	}
 	c.SetStyle(n.model)
@@ -542,8 +543,8 @@ func (n *NewBing) RequireAnswer(str string) *string {
 
 	r, err := c.Chat(prompt, msg)
 	if err != nil {
-		log.Printf("NewBing chat error: %v", err)
 		res := fmt.Sprintf("NewBing chat error: %v", err)
+		log.Println(res)
 		return &res
 	}
 
