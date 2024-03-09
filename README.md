@@ -3,6 +3,7 @@
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/Magic-Xin/MacArthurGo)](https://github.com/Magic-Xin/MacArthurGo/releases/latest)
 [![Build Release](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/release.yml/badge.svg)](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/release.yml)
 [![Build Dev](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/dev.yml/badge.svg?branch=dev)](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/dev.yml)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FMagic-Xin%2FMacArthurGo.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FMagic-Xin%2FMacArthurGo?ref=badge_shield)
 
 **MacArthurGo** is a chatbot developed for the **OneBot V11** protocol using Golang. It provides plugin loading to support various functions.
 
@@ -58,3 +59,6 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 ![JetBrains](https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.svg)
 
 **Special thanks to [JetBrains](https://jb.gg/OpenSourceSupport) for providing the open source license for this project.**
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FMagic-Xin%2FMacArthurGo.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FMagic-Xin%2FMacArthurGo?ref=badge_large)
