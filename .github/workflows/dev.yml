@@ -169,7 +169,7 @@ jobs:
         working-directory: bin
 
       - name: Upload Prerelease
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: ${{  success() }}
         with:
           tag_name: Prerelease-${{ github.ref_name }}
