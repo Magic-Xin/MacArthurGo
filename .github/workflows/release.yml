@@ -48,7 +48,7 @@ jobs:
         make releases
 
     - name: Upload To Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
         body: New Release.
