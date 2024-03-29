@@ -9,7 +9,7 @@
 
 If you have any comments or suggestions, you are welcome to discuss and provide feedback in the [issues](https://github.com/Magic-Xin/MacArthurGo/issues) section
 
-**Highly recommend using [OpenShamrock](https://github.com/whitechi73/OpenShamrock) as the OneBot server**
+**Highly recommend using [Lagrange.OneBot](https://github.com/KonataDev/Lagrange.Core) as the OneBot server**
 
 ## How to use
 
@@ -51,6 +51,8 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - [saucenao](https://saucenao.com/)
 - [ascii2d](https://ascii2d.net)
 - [go-cqhttp](https://github.com/Mrs4s/go-cqhttp)
+- [Lagrange.Core](https://github.com/KonataDev/Lagrange.Core)
+- [onebot-11](https://github.com/botuniverse/onebot-11)
 - [OpenShamrock](https://github.com/whitechi73/OpenShamrock)
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
 - [bing-lib](https://github.com/Harry-zklcdc/bing-lib)

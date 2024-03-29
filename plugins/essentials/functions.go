@@ -59,7 +59,8 @@ func SendMsg(ctx *map[string]any, message string, messageArray *[]cqcode.ArrayMe
 		arrayMessage = append([]cqcode.ArrayMessage{*cqcode.At(uid)}, arrayMessage...)
 	}
 	if reply {
-		arrayMessage = append([]cqcode.ArrayMessage{*cqcode.Reply(int64((*ctx)["message_id"].(float64)))}, arrayMessage...)
+		msgId := strconv.FormatInt(int64((*ctx)["message_id"].(float64)), 10)
+		arrayMessage = append([]cqcode.ArrayMessage{*cqcode.Reply(msgId)}, arrayMessage...)
 	}
 
 	return constructMessage(ctx, &arrayMessage)
@@ -91,8 +92,10 @@ func SendGroupForward(ctx *map[string]any, data *[]structs.ForwardNode, echo str
 	return SendAction("send_group_forward_msg", params, echo)
 }
 
-func ConstructForwardNode(data *[]cqcode.ArrayMessage) *structs.ForwardNode {
+func ConstructForwardNode(uin string, name string, data *[]cqcode.ArrayMessage) *structs.ForwardNode {
 	node := structs.NewForwardNode()
+	node.Data.Uin = uin
+	node.Data.Name = name
 	node.Data.Content = *data
 
 	return node
@@ -147,15 +150,6 @@ func GetUniversalImgURL(url string) (string, string) {
 	}
 
 	return url, ""
-}
-
-func HandleBannedHostsArray(str *string) {
-	bannedHosts := []string{"danbooru.donmai.us", "konachan.com"}
-	*str = strings.Replace(*str, "//", "//\u200B", -1)
-	for _, host := range bannedHosts {
-		*str = strings.Replace(*str, host, strings.Replace(host, ".", ".\u200B", -1), -1)
-	}
-	return
 }
 
 func GetOriginUrl(url string) *string {

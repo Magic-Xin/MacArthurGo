@@ -64,19 +64,21 @@ func (p *PicSearch) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		return
 	}
 
+	msg := essentials.DecodeArrayMessage(ctx)
+
 	if (*ctx)["message_type"].(string) == "group" {
 		if p.checkArgs(ctx, &p.Args) {
-			p.picSearch(ctx, send, false, true, p.checkArgs(ctx, &[]string{"purge"}))
+			p.picSearch(ctx, msg, send, false, true, p.checkArgs(ctx, &[]string{"purge"}))
 		}
 	} else if p.allowPrivate {
 		if p.checkArgs(ctx, &p.Args) {
-			p.picSearch(ctx, send, false, false, p.checkArgs(ctx, &[]string{"purge"}))
+			p.picSearch(ctx, msg, send, false, false, p.checkArgs(ctx, &[]string{"purge"}))
 		} else {
 			words := essentials.SplitArgument(ctx)
 			if len(words) == 0 {
-				p.picSearch(ctx, send, false, false, p.checkArgs(ctx, &[]string{"purge"}))
+				p.picSearch(ctx, msg, send, false, false, p.checkArgs(ctx, &[]string{"purge"}))
 			} else if !strings.HasPrefix(words[0], "/") {
-				p.picSearch(ctx, send, false, false, p.checkArgs(ctx, &[]string{"purge"}))
+				p.picSearch(ctx, msg, send, false, false, p.checkArgs(ctx, &[]string{"purge"}))
 			}
 		}
 
@@ -92,21 +94,29 @@ func (p *PicSearch) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 	split := strings.Split(echo, "|")
 
 	if split[0] == "picSearch" && (*ctx)["data"] != nil {
-		contexts := (*ctx)["data"].(map[string]any)
-		if len(split) == 2 {
-			p.picSearch(&contexts, send, true, contexts["message_type"].(string) == "group", split[1] == "purge")
-		} else {
-			p.picSearch(&contexts, send, true, contexts["message_type"].(string) == "group", false)
+		data := (*ctx)["data"].(map[string]any)
+		msg := essentials.DecodeArrayMessage(&data)
+		value, ok := essentials.GetCache(split[1])
+		if !ok {
+			log.Println("Pic search get cache error")
+			return
 		}
-	} else if (*ctx)["status"].(string) == "failed" {
-		if split[0] == "picForward" {
-			p.SecondTimesGroupForward(send, split[1:])
-		} else if split[0] == "picFailed" {
-			p.groupFailed(send, split[1:])
+		originCtx := value.(essentials.Value).Value.(map[string]any)
+
+		if (*ctx)["status"].(string) == "failed" {
+			*send <- *essentials.SendMsg(&originCtx, "搜图失败", nil, false, false)
+			return
+		}
+
+		if len(split) == 3 {
+			p.picSearch(&originCtx, msg, send, true, originCtx["message_type"].(string) == "group", split[2] == "purge")
+		} else {
+			p.picSearch(&originCtx, msg, send, true, originCtx["message_type"].(string) == "group", false)
 		}
 	}
 }
 
+// SecondTimesGroupForward Deprecated
 func (p *PicSearch) SecondTimesGroupForward(send *chan []byte, echo []string) {
 	id, err := strconv.ParseFloat(echo[2], 64)
 	if err != nil {
@@ -136,7 +146,7 @@ func (p *PicSearch) SecondTimesGroupForward(send *chan []byte, echo []string) {
 	var data []structs.ForwardNode
 	for _, r := range result {
 		if !strings.Contains(r, "SauceNAO") {
-			data = append(data, *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(r)}))
+			data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(r)}))
 		}
 	}
 	if echo[1] == "group" {
@@ -146,6 +156,7 @@ func (p *PicSearch) SecondTimesGroupForward(send *chan []byte, echo []string) {
 	}
 }
 
+// groupFailed Deprecated
 func (p *PicSearch) groupFailed(send *chan []byte, echo []string) {
 	id, _ := strconv.ParseFloat(echo[2], 64)
 	ctx := &map[string]any{
@@ -174,7 +185,7 @@ func (p *PicSearch) groupFailed(send *chan []byte, echo []string) {
 	}
 }
 
-func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho bool, isGroup bool, isPurge bool) {
+func (p *PicSearch) picSearch(ctx *map[string]any, msg *[]cqcode.ArrayMessage, send *chan []byte, isEcho bool, isGroup bool, isPurge bool) {
 	if !isGroup && !p.allowPrivate {
 		return
 	}
@@ -186,7 +197,6 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 		cached  bool
 	)
 
-	msg := essentials.DecodeArrayMessage(ctx)
 	if msg == nil {
 		return
 	}
@@ -244,12 +254,14 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 			wgResponse.Wait()
 		}
 		if c.Type == "reply" && !isEcho {
-			mid := int64(c.Data["id"].(float64))
-			echo := "picSearch"
+			messageID := int64((*ctx)["message_id"].(float64))
+			value := essentials.Value{Value: *ctx, Time: time.Now().Unix()}
+			essentials.SetCache(strconv.FormatInt(messageID, 10), value)
+			echo := fmt.Sprintf("picSearch|%d", messageID)
 			if isPurge {
 				echo += "|purge"
 			}
-			*send <- *essentials.SendAction("get_msg", structs.GetMsg{Id: mid}, echo)
+			*send <- *essentials.SendAction("get_msg", structs.GetMsg{Id: c.Data["id"].(string)}, echo)
 		}
 	}
 	end := time.Since(start)
@@ -282,7 +294,7 @@ func (p *PicSearch) picSearch(ctx *map[string]any, send *chan []byte, isEcho boo
 		if p.groupForward {
 			var data []structs.ForwardNode
 			for _, r := range result {
-				data = append(data, *essentials.ConstructForwardNode(&r))
+				data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &r))
 			}
 			if isGroup {
 				*send <- *essentials.SendGroupForward(ctx, &data, *p.genEcho(ctx, key, false))
@@ -378,13 +390,13 @@ func (p *PicSearch) sauceNAO(img string, response chan []cqcode.ArrayMessage, li
 	}
 	if sourceUrl != "" {
 		if p.handleBannedHosts {
-			essentials.HandleBannedHostsArray(&sourceUrl)
+			p.HandleBannedHostsArray(&sourceUrl)
 		}
 		msg += sourceUrl + "\n"
 	}
 	if extUrl != "" {
 		if p.handleBannedHosts {
-			essentials.HandleBannedHostsArray(&extUrl)
+			p.HandleBannedHostsArray(&extUrl)
 		}
 		msg += extUrl
 	}
@@ -470,7 +482,7 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 				Type := strings.Trim(xpath.InnerText(typePath), "\n")
 
 				if p.handleBannedHosts {
-					essentials.HandleBannedHostsArray(&Link)
+					p.HandleBannedHostsArray(&Link)
 				}
 
 				r := []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("ascii2d %s\n", checkType[i]))}
@@ -511,4 +523,13 @@ func (p *PicSearch) genEcho(ctx *map[string]any, key string, retry bool) *string
 	}
 
 	return &res
+}
+
+func (p *PicSearch) HandleBannedHostsArray(str *string) {
+	bannedHosts := []string{"danbooru.donmai.us", "konachan.com"}
+	*str = strings.Replace(*str, "//", "//\u200B", -1)
+	for _, host := range bannedHosts {
+		*str = strings.Replace(*str, host, strings.Replace(host, ".", ".\u200B", -1), -1)
+	}
+	return
 }

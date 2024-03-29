@@ -51,8 +51,7 @@ func (o OriginPic) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 			reply = append(reply, *cqcode.Image(fileUrl))
 		}
 		if m.Type == "reply" {
-			mid := int64(m.Data["id"].(float64))
-			*send <- *essentials.SendAction("get_msg", structs.GetMsg{Id: mid}, "originPic")
+			*send <- *essentials.SendAction("get_msg", structs.GetMsg{Id: m.Data["id"].(string)}, "originPic")
 			return
 		}
 	}

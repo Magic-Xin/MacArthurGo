@@ -199,6 +199,8 @@ func (c *ChatAI) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		messageID := int64((*ctx)["message_id"].(float64))
 		res, action = c.Gemini.RequireAnswer(str, message, messageID)
 		if action != nil {
+			value := essentials.Value{Value: *ctx, Time: time.Now().Unix()}
+			essentials.SetCache(strconv.FormatInt(messageID, 10), value)
 			*send <- *action
 			return
 		}
@@ -219,8 +221,10 @@ func (c *ChatAI) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 
 	if (*ctx)["message_type"].(string) == "group" && c.groupForward {
 		var data []structs.ForwardNode
-		originStr := append([]cqcode.ArrayMessage{*cqcode.Text("@" + (*ctx)["sender"].(map[string]any)["nickname"].(string) + ": ")}, *message...)
-		data = append(data, *essentials.ConstructForwardNode(&originStr), *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
+		uin := strconv.FormatInt(int64((*ctx)["sender"].(map[string]any)["user_id"].(float64)), 10)
+		name := (*ctx)["sender"].(map[string]any)["nickname"].(string)
+		*message = append([]cqcode.ArrayMessage{*cqcode.Text("@" + name + ": ")}, *message...)
+		data = append(data, *essentials.ConstructForwardNode(uin, name, message), *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
 		*send <- *essentials.SendGroupForward(ctx, &data, "")
 	} else {
 		*send <- *essentials.SendMsg(ctx, *res, nil, false, false)
@@ -243,7 +247,14 @@ func (c *ChatAI) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 		}
 
 		var res *string
+
 		message := essentials.DecodeArrayMessage(&contexts)
+		value, ok := essentials.GetCache(split[1])
+		if !ok {
+			log.Println("Gemini get cache error")
+		}
+		originCtx := value.(essentials.Value).Value.(map[string]any)
+
 		data, ok := c.Gemini.ReplyMap.Load(split[1])
 		if !ok {
 			log.Println("Gemini reply map load error")
@@ -258,8 +269,8 @@ func (c *ChatAI) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 			OriginStr string
 		}).OriginStr
 
-		*message = append(originMsg, *message...)
-		res, _ = c.Gemini.RequireAnswer(originStr, message, 0)
+		rMessage := append(originMsg, *message...)
+		res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0)
 
 		if res == nil {
 			return
@@ -271,11 +282,14 @@ func (c *ChatAI) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 
 		if contexts["message_type"].(string) == "group" && c.groupForward {
 			var data []structs.ForwardNode
-			originStr := append([]cqcode.ArrayMessage{*cqcode.Text("@" + contexts["sender"].(map[string]any)["nickname"].(string) + ": ")}, *message...)
-			data = append(data, *essentials.ConstructForwardNode(&originStr), *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
-			*send <- *essentials.SendGroupForward(&contexts, &data, "")
+			uin := strconv.FormatInt(int64(originCtx["sender"].(map[string]any)["user_id"].(float64)), 10)
+			name := originCtx["sender"].(map[string]any)["nickname"].(string)
+			message := append([]cqcode.ArrayMessage{*cqcode.Text("@" + name + ": ")}, rMessage...)
+			data = append(data, *essentials.ConstructForwardNode(uin, name, &message))
+			data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
+			*send <- *essentials.SendGroupForward(&originCtx, &data, "")
 		} else {
-			*send <- *essentials.SendMsg(&contexts, *res, nil, false, false)
+			*send <- *essentials.SendMsg(&originCtx, *res, nil, false, false)
 		}
 	}
 }
@@ -383,7 +397,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		prompts []genai.Part
 		model   *genai.GenerativeModel
 		res     string
-		reply   int64
+		reply   string
 	)
 
 	for _, msg := range *message {
@@ -399,11 +413,11 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			}{Data: data, ImgType: imgType})
 		}
 		if msg.Type == "reply" && messageID != 0 {
-			reply = int64(msg.Data["id"].(float64))
+			reply = msg.Data["id"].(string)
 		}
 	}
 
-	if reply != 0 && messageID != 0 {
+	if reply != "" && messageID != 0 {
 		g.ReplyMap.Store(strconv.FormatInt(messageID, 10), struct {
 			Data      []cqcode.ArrayMessage
 			OriginStr string
