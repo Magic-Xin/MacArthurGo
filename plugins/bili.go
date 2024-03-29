@@ -104,7 +104,7 @@ func (b *Bili) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		message := essentials.DecodeArrayMessage(ctx)
 		for _, msg := range *message {
 			if msg.Type == "reply" {
-				*send <- *essentials.SendAction("get_msg", structs.GetMsg{Id: int64(msg.Data["id"].(float64))}, "BiliAI")
+				*send <- *essentials.SendAction("get_msg", structs.GetMsg{Id: msg.Data["id"].(string)}, "BiliAI")
 				return
 			}
 		}
@@ -115,9 +115,9 @@ func (b *Bili) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 			if aiSum != nil {
 				if (*ctx)["message_type"].(string) == "group" && b.AiSummarize.GroupForward && len(*aiSum) > 1 {
 					var data []structs.ForwardNode
-					data = append(data, *essentials.ConstructForwardNode(videoData.ToArrayMessage()))
+					data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, videoData.ToArrayMessage()))
 					for _, msg := range *aiSum {
-						data = append(data, *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(msg)}))
+						data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(msg)}))
 					}
 					*send <- *essentials.SendGroupForward(ctx, &data, "")
 				} else {
@@ -179,9 +179,9 @@ func (b *Bili) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 				if aiSum != nil {
 					if ctxData["message_type"].(string) == "group" && b.AiSummarize.GroupForward && len(*aiSum) > 1 {
 						var data []structs.ForwardNode
-						data = append(data, *essentials.ConstructForwardNode(videoData.ToArrayMessage()))
+						data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, videoData.ToArrayMessage()))
 						for _, msg := range *aiSum {
-							data = append(data, *essentials.ConstructForwardNode(&[]cqcode.ArrayMessage{*cqcode.Text(msg)}))
+							data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(msg)}))
 						}
 						*send <- *essentials.SendGroupForward(&ctxData, &data, "")
 					} else {

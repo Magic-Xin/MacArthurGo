@@ -7,5 +7,5 @@ type Action struct {
 }
 
 type GetMsg struct {
-	Id int64 `json:"message_id"`
+	Id string `json:"message_id"`
 }

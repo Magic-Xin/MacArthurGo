@@ -14,19 +14,21 @@ import (
 type LoginInfo struct {
 	Plugin
 	NickName string
-	UserId   int64
+	UserId   string
 	Login    bool
 }
 
+var Info LoginInfo
+
 func init() {
-	info := LoginInfo{
+	Info = LoginInfo{
 		Plugin: Plugin{
 			Name:    "info",
 			Enabled: true,
 			Args:    []string{"/info", "/help"},
 		},
 	}
-	PluginArray = append(PluginArray, &PluginInterface{Interface: &info})
+	PluginArray = append(PluginArray, &PluginInterface{Interface: &Info})
 }
 
 func (l *LoginInfo) ReceiveAll(_ *map[string]any, send *chan []byte) {
@@ -100,8 +102,8 @@ func (l *LoginInfo) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 	}
 
 	data := (*ctx)["data"].(map[string]any)
-	l.NickName, l.UserId = data["nickname"].(string), int64(data["user_id"].(float64))
-	log.Printf("Get account nickname: %s, id: %d", l.NickName, l.UserId)
+	l.NickName, l.UserId = data["nickname"].(string), strconv.FormatInt(int64(data["user_id"].(float64)), 10)
+	log.Printf("Get account nickname: %s, id: %s", l.NickName, l.UserId)
 	sendCtx := map[string]any{
 		"message_type": "private",
 		"sender": map[string]any{

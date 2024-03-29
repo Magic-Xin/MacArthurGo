@@ -14,7 +14,7 @@ func At(qq string) *ArrayMessage {
 	return &ArrayMessage{Type: "at", Data: map[string]any{"qq": qq}}
 }
 
-func Reply(id int64) *ArrayMessage {
+func Reply(id string) *ArrayMessage {
 	return &ArrayMessage{Type: "reply", Data: map[string]any{"id": id}}
 }
 

@@ -37,6 +37,8 @@ type PrivateForward struct {
 type ForwardNode struct {
 	Type string `json:"type"`
 	Data struct {
+		Uin     string                `json:"uin"`
+		Name    string                `json:"name"`
 		Content []cqcode.ArrayMessage `json:"content"`
 	} `json:"data"`
 }
