@@ -195,9 +195,19 @@ func (c *ChatAI) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	} else if essentials.CheckArgumentArray(ctx, &c.QWen.Args) && c.QWen.Enabled {
 		res = c.QWen.RequireAnswer(str)
 	} else if essentials.CheckArgumentArray(ctx, &c.Gemini.Args) && c.Gemini.Enabled {
-		var action *[]byte
+		var (
+			action *[]byte
+			isNew  bool
+		)
+
+		if len(c.Gemini.Args) > 2 {
+			if essentials.CheckArgument(ctx, c.Gemini.Args[2]) {
+				isNew = true
+			}
+		}
+
 		messageID := int64((*ctx)["message_id"].(float64))
-		res, action = c.Gemini.RequireAnswer(str, message, messageID)
+		res, action = c.Gemini.RequireAnswer(str, message, messageID, isNew)
 		if action != nil {
 			value := essentials.Value{Value: *ctx, Time: time.Now().Unix()}
 			essentials.SetCache(strconv.FormatInt(messageID, 10), value)
@@ -270,7 +280,11 @@ func (c *ChatAI) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 		}).OriginStr
 
 		rMessage := append(originMsg, *message...)
-		res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0)
+		if split[2] == "true" {
+			res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0, true)
+		} else {
+			res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0, false)
+		}
 
 		if res == nil {
 			return
@@ -388,7 +402,7 @@ func (q *QWen) RequireAnswer(str string) *string {
 	return &res
 }
 
-func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64) (*string, *[]byte) {
+func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64, isNew bool) (*string, *[]byte) {
 	var (
 		images []struct {
 			Data    *[]byte
@@ -423,7 +437,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			OriginStr string
 		}{Data: *message, OriginStr: str})
 
-		echo := fmt.Sprintf("gemini|%d", messageID)
+		echo := fmt.Sprintf("gemini|%d|%v", messageID, isNew)
 		return nil, essentials.SendAction("get_msg", structs.GetMsg{Id: reply}, echo)
 	}
 
@@ -441,18 +455,28 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		}
 	}(client)
 
-	if len(images) != 0 {
-		model = client.GenerativeModel("gemini-pro-vision")
-		res = "gemini-pro-vision: "
-		for _, img := range images {
-			prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
+	if isNew {
+		model = client.GenerativeModel("gemini-1.5-pro-latest")
+		res = "gemini-1.5-pro-latest: "
+		if len(images) != 0 {
+			for _, img := range images {
+				prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
+			}
 		}
 	} else {
-		model = client.GenerativeModel("gemini-pro")
-		res = "gemini-pro: "
+		if len(images) != 0 {
+			model = client.GenerativeModel("gemini-1.0-pro-vision")
+			res = "gemini-1.0-pro-vision: "
+			for _, img := range images {
+				prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
+			}
+		} else {
+			model = client.GenerativeModel("gemini-1.0-pro")
+			res = "gemini-1.0-pro: "
+		}
 	}
-	prompts = append(prompts, genai.Text(str))
 
+	prompts = append(prompts, genai.Text(str))
 	model.SafetySettings = []*genai.SafetySetting{
 		{
 			Category:  genai.HarmCategoryHarassment,
