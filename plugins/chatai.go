@@ -178,33 +178,29 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	)
 	for _, msg := range message {
 		if msg.Type == "text" && msg.Data["text"] != nil {
+			str += msg.Data["text"].(string) + " "
 			if !rmArg {
 				rmArg = true
-				t := msg.Data["text"].(string)
 				for _, arg := range c.Args {
-					t = strings.Replace(t, arg, "", -1)
+					str = strings.Replace(str, arg, "", -1)
 				}
-				msg.Data["text"] = t
-				str += t + " "
-				continue
 			}
-			str += msg.Data["text"].(string) + " "
 		}
 	}
 
 	var res *string
-	if essentials.CheckArgumentArray(&message, &c.ChatGPT.Args) && c.ChatGPT.Enabled {
+	if essentials.CheckArgumentArray(&messageStruct.Message, &c.ChatGPT.Args) && c.ChatGPT.Enabled {
 		res = c.ChatGPT.RequireAnswer(str)
-	} else if essentials.CheckArgumentArray(&message, &c.QWen.Args) && c.QWen.Enabled {
+	} else if essentials.CheckArgumentArray(&messageStruct.Message, &c.QWen.Args) && c.QWen.Enabled {
 		res = c.QWen.RequireAnswer(str)
-	} else if essentials.CheckArgumentArray(&message, &c.Gemini.Args) && c.Gemini.Enabled {
+	} else if essentials.CheckArgumentArray(&messageStruct.Message, &c.Gemini.Args) && c.Gemini.Enabled {
 		var (
 			action *[]byte
 			isNew  bool
 		)
 
 		if len(c.Gemini.Args) > 2 {
-			if essentials.CheckArgument(&message, c.Gemini.Args[2]) {
+			if essentials.CheckArgument(&messageStruct.Message, c.Gemini.Args[2]) {
 				isNew = true
 			}
 		}
