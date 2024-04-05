@@ -117,29 +117,6 @@ func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 				}
 			}
 		}
-	} else if split[0] == "originPicFile" {
-		//id, _ := strconv.ParseFloat(split[2], 64)
-		//contexts := &map[string]any{
-		//	"message_type": split[1],
-		//	"sender": map[string]any{
-		//		"user_id": id,
-		//	},
-		//	"group_id": id,
-		//}
-		//file := (*ctx)["data"].(map[string]any)["file"].(string)
-		//*send <- *essentials.SendFile(contexts, file, split[3]+".gif")
-		value, ok := essentials.GetCache(split[1])
-		if !ok {
-			log.Println("Origin picture cache not found")
-			return nil
-		}
-		messageStruct := value.(essentials.Value).Value
-		if echoMessageStruct.Status != "ok" {
-			return essentials.SendMsg(&messageStruct, "原图获取失败", nil, false, true)
-		}
-
-		filePath := echoMessageStruct.Data.File
-		return essentials.SendFile(&messageStruct, filePath, fmt.Sprintf("%d", messageStruct.MessageId))
 	}
 	return nil
 }
