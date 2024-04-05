@@ -1,8 +1,10 @@
 package websocket
 
 import (
+	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"encoding/json"
+	"log"
 )
 
 func MessageFactory(msg *[]byte, send *chan []byte) {
@@ -13,6 +15,11 @@ func MessageFactory(msg *[]byte, send *chan []byte) {
 	}
 
 	ctx := i.(map[string]any)
+
+	if base.Config.Debug {
+		log.Printf("Received message: %v", ctx)
+	}
+
 	for _, p := range essentials.PluginArray {
 		go p.Interface.ReceiveAll(&ctx, send)
 	}

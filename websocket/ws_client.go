@@ -43,10 +43,6 @@ func (c *Client) ReadPump() {
 			break
 		}
 		go MessageFactory(&message, &c.Send)
-
-		if base.Config.Debug {
-			log.Println(string(message))
-		}
 	}
 }
 
@@ -70,7 +66,7 @@ func (c *Client) WritePump() {
 			}
 
 			if base.Config.Debug {
-				log.Println(string(message))
+				log.Printf("Send: %s\n", string(message))
 			}
 
 			w, err := c.Conn.NextWriter(websocket.TextMessage)
