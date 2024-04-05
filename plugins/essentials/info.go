@@ -2,6 +2,7 @@ package essentials
 
 import (
 	"MacArthurGo/base"
+	"MacArthurGo/structs"
 	"fmt"
 	"log"
 	"reflect"
@@ -28,18 +29,19 @@ func init() {
 			Args:    []string{"/info", "/help"},
 		},
 	}
-	PluginArray = append(PluginArray, &PluginInterface{Interface: &Info})
+	PluginArray = append(PluginArray, &Plugin{Interface: &Info})
 }
 
-func (l *LoginInfo) ReceiveAll(_ *map[string]any, send *chan []byte) {
+func (l *LoginInfo) ReceiveAll() *[]byte {
 	if !l.Login {
-		*send <- *SendAction("get_login_info", struct{}{}, "info")
 		l.Login = true
+		return SendAction("get_login_info", struct{}{}, "info")
 	}
+	return nil
 }
 
-func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if CheckArgument(ctx, l.Args[0]) {
+func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+	if CheckArgument(&messageStruct.Message, l.Args[0]) {
 		var mem runtime.MemStats
 		runtime.ReadMemStats(&mem)
 
@@ -53,9 +55,8 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		message += "Sys = " + strconv.FormatUint(mem.Sys/1024/1024, 10) + " MB\n"
 		message += "HeapAlloc = " + strconv.FormatUint(mem.HeapAlloc/1024/1024, 10) + " MB\n"
 
-		*send <- *SendMsg(ctx, message, nil, false, false)
-	}
-	if CheckArgument(ctx, l.Args[1]) {
+		return SendMsg(messageStruct, message, nil, false, false)
+	} else if CheckArgument(&messageStruct.Message, l.Args[1]) {
 		result := []string{"插件				触发指令"}
 		for _, p := range PluginArray {
 			var res string
@@ -63,8 +64,7 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 			if name := ref.Elem().FieldByName("Name"); name.IsValid() {
 				res += name.String()
 			} else {
-				*send <- *SendMsg(ctx, "插件解析出错", nil, false, false)
-				return
+				return SendMsg(messageStruct, "插件解析出错", nil, false, false)
 			}
 
 			if enable := ref.Elem().FieldByName("Enabled"); enable.IsValid() {
@@ -72,8 +72,7 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 					res += "(已禁用)"
 				}
 			} else {
-				*send <- *SendMsg(ctx, "插件解析出错", nil, false, false)
-				return
+				return SendMsg(messageStruct, "插件解析出错", nil, false, false)
 			}
 
 			if arg := ref.Elem().FieldByName("Args"); arg.IsValid() {
@@ -86,31 +85,31 @@ func (l *LoginInfo) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 					res += "无"
 				}
 			} else {
-				*send <- *SendMsg(ctx, "插件解析出错", nil, false, false)
-				return
+				return SendMsg(messageStruct, "插件解析出错", nil, false, false)
 			}
 			result = append(result, res)
 		}
 
-		*send <- *SendMsg(ctx, strings.Join(result, "\n"), nil, false, false)
+		return SendMsg(messageStruct, strings.Join(result, "\n"), nil, false, false)
 	}
+	return nil
 }
 
-func (l *LoginInfo) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
-	if (*ctx)["echo"].(string) != "info" || (*ctx)["data"] == nil {
-		return
+func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]byte {
+	if echoMessageStruct.Echo != "info" {
+		return nil
 	}
 
-	data := (*ctx)["data"].(map[string]any)
-	l.NickName, l.UserId = data["nickname"].(string), strconv.FormatInt(int64(data["user_id"].(float64)), 10)
+	data := echoMessageStruct.Data
+	l.NickName, l.UserId = data.Nickname, strconv.FormatInt(data.UserId, 10)
 	log.Printf("Get account nickname: %s, id: %s", l.NickName, l.UserId)
-	sendCtx := map[string]any{
-		"message_type": "private",
-		"sender": map[string]any{
-			"user_id": float64(base.Config.Admin),
-		},
+
+	sendStruct := structs.MessageStruct{
+		MessageType: "private",
+		UserId:      base.Config.Admin,
 	}
-	*send <- *SendMsg(&sendCtx, "MacArthurGo 已上线", nil, false, false)
+
+	return SendMsg(&sendStruct, "MacArthurGo 已上线", nil, false, false)
 }
 
 func (l *LoginInfo) timeToString(time int64) string {

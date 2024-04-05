@@ -1,32 +1,48 @@
 package essentials
 
-import "MacArthurGo/structs/cqcode"
+import (
+	"MacArthurGo/structs"
+	"context"
+)
 
-type MessageStruct struct {
-	Time         int64  `json:"time"`
-	MessageType  string `json:"message_type"`
-	MessageId    int64  `json:"message_id"`
-	GroupId      int64  `json:"group_id"`
-	UserId       int64  `json:"user_id"`
-	RawMessage   string `json:"raw_message"`
-	Echo         string `json:"echo"`
-	MessageArray *[]cqcode.ArrayMessage
+type IPlugin interface {
+	ReceiveAll() *[]byte
+	ReceiveMessage(*structs.MessageStruct) *[]byte
+	ReceiveEcho(*structs.EchoMessageStruct) *[]byte
 }
+
+var PluginArray []*Plugin
 
 type Plugin struct {
-	Name    string
-	Enabled bool
-	Args    []string
-}
-
-type PluginInterface struct {
+	Name      string
+	Enabled   bool
+	Args      []string
 	Interface IPlugin
 }
 
-type IPlugin interface {
-	ReceiveAll(*map[string]any, *chan []byte)
-	ReceiveMessage(*MessageStruct, *chan []byte)
-	ReceiveEcho(*map[string]any, *chan []byte)
+func (p *Plugin) GoroutineAll(ctx context.Context) *[]byte {
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
+		return p.Interface.ReceiveAll()
+	}
 }
 
-var PluginArray []*PluginInterface
+func (p *Plugin) GoroutineMessage(ctx context.Context, messageStruct *structs.MessageStruct) *[]byte {
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
+		return p.Interface.ReceiveMessage(messageStruct)
+	}
+}
+
+func (p *Plugin) GoroutineEcho(ctx context.Context, echoMessageStruct *structs.EchoMessageStruct) *[]byte {
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
+		return p.Interface.ReceiveEcho(echoMessageStruct)
+	}
+}

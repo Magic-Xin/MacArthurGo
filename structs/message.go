@@ -2,6 +2,42 @@ package structs
 
 import "MacArthurGo/structs/cqcode"
 
+type MessageStruct struct {
+	Time        int64  `json:"time"`
+	MessageType string `json:"message_type"`
+	MessageId   int64  `json:"message_id"`
+	GroupId     int64  `json:"group_id"`
+	UserId      int64  `json:"user_id"`
+	Sender      struct {
+		UserId   int64  `json:"user_id"`
+		Nickname string `json:"nickname"`
+	} `json:"sender"`
+	Message    []cqcode.ArrayMessage `json:"message"`
+	RawMessage string                `json:"raw_message"`
+	Echo       string                `json:"echo"`
+}
+
+type EchoMessageStruct struct {
+	Data struct {
+		// Info only
+		Nickname string `json:"nickname"`
+		UserId   int64  `json:"user_id"`
+
+		// originPic only
+		File string `json:"file"`
+
+		Time        int64  `json:"time"`
+		MessageType string `json:"message_type"`
+		MessageId   int64  `json:"message_id"`
+		Sender      struct {
+			UserId int64 `json:"user_id"`
+		}
+		Message []cqcode.ArrayMessage `json:"message"`
+	} `json:"data"`
+	Echo   string `json:"echo"`
+	Status string `json:"status"`
+}
+
 type PrivateFile struct {
 	UserId int64  `json:"user_id"`
 	File   string `json:"file"`
@@ -12,6 +48,13 @@ type GroupFile struct {
 	GroupId int64  `json:"group_id"`
 	File    string `json:"file"`
 	Name    string `json:"name"`
+}
+
+type Message struct {
+	MessageType string                `json:"message_type"`
+	UserId      int64                 `json:"user_id"`
+	GroupId     int64                 `json:"group_id"`
+	Message     []cqcode.ArrayMessage `json:"message"`
 }
 
 type PrivateMessage struct {

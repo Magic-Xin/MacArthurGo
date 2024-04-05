@@ -1,12 +1,13 @@
 package essentials
 
 import (
+	"MacArthurGo/structs"
 	"sync"
 	"time"
 )
 
 type Value struct {
-	Value MessageStruct
+	Value structs.MessageStruct
 	Time  int64
 }
 

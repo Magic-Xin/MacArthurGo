@@ -3,6 +3,7 @@ package plugins
 import (
 	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
+	"MacArthurGo/structs"
 	"encoding/json"
 	"log"
 	"math/rand"
@@ -29,43 +30,44 @@ func init() {
 		CommonProbability: base.Config.Plugins.Repeat.CommonProbability,
 	}
 
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &repeat})
+	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &repeat})
 }
 
-func (r *Repeat) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
+func (r *Repeat) ReceiveAll() *[]byte {
+	return nil
+}
 
-func (r *Repeat) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
+func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	if !r.Enabled {
-		return
+		return nil
 	}
 
-	if (*ctx)["message_type"].(string) != "group" || (*ctx)["message"] == nil || (*ctx)["group_id"] == nil {
-		return
+	if messageStruct.MessageType != "group" || messageStruct.Message == nil || messageStruct.GroupId == 0 {
+		return nil
 	}
 
-	msg, err := json.Marshal((*ctx)["message"])
+	msg, err := json.Marshal(messageStruct.Message)
 	if err != nil {
 		log.Printf("Repeat json marshal error: %v", err)
-		return
+		return nil
 	}
-	message := essentials.DecodeArrayMessage(ctx)
+	message := messageStruct.Message
 	if message == nil {
-		return
+		return nil
 	}
 
-	groupId := strconv.FormatInt(int64((*ctx)["group_id"].(float64)), 10)
+	groupId := strconv.FormatInt(messageStruct.GroupId, 10)
 	md5 := essentials.Md5(&msg)
 	cache, ok := r.repeatMap.Load(groupId)
 	if !ok {
 		r.repeatMap.Store(groupId, []any{md5, 1})
-		return
+		return nil
 	}
 
 	if cache.([]any)[0].(string) == md5 {
 		if cache.([]any)[1].(int) >= int(r.Times) && r.getRand(false) {
 			r.repeatMap.Store(groupId, []any{md5, 1})
-			*send <- *essentials.SendMsg(ctx, "", message, false, false)
-			return
+			return essentials.SendMsg(messageStruct, "", &message, false, false)
 		} else {
 			r.repeatMap.Store(groupId, []any{md5, cache.([]any)[1].(int) + 1})
 		}
@@ -74,11 +76,14 @@ func (r *Repeat) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 
 	if r.getRand(true) {
-		*send <- *essentials.SendMsg(ctx, "", message, false, false)
+		return essentials.SendMsg(messageStruct, "", &message, false, false)
 	}
+	return nil
 }
 
-func (r *Repeat) ReceiveEcho(_ *map[string]any, _ *chan []byte) {}
+func (r *Repeat) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
+	return nil
+}
 
 func (r *Repeat) getRand(common bool) bool {
 	if common {

@@ -6,11 +6,15 @@ import (
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type OriginPic struct {
@@ -25,62 +29,74 @@ func init() {
 			Args:    base.Config.Plugins.OriginPic.Args,
 		},
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &originPic})
+	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &originPic})
 }
 
-func (o OriginPic) ReceiveAll(*map[string]any, *chan []byte) {}
+func (o *OriginPic) ReceiveAll() *[]byte {
+	return nil
+}
 
-func (o OriginPic) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
+func (o *OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	if !o.Enabled {
-		return
+		return nil
 	}
 
-	if !essentials.CheckArgumentArray(ctx, &o.Args) {
-		return
+	if !essentials.CheckArgumentArray(&messageStruct.Message, &o.Args) {
+		return nil
 	}
 
-	message := essentials.DecodeArrayMessage(ctx)
+	message := messageStruct.Message
 	if message == nil {
-		return
+		return nil
 	}
 
 	var reply []cqcode.ArrayMessage
-	for _, m := range *message {
+	for _, m := range message {
 		if m.Type == "image" {
 			fileUrl, _ := essentials.GetUniversalImgURL(m.Data["url"].(string))
 			reply = append(reply, *cqcode.Image(fileUrl))
 		}
 		if m.Type == "reply" {
-			*send <- *essentials.SendAction("get_msg", structs.GetMsg{Id: m.Data["id"].(string)}, "originPic")
-			return
+			echo := fmt.Sprintf("originPic|%d", messageStruct.MessageId)
+			value := essentials.Value{Value: *messageStruct, Time: time.Now().Unix()}
+			essentials.SetCache(strconv.FormatInt(messageStruct.MessageId, 10), value)
+			return essentials.SendAction("get_msg", structs.GetMsg{Id: m.Data["id"].(string)}, echo)
 		}
 	}
 
 	if len(reply) > 0 {
-		*send <- *essentials.SendMsg(ctx, "", &reply, false, false)
+		return essentials.SendMsg(messageStruct, "", &reply, false, false)
 	}
+	return nil
 }
 
-func (o OriginPic) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
+func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]byte {
 	if !o.Enabled {
-		return
+		return nil
 	}
 
-	if (*ctx)["status"].(string) != "ok" {
-		return
+	if echoMessageStruct.Status != "ok" {
+		return nil
 	}
 
-	echo := (*ctx)["echo"].(string)
+	echo := echoMessageStruct.Echo
 	split := strings.Split(echo, "|")
 
 	if split[0] == "originPic" {
-		contexts := (*ctx)["data"].(map[string]any)
-		message := essentials.DecodeArrayMessage(&contexts)
+		contexts := echoMessageStruct.Data
+		message := contexts.Message
 		if message == nil {
-			return
+			return nil
 		}
 
-		for _, m := range *message {
+		value, ok := essentials.GetCache(split[1])
+		if !ok {
+			log.Println("Origin picture cache not found")
+			return nil
+		}
+		messageStruct := value.(essentials.Value).Value
+
+		for _, m := range message {
 			if m.Type == "image" {
 				originUrl := *essentials.GetOriginUrl(m.Data["url"].(string))
 				imgType, err := o.getFileType(originUrl)
@@ -89,38 +105,45 @@ func (o OriginPic) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 					continue
 				}
 				if imgType == "gif" {
-					params := struct {
-						Url string `json:"url"`
-					}{Url: originUrl}
-					echo := "originPicFile|" + contexts["message_type"].(string)
-					if contexts["message_type"].(string) == "group" {
-						echo += "|" + strconv.FormatInt(int64(contexts["group_id"].(float64)), 10)
-					} else {
-						echo += "|" + strconv.FormatInt(int64(contexts["user_id"].(float64)), 10)
+					filePath, err := o.downloadGIF(originUrl)
+					if err != nil {
+						log.Printf("Download gif error: %v", err)
+						continue
 					}
-					echo += "|" + m.Data["file"].(string)
-
-					*send <- *essentials.SendAction("download_file", params, echo)
+					return essentials.SendFile(&messageStruct, filePath, fmt.Sprintf("%d.gif", messageStruct.MessageId))
 				} else {
-					*send <- *essentials.SendMsg(&contexts, "", &[]cqcode.ArrayMessage{*cqcode.Image(originUrl)}, false, false)
+					return essentials.SendMsg(&messageStruct, "", &[]cqcode.ArrayMessage{*cqcode.Image(originUrl)}, false, false)
 				}
 			}
 		}
 	} else if split[0] == "originPicFile" {
-		id, _ := strconv.ParseFloat(split[2], 64)
-		contexts := &map[string]any{
-			"message_type": split[1],
-			"sender": map[string]any{
-				"user_id": id,
-			},
-			"group_id": id,
+		//id, _ := strconv.ParseFloat(split[2], 64)
+		//contexts := &map[string]any{
+		//	"message_type": split[1],
+		//	"sender": map[string]any{
+		//		"user_id": id,
+		//	},
+		//	"group_id": id,
+		//}
+		//file := (*ctx)["data"].(map[string]any)["file"].(string)
+		//*send <- *essentials.SendFile(contexts, file, split[3]+".gif")
+		value, ok := essentials.GetCache(split[1])
+		if !ok {
+			log.Println("Origin picture cache not found")
+			return nil
 		}
-		file := (*ctx)["data"].(map[string]any)["file"].(string)
-		*send <- *essentials.SendFile(contexts, file, split[3]+".gif")
+		messageStruct := value.(essentials.Value).Value
+		if echoMessageStruct.Status != "ok" {
+			return essentials.SendMsg(&messageStruct, "原图获取失败", nil, false, true)
+		}
+
+		filePath := echoMessageStruct.Data.File
+		return essentials.SendFile(&messageStruct, filePath, fmt.Sprintf("%d", messageStruct.MessageId))
 	}
+	return nil
 }
 
-func (o OriginPic) getFileType(url string) (string, error) {
+func (o *OriginPic) getFileType(url string) (string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", err
@@ -145,5 +168,82 @@ func (o OriginPic) getFileType(url string) (string, error) {
 		return "gif", nil
 	default:
 		return "", errors.New("unsupported image type")
+	}
+}
+
+func (o *OriginPic) downloadGIF(url string) (string, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	body := resp.Body
+	defer func(Body io.ReadCloser) {
+		err = Body.Close()
+		if err != nil {
+			log.Printf("Image fetch close error: %v", err)
+		}
+	}(body)
+	imgData, err := io.ReadAll(body)
+	if err != nil {
+		return "", err
+	}
+	imagePath := filepath.Join(".", "img_cache")
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		err = os.Mkdir(imagePath, os.ModeDir|0755)
+		if err != nil {
+			log.Fatalf("Can not create log folder error: %v", err)
+		}
+	}
+	file, err := os.Create(filepath.Join(imagePath, fmt.Sprintf("%d.gif", time.Now().Unix())))
+	if err != nil {
+		return "", err
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			log.Printf("Image file close error: %v", err)
+		}
+	}(file)
+	_, err = file.Write(imgData)
+	if err != nil {
+		return "", err
+	}
+	filePath, err := filepath.Abs(file.Name())
+	if err != nil {
+		return "", err
+	}
+
+	return filePath, nil
+}
+
+func (o *OriginPic) deleteCache() {
+	for {
+		time.Sleep(1 * time.Hour)
+		imagePath := filepath.Join(".", "img_cache")
+		if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+			continue
+		}
+		files, err := os.ReadDir(imagePath)
+		if err != nil {
+			log.Printf("Read directory error: %v", err)
+			continue
+		}
+		for _, f := range files {
+			createTime, err := strconv.ParseInt(strings.TrimSuffix(f.Name(), filepath.Ext(f.Name())), 10, 64)
+			if err != nil {
+				log.Printf("Parse file name error: %v", err)
+				continue
+			}
+			if time.Now().Unix()-createTime > 1800 {
+				err := os.Remove(filepath.Join(imagePath, f.Name()))
+				if err != nil {
+					log.Printf("Remove file error: %v", err)
+				}
+			}
+		}
 	}
 }

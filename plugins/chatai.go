@@ -12,6 +12,7 @@ import (
 	"fmt"
 	binglib "github.com/Harry-zklcdc/bing-lib"
 	"github.com/google/generative-ai-go/genai"
+	"github.com/google/go-cmp/cmp"
 	"github.com/sashabaranov/go-openai"
 	"github.com/vinta/pangu"
 	"google.golang.org/api/iterator"
@@ -153,27 +154,29 @@ func init() {
 		groupForward: base.Config.Plugins.ChatAI.GroupForward,
 		panGu:        base.Config.Plugins.ChatAI.PanGu,
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &chatAI})
+	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &chatAI})
 }
 
-func (c *ChatAI) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
+func (c *ChatAI) ReceiveAll() *[]byte {
+	return nil
+}
 
-func (c *ChatAI) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
+func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	if !c.Enabled {
-		return
+		return nil
 	}
 
-	words := essentials.SplitArgument(ctx)
+	words := essentials.SplitArgument(&messageStruct.Message)
 	if len(words) < 2 {
-		return
+		return nil
 	}
 
-	message := essentials.DecodeArrayMessage(ctx)
+	message := messageStruct.Message
 	var (
 		rmArg bool
 		str   string
 	)
-	for _, msg := range *message {
+	for _, msg := range message {
 		if msg.Type == "text" && msg.Data["text"] != nil {
 			if !rmArg {
 				rmArg = true
@@ -190,85 +193,77 @@ func (c *ChatAI) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	}
 
 	var res *string
-	if essentials.CheckArgumentArray(ctx, &c.ChatGPT.Args) && c.ChatGPT.Enabled {
+	if essentials.CheckArgumentArray(&message, &c.ChatGPT.Args) && c.ChatGPT.Enabled {
 		res = c.ChatGPT.RequireAnswer(str)
-	} else if essentials.CheckArgumentArray(ctx, &c.QWen.Args) && c.QWen.Enabled {
+	} else if essentials.CheckArgumentArray(&message, &c.QWen.Args) && c.QWen.Enabled {
 		res = c.QWen.RequireAnswer(str)
-	} else if essentials.CheckArgumentArray(ctx, &c.Gemini.Args) && c.Gemini.Enabled {
+	} else if essentials.CheckArgumentArray(&message, &c.Gemini.Args) && c.Gemini.Enabled {
 		var (
 			action *[]byte
 			isNew  bool
 		)
 
 		if len(c.Gemini.Args) > 2 {
-			if essentials.CheckArgument(ctx, c.Gemini.Args[2]) {
+			if essentials.CheckArgument(&message, c.Gemini.Args[2]) {
 				isNew = true
 			}
 		}
 
-		messageID := int64((*ctx)["message_id"].(float64))
-		res, action = c.Gemini.RequireAnswer(str, message, messageID, isNew)
+		messageID := messageStruct.MessageId
+		res, action = c.Gemini.RequireAnswer(str, &message, messageID, isNew)
 		if action != nil {
-			value := essentials.Value{Value: *ctx, Time: time.Now().Unix()}
+			value := essentials.Value{Value: *messageStruct, Time: time.Now().Unix()}
 			essentials.SetCache(strconv.FormatInt(messageID, 10), value)
-			*send <- *action
-			return
+			return action
 		}
-	} else if essentials.CheckArgumentArray(ctx, &c.NewBing.Args) && c.NewBing.Enabled {
-		*send <- *essentials.SendMsg(ctx, "NewBing 回复生成中，速度较慢请勿重复发送请求", nil, false, true)
+	} else if essentials.CheckArgumentArray(&message, &c.NewBing.Args) && c.NewBing.Enabled {
 		res = c.NewBing.RequireAnswer(str)
 	} else {
-		return
+		return nil
 	}
 
 	if res == nil {
-		return
+		return nil
 	}
 
 	if c.panGu {
 		*res = pangu.SpacingText(*res)
 	}
 
-	if (*ctx)["message_type"].(string) == "group" && c.groupForward {
+	if messageStruct.MessageType == "group" && c.groupForward {
 		var data []structs.ForwardNode
-		uin := strconv.FormatInt(int64((*ctx)["sender"].(map[string]any)["user_id"].(float64)), 10)
-		name := (*ctx)["sender"].(map[string]any)["nickname"].(string)
-		*message = append([]cqcode.ArrayMessage{*cqcode.Text("@" + name + ": ")}, *message...)
-		data = append(data, *essentials.ConstructForwardNode(uin, name, message), *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
-		*send <- *essentials.SendGroupForward(ctx, &data, "")
+		uin := strconv.FormatInt(messageStruct.UserId, 10)
+		name := messageStruct.Sender.Nickname
+		message = append([]cqcode.ArrayMessage{*cqcode.Text("@" + name + ": ")}, message...)
+		data = append(data, *essentials.ConstructForwardNode(uin, name, &message), *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
+		return essentials.SendGroupForward(messageStruct, &data, "")
 	} else {
-		*send <- *essentials.SendMsg(ctx, *res, nil, false, false)
+		return essentials.SendMsg(messageStruct, *res, nil, false, false)
 	}
 }
 
-func (c *ChatAI) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
+func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]byte {
 	if !c.Enabled {
-		return
+		return nil
 	}
 
-	echo := (*ctx)["echo"].(string)
+	echo := echoMessageStruct.Echo
 	split := strings.Split(echo, "|")
 
-	if split[0] == "gemini" && (*ctx)["data"] != nil {
-		contexts := (*ctx)["data"].(map[string]any)
-		if (*ctx)["status"] != "ok" {
-			*send <- *essentials.SendMsg(&contexts, "Gemini reply args error", nil, false, false)
-			return
-		}
-
-		var res *string
-
-		message := essentials.DecodeArrayMessage(&contexts)
+	if split[0] == "gemini" && !cmp.Equal(echoMessageStruct.Data, struct{}{}) {
 		value, ok := essentials.GetCache(split[1])
 		if !ok {
 			log.Println("Gemini get cache error")
 		}
-		originCtx := value.(essentials.Value).Value.(map[string]any)
+		originCtx := value.(essentials.Value).Value
+		if echoMessageStruct.Status != "ok" {
+			return essentials.SendMsg(&originCtx, "Gemini reply args error", nil, false, false)
+		}
 
 		data, ok := c.Gemini.ReplyMap.Load(split[1])
 		if !ok {
 			log.Println("Gemini reply map load error")
-			return
+			return nil
 		}
 
 		originMsg, originStr := data.(struct {
@@ -279,7 +274,9 @@ func (c *ChatAI) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 			OriginStr string
 		}).OriginStr
 
-		rMessage := append(originMsg, *message...)
+		var res *string
+		message := echoMessageStruct.Data.Message
+		rMessage := append(originMsg, message...)
 		if split[2] == "true" {
 			res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0, true)
 		} else {
@@ -287,25 +284,26 @@ func (c *ChatAI) ReceiveEcho(ctx *map[string]any, send *chan []byte) {
 		}
 
 		if res == nil {
-			return
+			return nil
 		}
 
 		if c.panGu {
 			*res = pangu.SpacingText(*res)
 		}
 
-		if contexts["message_type"].(string) == "group" && c.groupForward {
+		if originCtx.MessageType == "group" && c.groupForward {
 			var data []structs.ForwardNode
-			uin := strconv.FormatInt(int64(originCtx["sender"].(map[string]any)["user_id"].(float64)), 10)
-			name := originCtx["sender"].(map[string]any)["nickname"].(string)
+			uin := strconv.FormatInt(originCtx.UserId, 10)
+			name := originCtx.Sender.Nickname
 			message := append([]cqcode.ArrayMessage{*cqcode.Text("@" + name + ": ")}, rMessage...)
 			data = append(data, *essentials.ConstructForwardNode(uin, name, &message))
 			data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
-			*send <- *essentials.SendGroupForward(&originCtx, &data, "")
+			return essentials.SendGroupForward(&originCtx, &data, "")
 		} else {
-			*send <- *essentials.SendMsg(&originCtx, *res, nil, false, false)
+			return essentials.SendMsg(&originCtx, *res, nil, false, false)
 		}
 	}
+	return nil
 }
 
 func (c *ChatGPT) RequireAnswer(str string) *string {

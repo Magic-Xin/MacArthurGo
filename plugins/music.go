@@ -3,6 +3,7 @@ package plugins
 import (
 	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
+	"MacArthurGo/structs"
 	"io"
 	"log"
 	"net/http"
@@ -22,26 +23,28 @@ func init() {
 			Enabled: base.Config.Plugins.Music.Enable,
 		},
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &music})
+	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &music})
 }
 
-func (m *Music) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
+func (m *Music) ReceiveAll() *[]byte {
+	return nil
+}
 
-func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
+func (m *Music) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	if !m.Enabled {
-		return
+		return nil
 	}
 
 	var (
 		urlType string
 		res     string
 	)
-	message := essentials.DecodeArrayMessage(ctx)
+	message := messageStruct.Message
 	if message == nil {
-		return
+		return nil
 	}
 
-	for _, msg := range *message {
+	for _, msg := range message {
 		if msg.Type == "text" && msg.Data["text"] != nil {
 			str := msg.Data["text"].(string)
 			if strings.Contains(str, "//music.163.com/") {
@@ -72,13 +75,16 @@ func (m *Music) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		if match != nil {
 			id, err := strconv.ParseInt(match[0][1], 10, 64)
 			if err == nil {
-				*send <- *essentials.SendMusic(ctx, urlType, id)
+				return essentials.SendMusic(messageStruct, urlType, id)
 			}
 		}
 	}
+	return nil
 }
 
-func (m *Music) ReceiveEcho(_ *map[string]any, _ *chan []byte) {}
+func (m *Music) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
+	return nil
+}
 
 func (*Music) getQQMusicID(url *string) *string {
 	if mid := regexp.MustCompile(`songmid=(\w+)&`).FindAllStringSubmatch(*url, -1); mid != nil {

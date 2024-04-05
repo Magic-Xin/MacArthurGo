@@ -24,18 +24,18 @@ func SendAction(action string, params any, echo string) *[]byte {
 	return &jsonMsg
 }
 
-func SendFile(ctx *map[string]any, file string, name string) *[]byte {
-	if file == "" || ctx == nil {
+func SendFile(messageStruct *structs.MessageStruct, file string, name string) *[]byte {
+	if file == "" || messageStruct == nil {
 		return nil
 	}
 
 	var act structs.Action
-	if (*ctx)["message_type"] == "group" {
-		groupId := int64((*ctx)["group_id"].(float64))
+	if messageStruct.MessageType == "group" {
+		groupId := messageStruct.GroupId
 		params := structs.GroupFile{GroupId: groupId, File: file, Name: name}
 		act = structs.Action{Action: "upload_group_file", Params: params}
 	} else {
-		userId := int64((*ctx)["sender"].(map[string]any)["user_id"].(float64))
+		userId := messageStruct.UserId
 		params := structs.PrivateFile{UserId: userId, File: file, Name: name}
 		act = structs.Action{Action: "upload_private_file", Params: params}
 	}
@@ -44,8 +44,8 @@ func SendFile(ctx *map[string]any, file string, name string) *[]byte {
 	return &jsonMsg
 }
 
-func SendMsg(ctx *map[string]any, message string, messageArray *[]cqcode.ArrayMessage, at bool, reply bool) *[]byte {
-	if (message == "" && messageArray == nil) || ctx == nil {
+func SendMsg(messageStruct *structs.MessageStruct, message string, messageArray *[]cqcode.ArrayMessage, at bool, reply bool) *[]byte {
+	if (message == "" && messageArray == nil) || messageStruct == nil {
 		return nil
 	}
 
@@ -54,38 +54,50 @@ func SendMsg(ctx *map[string]any, message string, messageArray *[]cqcode.ArrayMe
 		arrayMessage = append(arrayMessage, *messageArray...)
 	}
 
-	if at && (*ctx)["message_type"] == "group" {
-		uid := strconv.FormatInt(int64((*ctx)["user_id"].(float64)), 10)
+	if at && messageStruct.MessageType == "group" {
+		uid := strconv.FormatInt(messageStruct.UserId, 10)
 		arrayMessage = append([]cqcode.ArrayMessage{*cqcode.At(uid)}, arrayMessage...)
 	}
 	if reply {
-		msgId := strconv.FormatInt(int64((*ctx)["message_id"].(float64)), 10)
+		msgId := strconv.FormatInt(messageStruct.MessageId, 10)
 		arrayMessage = append([]cqcode.ArrayMessage{*cqcode.Reply(msgId)}, arrayMessage...)
 	}
 
-	return constructMessage(ctx, &arrayMessage)
+	return constructMessage(messageStruct, &arrayMessage)
 }
 
-func SendPoke(ctx *map[string]any, uid int64) *[]byte {
-	return constructMessage(ctx, &[]cqcode.ArrayMessage{*cqcode.Poke(uid)})
+func SendPoke(messageStruct *structs.MessageStruct, uid int64) *[]byte {
+	if messageStruct.MessageType == "group" {
+		return SendAction("group_poke",
+			struct {
+				GroupId int64
+				UserId  int64
+			}{GroupId: messageStruct.GroupId, UserId: uid}, "")
+	} else if messageStruct.MessageType == "private" {
+		return SendAction("friend_poke",
+			struct {
+				UserId int64
+			}{UserId: uid}, "")
+	}
+	return nil
 }
 
-func SendMusic(ctx *map[string]any, urlType string, id int64) *[]byte {
-	return constructMessage(ctx, &[]cqcode.ArrayMessage{*cqcode.Music(urlType, id)})
+func SendMusic(messageStruct *structs.MessageStruct, urlType string, id int64) *[]byte {
+	return constructMessage(messageStruct, &[]cqcode.ArrayMessage{*cqcode.Music(urlType, id)})
 }
 
-func SendPrivateForward(ctx *map[string]any, data *[]structs.ForwardNode, echo string) *[]byte {
+func SendPrivateForward(messageStruct *structs.MessageStruct, data *[]structs.ForwardNode, echo string) *[]byte {
 	params := structs.PrivateForward{
-		UserId:   int64((*ctx)["sender"].(map[string]any)["user_id"].(float64)),
+		UserId:   messageStruct.UserId,
 		Messages: *data,
 	}
 
 	return SendAction("send_private_forward_msg", params, echo)
 }
 
-func SendGroupForward(ctx *map[string]any, data *[]structs.ForwardNode, echo string) *[]byte {
+func SendGroupForward(messageStruct *structs.MessageStruct, data *[]structs.ForwardNode, echo string) *[]byte {
 	params := structs.GroupForward{
-		GroupId:  int64((*ctx)["group_id"].(float64)),
+		GroupId:  messageStruct.GroupId,
 		Messages: *data,
 	}
 
@@ -101,31 +113,29 @@ func ConstructForwardNode(uin string, name string, data *[]cqcode.ArrayMessage) 
 	return node
 }
 
-func CheckArgument(ctx *map[string]any, arg string) bool {
-	if split := SplitArgument(ctx); len(split) > 0 {
-		return SplitArgument(ctx)[0] == arg
+func CheckArgument(message *[]cqcode.ArrayMessage, arg string) bool {
+	if split := SplitArgument(message); len(split) > 0 {
+		return split[0] == arg
 	}
 	return false
 }
 
-func CheckArgumentArray(ctx *map[string]any, args *[]string) bool {
+func CheckArgumentArray(message *[]cqcode.ArrayMessage, args *[]string) bool {
 	if args == nil {
 		return false
 	}
 
 	for _, arg := range *args {
-		if split := SplitArgument(ctx); len(split) > 0 {
-			if SplitArgument(ctx)[0] == arg {
+		if split := SplitArgument(message); len(split) > 0 {
+			if split[0] == arg {
 				return true
 			}
 		}
-
 	}
 	return false
 }
 
-func SplitArgument(ctx *map[string]any) []string {
-	message := DecodeArrayMessage(ctx)
+func SplitArgument(message *[]cqcode.ArrayMessage) []string {
 	var res string
 	for _, msg := range *message {
 		if msg.Type == "text" {
@@ -169,35 +179,23 @@ func GetOriginUrl(url string) *string {
 	return &originURL
 }
 
-func DecodeArrayMessage(ctx *map[string]any) *[]cqcode.ArrayMessage {
-	msg, err := json.Marshal((*ctx)["message"])
-	if err != nil {
-		log.Printf("Marshal message error: %v", err)
-		return nil
-	}
-	return cqcode.Unmarshal(msg)
-}
-
 func Md5(origin *[]byte) string {
 	return fmt.Sprintf("%x", md5.Sum(*origin))
 }
 
-func constructMessage(ctx *map[string]any, message *[]cqcode.ArrayMessage) *[]byte {
-	if (*ctx)["message_type"] == nil {
+func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.ArrayMessage) *[]byte {
+	if messageStruct.MessageType == "" {
 		return nil
 	}
 
-	messageType := (*ctx)["message_type"].(string)
 	var act structs.Action
-	if messageType == "private" {
-		userId := int64((*ctx)["sender"].(map[string]any)["user_id"].(float64))
-		msg := structs.PrivateMessage{UserId: userId, Message: *message}
-		act = structs.Action{Action: "send_private_msg", Params: msg}
-	} else {
-		groupId := int64((*ctx)["group_id"].(float64))
-		msg := structs.GroupMessage{GroupId: groupId, Message: *message}
-		act = structs.Action{Action: "send_group_msg", Params: msg}
+	msg := structs.Message{
+		MessageType: messageStruct.MessageType,
+		UserId:      messageStruct.UserId,
+		GroupId:     messageStruct.GroupId,
+		Message:     *message,
 	}
+	act = structs.Action{Action: "send_msg", Params: msg}
 
 	jsonMsg, _ := json.Marshal(act)
 	return &jsonMsg
