@@ -172,20 +172,14 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	}
 
 	message := messageStruct.Message
-	var (
-		rmArg bool
-		str   string
-	)
+	var str string
 	for _, msg := range message {
 		if msg.Type == "text" && msg.Data["text"] != nil {
 			str += msg.Data["text"].(string) + " "
-			if !rmArg {
-				rmArg = true
-				for _, arg := range c.Args {
-					str = strings.Replace(str, arg, "", -1)
-				}
-			}
 		}
+	}
+	for _, arg := range c.Args {
+		str = strings.Replace(str, arg, "", 1)
 	}
 
 	var res *string
