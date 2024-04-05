@@ -6,13 +6,12 @@ import (
 )
 
 type Value struct {
-	Value any
+	Value MessageStruct
 	Time  int64
 }
 
 func init() {
 	go DeleteExpiredCache(3600, 1800)
-
 }
 
 var cache sync.Map
