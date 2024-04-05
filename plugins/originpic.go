@@ -30,6 +30,7 @@ func init() {
 		},
 	}
 	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &originPic})
+	go originPic.deleteCache()
 }
 
 func (o *OriginPic) ReceiveAll() *[]byte {
