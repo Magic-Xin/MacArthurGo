@@ -75,7 +75,6 @@ type config struct {
 			HandleBannedHosts bool     `json:"handleBannedHosts"`
 			ExpirationTime    int64    `json:"expirationTime"`
 			IntervalTime      int64    `json:"intervalTime"`
-			SearchFeedback    string   `json:"searchFeedback"`
 			SauceNAOToken     string   `json:"sauceNAOToken"`
 		} `json:"picSearch"`
 		ChatAI struct {
@@ -101,6 +100,7 @@ type config struct {
 				Enable bool     `json:"enable"`
 				Args   []string `json:"args"`
 				Model  string   `json:"model"`
+				Token  string   `json:"token"`
 			} `json:"newBing"`
 			GroupForward bool `json:"groupForward"`
 			PanGu        bool `json:"panGu"`

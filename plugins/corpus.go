@@ -3,6 +3,7 @@ package plugins
 import (
 	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
+	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"regexp"
 	"strings"
@@ -52,22 +53,24 @@ func init() {
 		},
 		rules: &rules,
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &corpus})
+	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &corpus})
 }
 
-func (c *Corpus) ReceiveAll(*map[string]any, *chan []byte) {}
+func (c *Corpus) ReceiveAll() *[]byte {
+	return nil
+}
 
-func (c *Corpus) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
+func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	if !c.Enabled {
-		return
+		return nil
 	}
 
-	message := essentials.DecodeArrayMessage(ctx)
-	if message == nil || (*ctx)["message_type"] == nil {
-		return
+	message := messageStruct.Message
+	if message == nil || messageStruct.MessageType == "" {
+		return nil
 	}
 	var text string
-	for _, msg := range *message {
+	for _, msg := range message {
 		if msg.Type == "text" {
 			text += msg.Data["text"].(string)
 		}
@@ -76,32 +79,35 @@ func (c *Corpus) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 	for _, v := range *c.rules {
 		if match := regexp.MustCompile(v.Regexp).MatchString(text); match {
 			if v.Scene != "a" && v.Scene != "all" {
-				if !strings.HasPrefix((*ctx)["message_type"].(string), v.Scene) {
+				if !strings.HasPrefix(messageStruct.MessageType, v.Scene) {
 					continue
 				}
 			}
 			if v.Users != nil {
-				userId := int64((*ctx)["sender"].(map[string]any)["user_id"].(float64))
+				userId := messageStruct.UserId
 				if !c.Contain(v.Users, userId) {
 					continue
 				}
 			}
-			if v.Groups != nil && (*ctx)["message_type"].(string) == "group" {
-				groupId := int64((*ctx)["group_id"].(float64))
+			if v.Groups != nil && messageStruct.MessageType == "group" {
+				groupId := messageStruct.GroupId
 				if !c.Contain(v.Groups, groupId) {
 					continue
 				}
 			}
 
 			if v.Message != nil {
-				*send <- *essentials.SendMsg(ctx, "", v.Message, v.IsAt, v.IsReply)
+				return essentials.SendMsg(messageStruct, "", v.Message, v.IsAt, v.IsReply)
 			}
 			break
 		}
 	}
+	return nil
 }
 
-func (c *Corpus) ReceiveEcho(*map[string]any, *chan []byte) {}
+func (c *Corpus) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
+	return nil
+}
 
 func (c *Corpus) Contain(arr []int64, item int64) bool {
 	for _, v := range arr {

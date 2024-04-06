@@ -55,7 +55,7 @@ func main() {
 			}
 		}
 	}
-	client := &websocket.Client{Conn: conn, Send: make(chan []byte)}
+	client := &websocket.Client{Conn: conn, SendPump: make(chan *[]byte)}
 
 	go client.ReadPump()
 	go client.WritePump()

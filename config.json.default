@@ -96,6 +96,7 @@
         "enable": true,
         "args": ["/bing", "/b"],
         "model": "Creative-g4t",
+        "token": "_U="
       },
       "groupForward": true,
       "panGu": true

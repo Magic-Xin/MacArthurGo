@@ -3,6 +3,7 @@ package plugins
 import (
 	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
+	"MacArthurGo/structs"
 	"strconv"
 )
 
@@ -18,28 +19,31 @@ func init() {
 			Args:    base.Config.Plugins.Poke.Args,
 		},
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &poke})
+	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &poke})
 }
 
-func (p *Poke) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
+func (p *Poke) ReceiveAll() *[]byte {
+	return nil
+}
 
-func (p *Poke) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !essentials.CheckArgumentArray(ctx, &p.Args) || !p.Enabled {
-		return
+func (p *Poke) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+	if !essentials.CheckArgumentArray(&messageStruct.Message, &p.Args) || !p.Enabled {
+		return nil
 	}
 
-	words := essentials.SplitArgument(ctx)
+	words := essentials.SplitArgument(&messageStruct.Message)
 
 	var (
 		uid int64
 		err error
 	)
+
 	if len(words) < 2 {
-		uid = int64((*ctx)["user_id"].(float64))
+		uid = messageStruct.UserId
 	} else {
-		msg := essentials.DecodeArrayMessage(ctx)
+		msg := messageStruct.Message
 		if msg != nil {
-			for _, m := range *msg {
+			for _, m := range msg {
 				if m.Type == "at" {
 					uid, err = strconv.ParseInt(m.Data["qq"].(string), 10, 64)
 					if err != nil {
@@ -50,14 +54,19 @@ func (p *Poke) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 			if err != nil {
 				uid, err = strconv.ParseInt((words)[1], 10, 64)
 				if err != nil {
-					uid = int64((*ctx)["user_id"].(float64))
+					uid = messageStruct.UserId
 				}
 			}
 		}
 	}
 
-	msg := essentials.SendPoke(ctx, uid)
-	*send <- *msg
+	if uid != 0 {
+		return essentials.SendPoke(messageStruct, uid)
+	}
+
+	return nil
 }
 
-func (p *Poke) ReceiveEcho(_ *map[string]any, _ *chan []byte) {}
+func (p *Poke) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
+	return nil
+}

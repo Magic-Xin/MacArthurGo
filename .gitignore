@@ -34,3 +34,4 @@ MacArthurGo
 log/*
 *.log
 *.db
+img_cache/*

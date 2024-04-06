@@ -9,8 +9,8 @@ import (
 )
 
 type Client struct {
-	Conn *websocket.Conn
-	Send chan []byte
+	Conn     *websocket.Conn
+	SendPump chan *[]byte
 }
 
 func InitWebsocketConnection(addr string, at string) (*websocket.Conn, error) {
@@ -42,11 +42,14 @@ func (c *Client) ReadPump() {
 			}
 			break
 		}
-		go MessageFactory(&message, &c.Send)
 
 		if base.Config.Debug {
-			log.Println(string(message))
+			log.Printf("Receive: %s\n", string(message))
 		}
+
+		go func() {
+			c.SendPump <- MessageFactory(&message)
+		}()
 	}
 }
 
@@ -60,7 +63,11 @@ func (c *Client) WritePump() {
 
 	for {
 		select {
-		case message, ok := <-c.Send:
+		case message, ok := <-c.SendPump:
+			if message == nil {
+				continue
+			}
+
 			if !ok {
 				err := c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				if err != nil {
@@ -70,7 +77,7 @@ func (c *Client) WritePump() {
 			}
 
 			if base.Config.Debug {
-				log.Println(string(message))
+				log.Printf("Send: %s\n", string(*message))
 			}
 
 			w, err := c.Conn.NextWriter(websocket.TextMessage)
@@ -78,7 +85,7 @@ func (c *Client) WritePump() {
 				log.Fatalf("Next writer error: %v", err)
 			}
 
-			_, err = w.Write(message)
+			_, err = w.Write(*message)
 			if err != nil {
 				log.Fatalf("Write message error: %v", err)
 			}

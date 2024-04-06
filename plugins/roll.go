@@ -3,6 +3,7 @@ package plugins
 import (
 	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
+	"MacArthurGo/structs"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -21,17 +22,19 @@ func init() {
 			Args:    base.Config.Plugins.Roll.Args,
 		},
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.PluginInterface{Interface: &roll})
+	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &roll})
 }
 
-func (r *Roll) ReceiveAll(_ *map[string]any, _ *chan []byte) {}
+func (r *Roll) ReceiveAll() *[]byte {
+	return nil
+}
 
-func (r *Roll) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
-	if !essentials.CheckArgumentArray(ctx, &r.Args) || !r.Enabled {
-		return
+func (r *Roll) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+	if !essentials.CheckArgumentArray(&messageStruct.Message, &r.Args) || !r.Enabled {
+		return nil
 	}
 
-	words := essentials.SplitArgument(ctx)
+	words := essentials.SplitArgument(&messageStruct.Message)
 	var result string
 	if len(words) == 1 {
 		result = r.getRoll(-1)
@@ -46,11 +49,15 @@ func (r *Roll) ReceiveMessage(ctx *map[string]any, send *chan []byte) {
 		result = r.getRollContent((words)[1:])
 	}
 
-	msg := essentials.SendMsg(ctx, result, nil, false, true)
-	*send <- *msg
+	if result != "" {
+		return essentials.SendMsg(messageStruct, result, nil, false, true)
+	}
+	return nil
 }
 
-func (r *Roll) ReceiveEcho(_ *map[string]any, _ *chan []byte) {}
+func (r *Roll) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
+	return nil
+}
 
 func (*Roll) getRoll(n int) string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
