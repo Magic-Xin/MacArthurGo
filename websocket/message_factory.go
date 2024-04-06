@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"time"
 )
 
 func MessageFactory(msg *[]byte) *[]byte {
@@ -18,7 +17,7 @@ func MessageFactory(msg *[]byte) *[]byte {
 	}
 
 	ch := make(chan *[]byte)
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	for _, p := range essentials.PluginArray {
@@ -68,6 +67,7 @@ func MessageFactory(msg *[]byte) *[]byte {
 		case r := <-ch:
 			if r != nil {
 				cancel()
+				close(ch)
 				return r
 			}
 		case <-ctx.Done():
