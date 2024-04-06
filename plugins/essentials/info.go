@@ -50,6 +50,9 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 		message += "分支: " + base.Branch + "\n" + "版本: " + base.Version + "\n" + "编译时间: " + base.BuildTime + "\n"
 		message += "已运行时间: " + l.timeToString(time.Now().Unix()-base.Config.StartTime) + "\n\n"
 
+		message += "已加载插件: " + strconv.Itoa(len(PluginArray)) + " 个\n"
+		message += "Goroutine 数量: " + strconv.Itoa(runtime.NumGoroutine()) + "\n\n"
+
 		message += "内存使用情况:\n"
 		message += "Alloc = " + strconv.FormatUint(mem.Alloc/1024/1024, 10) + " MB\n"
 		message += "Sys = " + strconv.FormatUint(mem.Sys/1024/1024, 10) + " MB\n"
