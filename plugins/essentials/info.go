@@ -5,7 +5,6 @@ import (
 	"MacArthurGo/structs"
 	"fmt"
 	"log"
-	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -60,36 +59,23 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 
 		return SendMsg(messageStruct, message, nil, false, false)
 	} else if CheckArgument(&messageStruct.Message, l.Args[1]) {
-		result := []string{"插件				触发指令"}
+		result := []string{"插件\t\t触发指令"}
 		for _, p := range PluginArray {
 			var res string
-			ref := reflect.ValueOf(p.Interface)
-			if name := ref.Elem().FieldByName("Name"); name.IsValid() {
-				res += name.String()
-			} else {
-				return SendMsg(messageStruct, "插件解析出错", nil, false, false)
+			res += p.Name
+			if !p.Enabled {
+				res += "(已禁用)"
 			}
 
-			if enable := ref.Elem().FieldByName("Enabled"); enable.IsValid() {
-				if !enable.Bool() {
-					res += "(已禁用)"
-				}
+			res += "\t\t"
+			if p.Args == nil {
+				res += "无"
 			} else {
-				return SendMsg(messageStruct, "插件解析出错", nil, false, false)
+				for _, arg := range p.Args {
+					res += arg + "	"
+				}
 			}
 
-			if arg := ref.Elem().FieldByName("Args"); arg.IsValid() {
-				res += "			"
-				if arg.Interface().([]string) != nil {
-					for _, a := range arg.Interface().([]string) {
-						res += a + "	"
-					}
-				} else {
-					res += "无"
-				}
-			} else {
-				return SendMsg(messageStruct, "插件解析出错", nil, false, false)
-			}
 			result = append(result, res)
 		}
 
