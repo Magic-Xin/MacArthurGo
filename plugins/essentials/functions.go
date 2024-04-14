@@ -4,6 +4,7 @@ import (
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"crypto/md5"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -163,13 +164,12 @@ func GetUniversalImgURL(url string) (string, string) {
 }
 
 func GetOriginUrl(url string) *string {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		log.Printf("Url parser request error: %v", err)
-		return nil
+	tr := http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
+	client := http.Client{Transport: &tr}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Get(url)
 	if err != nil {
 		log.Printf("Url parser response error: %v", err)
 		return nil
