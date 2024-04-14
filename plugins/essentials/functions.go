@@ -150,6 +150,7 @@ func GetUniversalImgURL(url string) (string, string) {
 	pattern := regexp.MustCompile(`^https?://(c2cpicdw|gchat)\.qpic\.cn/(offpic|gchatpic)_new/`)
 	if pattern.MatchString(url) {
 		url = strings.Replace(url, "/c2cpicdw.qpic.cn/offpic_new/", "/gchat.qpic.cn/gchatpic_new/", 1)
+		url = strings.Replace(url, "/gchat.qpic.cn/offpic_new/", "/gchat.qpic.cn/gchatpic_new/", 1)
 		url = regexp.MustCompile(`/\d+/+\d+-\d+-`).ReplaceAllString(url, "/0/0-0-")
 		url = strings.TrimSuffix(url, "?.*$")
 	}
