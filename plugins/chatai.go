@@ -8,14 +8,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	binglib "github.com/Harry-zklcdc/bing-lib"
 	"github.com/google/generative-ai-go/genai"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sashabaranov/go-openai"
 	"github.com/vinta/pangu"
-	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"image/gif"
 	"image/jpeg"
@@ -453,13 +451,13 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		}
 	} else {
 		if len(images) != 0 {
-			model = client.GenerativeModel("gemini-1.0-pro-vision")
+			model = client.GenerativeModel("gemini-pro-vision")
 			res = "gemini-1.0-pro-vision: "
 			for _, img := range images {
 				prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
 			}
 		} else {
-			model = client.GenerativeModel("gemini-1.0-pro")
+			model = client.GenerativeModel("gemini-pro")
 			res = "gemini-1.0-pro: "
 		}
 	}
@@ -484,28 +482,21 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		},
 	}
 
-	iter := model.GenerateContentStream(ctx, prompts...)
-	if iter == nil {
+	resp, err := model.GenerateContent(ctx, prompts...)
+	if err != nil {
 		log.Printf("Gemini generate error: %v", err)
 		res = fmt.Sprintf("Gemini generate error: %v", err)
 		return &res, nil
 	}
 
-	for {
-		resp, err := iter.Next()
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-		if err != nil {
-			log.Printf("Gemini iterator error: %v", err)
-			res += fmt.Sprintf("Gemini iterator error: %v", err)
-			return &res, nil
-		}
+	if len(resp.Candidates) == 0 {
+		res = "Gemini generate empty"
+		return &res, nil
+	}
 
-		for _, cand := range resp.Candidates {
-			for _, part := range cand.Content.Parts {
-				res += fmt.Sprintf("%s", part)
-			}
+	for _, c := range resp.Candidates {
+		for _, part := range c.Content.Parts {
+			res += fmt.Sprintf("%s", part)
 		}
 	}
 

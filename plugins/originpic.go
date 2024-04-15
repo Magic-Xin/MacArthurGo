@@ -99,21 +99,21 @@ func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 
 		for _, m := range message {
 			if m.Type == "image" {
-				originUrl := *essentials.GetOriginUrl(m.Data["url"].(string))
-				imgType, err := o.getFileType(originUrl)
+				imgUrl, _ := essentials.GetUniversalImgURL(m.Data["url"].(string))
+				imgType, err := o.getFileType(imgUrl)
 				if err != nil {
 					log.Printf("Image type error: %v", err)
 					continue
 				}
 				if imgType == "gif" {
-					filePath, err := o.downloadGIF(originUrl)
+					filePath, err := o.downloadGIF(imgUrl)
 					if err != nil {
 						log.Printf("Download gif error: %v", err)
 						continue
 					}
 					return essentials.SendFile(&messageStruct, filePath, fmt.Sprintf("%d.gif", messageStruct.MessageId))
 				} else {
-					return essentials.SendMsg(&messageStruct, "", &[]cqcode.ArrayMessage{*cqcode.Image(originUrl)}, false, false)
+					return essentials.SendMsg(&messageStruct, "", &[]cqcode.ArrayMessage{*cqcode.Image(imgUrl)}, false, false)
 				}
 			}
 		}
@@ -122,7 +122,11 @@ func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 }
 
 func (o *OriginPic) getFileType(url string) (string, error) {
-	resp, err := http.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}

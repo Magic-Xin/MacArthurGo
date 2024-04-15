@@ -146,9 +146,18 @@ func SplitArgument(message *[]cqcode.ArrayMessage) []string {
 }
 
 func GetUniversalImgURL(url string) (string, string) {
+	if match := regexp.MustCompile("https://(multimedia.nt.qq.com.cn/.*)").FindAllStringSubmatch(url, -1); match != nil {
+		url = "http://" + match[0][1]
+		if matchUid := regexp.MustCompile("rkey=(.*)&").FindAllStringSubmatch(url, -1); matchUid != nil {
+			return url, matchUid[0][1]
+		}
+		return url, ""
+	}
+
 	pattern := regexp.MustCompile(`^https?://(c2cpicdw|gchat)\.qpic\.cn/(offpic|gchatpic)_new/`)
 	if pattern.MatchString(url) {
 		url = strings.Replace(url, "/c2cpicdw.qpic.cn/offpic_new/", "/gchat.qpic.cn/gchatpic_new/", 1)
+		url = strings.Replace(url, "/gchat.qpic.cn/offpic_new/", "/gchat.qpic.cn/gchatpic_new/", 1)
 		url = regexp.MustCompile(`/\d+/+\d+-\d+-`).ReplaceAllString(url, "/0/0-0-")
 		url = strings.TrimSuffix(url, "?.*$")
 	}
@@ -168,7 +177,6 @@ func GetOriginUrl(url string) *string {
 		log.Printf("Url parser request error: %v", err)
 		return nil
 	}
-
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Printf("Url parser response error: %v", err)

@@ -70,7 +70,6 @@
       "handleBannedHosts": true,
       "expirationTime": 86400,
       "intervalTime": 1800,
-      "searchFeedback": "",
       "sauceNAOToken": ""
     },
     "chatAI": {
