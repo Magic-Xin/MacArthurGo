@@ -4,7 +4,6 @@ import (
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"crypto/md5"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -147,6 +146,14 @@ func SplitArgument(message *[]cqcode.ArrayMessage) []string {
 }
 
 func GetUniversalImgURL(url string) (string, string) {
+	if match := regexp.MustCompile("https://(multimedia.nt.qq.com.cn/.*)").FindAllStringSubmatch(url, -1); match != nil {
+		url = "http://" + match[0][1]
+		if matchUid := regexp.MustCompile("rkey=(.*)&").FindAllStringSubmatch(url, -1); matchUid != nil {
+			return url, matchUid[0][1]
+		}
+		return url, ""
+	}
+
 	pattern := regexp.MustCompile(`^https?://(c2cpicdw|gchat)\.qpic\.cn/(offpic|gchatpic)_new/`)
 	if pattern.MatchString(url) {
 		url = strings.Replace(url, "/c2cpicdw.qpic.cn/offpic_new/", "/gchat.qpic.cn/gchatpic_new/", 1)
@@ -165,12 +172,12 @@ func GetUniversalImgURL(url string) (string, string) {
 }
 
 func GetOriginUrl(url string) *string {
-	tr := http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Printf("Url parser request error: %v", err)
+		return nil
 	}
-	client := http.Client{Transport: &tr}
-
-	resp, err := client.Get(url)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Printf("Url parser response error: %v", err)
 		return nil
