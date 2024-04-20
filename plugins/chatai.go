@@ -162,6 +162,10 @@ func (c *ChatAI) ReceiveAll() *[]byte {
 }
 
 func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+	if !essentials.CheckArgumentArray(&messageStruct.Message, &c.Args) {
+		return nil
+	}
+
 	words := essentials.SplitArgument(&messageStruct.Message)
 	if len(words) < 2 {
 		return nil
