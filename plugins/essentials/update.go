@@ -198,9 +198,9 @@ func (u *Update) doUpdate(url string) error {
 
 	err = selfupdate.Apply(resp.Body, selfupdate.Options{})
 	if err != nil {
-		if rerr := selfupdate.RollbackError(err); rerr != nil {
-			fmt.Printf("Failed to rollback from bad update: %v\n", rerr)
-			return rerr
+		if err1 := selfupdate.RollbackError(err); err1 != nil {
+			fmt.Printf("Failed to rollback from bad update: %v\n", err1)
+			return err1
 		}
 	}
 	return err
