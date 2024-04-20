@@ -222,8 +222,8 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		var data []structs.ForwardNode
 		uin := strconv.FormatInt(messageStruct.UserId, 10)
 		name := messageStruct.Sender.Nickname
-		message = append([]cqcode.ArrayMessage{*cqcode.Text("@" + name + ": ")}, message...)
-		data = append(data, *essentials.ConstructForwardNode(uin, name, &message), *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
+		originMessage := []cqcode.ArrayMessage{*cqcode.Text("@" + name + ": " + str)}
+		data = append(data, *essentials.ConstructForwardNode(uin, name, &originMessage), *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
 		return essentials.SendGroupForward(messageStruct, &data, "")
 	} else {
 		return essentials.SendMsg(messageStruct, *res, nil, false, false)
