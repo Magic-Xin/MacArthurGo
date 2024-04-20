@@ -12,7 +12,6 @@ import (
 )
 
 type Repeat struct {
-	essentials.Plugin
 	Times             int64
 	Probability       float64
 	CommonProbability float64
@@ -21,16 +20,16 @@ type Repeat struct {
 
 func init() {
 	repeat := Repeat{
-		Plugin: essentials.Plugin{
-			Name:    "随机复读",
-			Enabled: base.Config.Plugins.Repeat.Enable,
-		},
 		Times:             base.Config.Plugins.Repeat.Times,
 		Probability:       base.Config.Plugins.Repeat.Probability,
 		CommonProbability: base.Config.Plugins.Repeat.CommonProbability,
 	}
-
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &repeat})
+	plugin := &essentials.Plugin{
+		Name:      "随机复读",
+		Enabled:   base.Config.Plugins.Repeat.Enable,
+		Interface: &repeat,
+	}
+	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
 func (r *Repeat) ReceiveAll() *[]byte {
@@ -38,10 +37,6 @@ func (r *Repeat) ReceiveAll() *[]byte {
 }
 
 func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if !r.Enabled {
-		return nil
-	}
-
 	if messageStruct.MessageType != "group" || messageStruct.Message == nil || messageStruct.GroupId == 0 {
 		return nil
 	}

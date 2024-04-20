@@ -10,19 +10,16 @@ import (
 	"time"
 )
 
-type Roll struct {
-	essentials.Plugin
-}
+type Roll struct{}
 
 func init() {
-	roll := Roll{
-		essentials.Plugin{
-			Name:    "随机",
-			Enabled: base.Config.Plugins.Roll.Enable,
-			Args:    base.Config.Plugins.Roll.Args,
-		},
+	plugin := &essentials.Plugin{
+		Name:      "随机",
+		Enabled:   base.Config.Plugins.Roll.Enable,
+		Args:      base.Config.Plugins.Roll.Args,
+		Interface: &Roll{},
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &roll})
+	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
 func (r *Roll) ReceiveAll() *[]byte {
@@ -30,7 +27,7 @@ func (r *Roll) ReceiveAll() *[]byte {
 }
 
 func (r *Roll) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if !essentials.CheckArgumentArray(&messageStruct.Message, &r.Args) || !r.Enabled {
+	if !essentials.CheckArgumentArray(&messageStruct.Message, &base.Config.Plugins.Roll.Args) {
 		return nil
 	}
 

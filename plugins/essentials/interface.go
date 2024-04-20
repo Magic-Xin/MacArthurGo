@@ -21,6 +21,9 @@ type Plugin struct {
 }
 
 func (p *Plugin) GoroutineAll(ctx context.Context) *[]byte {
+	if !p.Enabled {
+		return nil
+	}
 	select {
 	case <-ctx.Done():
 		return nil
@@ -30,6 +33,9 @@ func (p *Plugin) GoroutineAll(ctx context.Context) *[]byte {
 }
 
 func (p *Plugin) GoroutineMessage(ctx context.Context, messageStruct *structs.MessageStruct) *[]byte {
+	if !p.Enabled {
+		return nil
+	}
 	select {
 	case <-ctx.Done():
 		return nil
@@ -39,6 +45,9 @@ func (p *Plugin) GoroutineMessage(ctx context.Context, messageStruct *structs.Me
 }
 
 func (p *Plugin) GoroutineEcho(ctx context.Context, echoMessageStruct *structs.EchoMessageStruct) *[]byte {
+	if !p.Enabled {
+		return nil
+	}
 	select {
 	case <-ctx.Done():
 		return nil

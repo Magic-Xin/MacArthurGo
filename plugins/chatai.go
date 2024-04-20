@@ -59,11 +59,11 @@ type NewBing struct {
 }
 
 type ChatAI struct {
-	essentials.Plugin
 	ChatGPT      *ChatGPT
 	QWen         *QWen
 	Gemini       *Gemini
 	NewBing      *NewBing
+	Args         []string
 	groupForward bool
 	panGu        bool
 }
@@ -140,19 +140,21 @@ func init() {
 	}
 
 	chatAI := ChatAI{
-		Plugin: essentials.Plugin{
-			Name:    "ChatAI",
-			Enabled: base.Config.Plugins.ChatAI.Enable,
-			Args:    args,
-		},
 		ChatGPT:      &chatGPT,
 		QWen:         &qWen,
 		Gemini:       &gemini,
 		NewBing:      &newBing,
+		Args:         args,
 		groupForward: base.Config.Plugins.ChatAI.GroupForward,
 		panGu:        base.Config.Plugins.ChatAI.PanGu,
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &chatAI})
+	plugin := &essentials.Plugin{
+		Name:      "chatAI",
+		Enabled:   base.Config.Plugins.ChatAI.Enable,
+		Args:      args,
+		Interface: &chatAI,
+	}
+	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
 func (c *ChatAI) ReceiveAll() *[]byte {
@@ -160,10 +162,6 @@ func (c *ChatAI) ReceiveAll() *[]byte {
 }
 
 func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if !c.Enabled {
-		return nil
-	}
-
 	words := essentials.SplitArgument(&messageStruct.Message)
 	if len(words) < 2 {
 		return nil
@@ -231,10 +229,6 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 }
 
 func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]byte {
-	if !c.Enabled {
-		return nil
-	}
-
 	echo := echoMessageStruct.Echo
 	split := strings.Split(echo, "|")
 

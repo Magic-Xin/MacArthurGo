@@ -23,7 +23,6 @@ import (
 )
 
 type PicSearch struct {
-	essentials.Plugin
 	groupForward      bool
 	allowPrivate      bool
 	handleBannedHosts bool
@@ -31,17 +30,19 @@ type PicSearch struct {
 }
 
 func init() {
-	pSearch := PicSearch{
-		Plugin: essentials.Plugin{
-			Name:    "搜图",
-			Enabled: base.Config.Plugins.PicSearch.Enable,
-			Args:    base.Config.Plugins.PicSearch.Args,
-		},
+	picSearch := PicSearch{
 		groupForward:      base.Config.Plugins.PicSearch.GroupForward,
 		allowPrivate:      base.Config.Plugins.PicSearch.AllowPrivate,
 		handleBannedHosts: base.Config.Plugins.PicSearch.HandleBannedHosts,
 		sauceNAOToken:     base.Config.Plugins.PicSearch.SauceNAOToken,
 	}
+	plugin := &essentials.Plugin{
+		Name:      "搜图",
+		Enabled:   base.Config.Plugins.PicSearch.Enable,
+		Args:      base.Config.Plugins.PicSearch.Args,
+		Interface: &picSearch,
+	}
+	essentials.PluginArray = append(essentials.PluginArray, plugin)
 
 	key := &[]string{"uid", "res", "created"}
 	value := &[]string{"TEXT PRIMARY KEY NOT NULL", "TEXT NOT NULL", "NUMERIC NOT NULL"}
@@ -52,7 +53,6 @@ func init() {
 		return
 	}
 
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &pSearch})
 	go essentials.DeleteExpired("picSearch", "created", base.Config.Plugins.PicSearch.ExpirationTime, base.Config.Plugins.PicSearch.IntervalTime)
 }
 
@@ -61,18 +61,14 @@ func (p *PicSearch) ReceiveAll() *[]byte {
 }
 
 func (p *PicSearch) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if !p.Enabled {
-		return nil
-	}
-
 	rawMsg := messageStruct.RawMessage
 
 	if messageStruct.MessageType == "group" {
-		if p.checkArgs(rawMsg, &p.Args) {
+		if p.checkArgs(rawMsg, &base.Config.Plugins.PicSearch.Args) {
 			return p.picSearch(messageStruct, &messageStruct.Message, false, true, p.checkArgs(rawMsg, &[]string{"purge"}))
 		}
 	} else if p.allowPrivate {
-		if p.checkArgs(rawMsg, &p.Args) {
+		if p.checkArgs(rawMsg, &base.Config.Plugins.PicSearch.Args) {
 			return p.picSearch(messageStruct, &messageStruct.Message, false, false, p.checkArgs(rawMsg, &[]string{"purge"}))
 		} else {
 			words := essentials.SplitArgument(&messageStruct.Message)
@@ -88,10 +84,6 @@ func (p *PicSearch) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 }
 
 func (p *PicSearch) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]byte {
-	if !p.Enabled {
-		return nil
-	}
-
 	echo := echoMessageStruct.Echo
 	split := strings.Split(echo, "|")
 

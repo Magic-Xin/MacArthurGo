@@ -24,7 +24,6 @@ import (
 )
 
 type Bili struct {
-	essentials.Plugin
 	AiSummarize *AISummarize
 }
 
@@ -71,16 +70,16 @@ func init() {
 			36, 20, 34, 44, 52,
 		},
 	}
-	args := aiSummarize.Args
 	bili := Bili{
-		Plugin: essentials.Plugin{
-			Name:    "B 站链接解析",
-			Enabled: base.Config.Plugins.Bili.Enable,
-			Args:    args,
-		},
 		AiSummarize: &aiSummarize,
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &bili})
+	plugin := &essentials.Plugin{
+		Name:      "B 站链接解析",
+		Enabled:   base.Config.Plugins.Bili.Enable,
+		Args:      aiSummarize.Args,
+		Interface: &bili,
+	}
+	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
 func (b *Bili) ReceiveAll() *[]byte {
@@ -88,10 +87,6 @@ func (b *Bili) ReceiveAll() *[]byte {
 }
 
 func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if !b.Enabled {
-		return nil
-	}
-
 	const biliShort = `(b23.tv\\?/\w+)`
 	const video = `www.bilibili.com/video/(\w+)`
 	const live = `live.bilibili.com/(\d+)`
@@ -164,10 +159,6 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 }
 
 func (b *Bili) ReceiveEcho(EchoMessageStruct *structs.EchoMessageStruct) *[]byte {
-	if !b.Enabled {
-		return nil
-	}
-
 	split := strings.Split(EchoMessageStruct.Echo, "|")
 
 	if split[0] == "BiliAI" {

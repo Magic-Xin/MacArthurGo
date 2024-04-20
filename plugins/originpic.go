@@ -17,19 +17,18 @@ import (
 	"time"
 )
 
-type OriginPic struct {
-	essentials.Plugin
-}
+type OriginPic struct{}
 
 func init() {
-	originPic := OriginPic{
-		essentials.Plugin{
-			Name:    "原图",
-			Enabled: base.Config.Plugins.OriginPic.Enable,
-			Args:    base.Config.Plugins.OriginPic.Args,
-		},
+	originPic := OriginPic{}
+	plugin := &essentials.Plugin{
+		Name:      "原图",
+		Enabled:   base.Config.Plugins.OriginPic.Enable,
+		Args:      base.Config.Plugins.OriginPic.Args,
+		Interface: &originPic,
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &originPic})
+
+	essentials.PluginArray = append(essentials.PluginArray, plugin)
 	go originPic.deleteCache()
 }
 
@@ -38,11 +37,7 @@ func (o *OriginPic) ReceiveAll() *[]byte {
 }
 
 func (o *OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if !o.Enabled {
-		return nil
-	}
-
-	if !essentials.CheckArgumentArray(&messageStruct.Message, &o.Args) {
+	if !essentials.CheckArgumentArray(&messageStruct.Message, &base.Config.Plugins.OriginPic.Args) {
 		return nil
 	}
 
@@ -72,10 +67,6 @@ func (o *OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 }
 
 func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]byte {
-	if !o.Enabled {
-		return nil
-	}
-
 	if echoMessageStruct.Status != "ok" {
 		return nil
 	}

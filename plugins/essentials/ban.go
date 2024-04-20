@@ -7,21 +7,19 @@ import (
 	"strconv"
 )
 
-type Ban struct {
-	Plugin
-}
+type Ban struct{}
 
 var BanList Ban
 
 func init() {
-	BanList = Ban{
-		Plugin: Plugin{
-			Name:    "禁止响应指定用户",
-			Enabled: true,
-		},
+	BanList = Ban{}
+	plugin := &Plugin{
+		Name:      "ban",
+		Enabled:   true,
+		Args:      []string{"/ban", "/unban", "/ban-list"},
+		Interface: &BanList,
 	}
-
-	PluginArray = append(PluginArray, &Plugin{Interface: &BanList})
+	PluginArray = append(PluginArray, plugin)
 }
 
 func (b *Ban) ReceiveAll() *[]byte {
