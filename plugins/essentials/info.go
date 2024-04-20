@@ -20,11 +20,12 @@ type LoginInfo struct {
 var Info LoginInfo
 
 func init() {
+	Info = LoginInfo{}
 	plugin := &Plugin{
 		Name:      "info",
 		Enabled:   true,
 		Args:      []string{"/info", "/help"},
-		Interface: &LoginInfo{},
+		Interface: &Info,
 	}
 	PluginArray = append(PluginArray, plugin)
 }
