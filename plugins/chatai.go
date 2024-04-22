@@ -172,15 +172,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	}
 
 	message := messageStruct.Message
-	var str string
-	for _, msg := range message {
-		if msg.Type == "text" && msg.Data["text"] != nil {
-			str += msg.Data["text"].(string) + " "
-		}
-	}
-	for _, arg := range c.Args {
-		str = strings.Replace(str, arg, "", 1)
-	}
+	str := strings.Join(words[1:], " ")
 
 	var res *string
 	if essentials.CheckArgumentArray(&messageStruct.Message, &c.ChatGPT.Args) && c.ChatGPT.Enabled {
@@ -188,19 +180,9 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	} else if essentials.CheckArgumentArray(&messageStruct.Message, &c.QWen.Args) && c.QWen.Enabled {
 		res = c.QWen.RequireAnswer(str)
 	} else if essentials.CheckArgumentArray(&messageStruct.Message, &c.Gemini.Args) && c.Gemini.Enabled {
-		var (
-			action *[]byte
-			isNew  bool
-		)
-
-		if len(c.Gemini.Args) > 2 {
-			if essentials.CheckArgument(&messageStruct.Message, c.Gemini.Args[2]) {
-				isNew = true
-			}
-		}
-
+		var action *[]byte
 		messageID := messageStruct.MessageId
-		res, action = c.Gemini.RequireAnswer(str, &message, messageID, isNew)
+		res, action = c.Gemini.RequireAnswer(str, &message, messageID)
 		if action != nil {
 			value := essentials.Value{Value: *messageStruct, Time: time.Now().Unix()}
 			essentials.SetCache(strconv.FormatInt(messageID, 10), value)
@@ -263,11 +245,7 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 		var res *string
 		message := echoMessageStruct.Data.Message
 		rMessage := append(originMsg, message...)
-		if split[2] == "true" {
-			res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0, true)
-		} else {
-			res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0, false)
-		}
+		res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0)
 
 		if res == nil {
 			return nil
@@ -386,7 +364,7 @@ func (q *QWen) RequireAnswer(str string) *string {
 	return &res
 }
 
-func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64, isNew bool) (*string, *[]byte) {
+func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64) (*string, *[]byte) {
 	var (
 		images []struct {
 			Data    *[]byte
@@ -421,7 +399,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			OriginStr string
 		}{Data: *message, OriginStr: str})
 
-		echo := fmt.Sprintf("gemini|%d|%v", messageID, isNew)
+		echo := fmt.Sprintf("gemini|%d", messageID)
 		return nil, essentials.SendAction("get_msg", structs.GetMsg{Id: reply}, echo)
 	}
 
@@ -438,25 +416,11 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			log.Printf("Gemini client close error: %v", err)
 		}
 	}(client)
-
-	if isNew {
-		model = client.GenerativeModel("gemini-1.5-pro-latest")
-		res = "gemini-1.5-pro-latest: "
-		if len(images) != 0 {
-			for _, img := range images {
-				prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
-			}
-		}
-	} else {
-		if len(images) != 0 {
-			model = client.GenerativeModel("gemini-pro-vision")
-			res = "gemini-1.0-pro-vision: "
-			for _, img := range images {
-				prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
-			}
-		} else {
-			model = client.GenerativeModel("gemini-pro")
-			res = "gemini-1.0-pro: "
+	model = client.GenerativeModel("models/gemini-1.5-pro-latest")
+	res = "gemini-1.5-pro-latest: "
+	if len(images) != 0 {
+		for _, img := range images {
+			prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
 		}
 	}
 
@@ -482,9 +446,42 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 
 	resp, err := model.GenerateContent(ctx, prompts...)
 	if err != nil {
-		log.Printf("Gemini generate error: %v", err)
-		res = fmt.Sprintf("Gemini generate error: %v", err)
-		return &res, nil
+		if len(images) != 0 {
+			model = client.GenerativeModel("gemini-pro-vision")
+			res = "gemini-1.0-pro-vision: "
+			for _, img := range images {
+				prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
+			}
+		} else {
+			model = client.GenerativeModel("gemini-pro")
+			res = "gemini-1.0-pro: "
+		}
+		model.SafetySettings = []*genai.SafetySetting{
+			{
+				Category:  genai.HarmCategoryHarassment,
+				Threshold: genai.HarmBlockNone,
+			},
+			{
+				Category:  genai.HarmCategoryHateSpeech,
+				Threshold: genai.HarmBlockNone,
+			},
+			{
+				Category:  genai.HarmCategorySexuallyExplicit,
+				Threshold: genai.HarmBlockNone,
+			},
+			{
+				Category:  genai.HarmCategoryDangerousContent,
+				Threshold: genai.HarmBlockNone,
+			},
+		}
+		respOld, err := model.GenerateContent(ctx, prompts...)
+		if err != nil {
+			log.Printf("Gemini generate error: %v", err)
+			res = fmt.Sprintf("Gemini generate error: %v", err)
+			return &res, nil
+		}
+
+		resp = respOld
 	}
 
 	if len(resp.Candidates) == 0 {
