@@ -41,13 +41,14 @@ func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		return nil
 	}
 
-	msg, err := json.Marshal(messageStruct.Message)
-	if err != nil {
-		log.Printf("Repeat json marshal error: %v", err)
+	if essentials.CheckArgument(&messageStruct.Message, "/") {
 		return nil
 	}
+
 	message := messageStruct.Message
-	if message == nil {
+	msg, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("Repeat json marshal error: %v", err)
 		return nil
 	}
 
