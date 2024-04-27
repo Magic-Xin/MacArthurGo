@@ -3,6 +3,7 @@ package main
 import (
 	"MacArthurGo/base"
 	_ "MacArthurGo/base"
+	"MacArthurGo/client"
 	_ "MacArthurGo/plugins"
 	"MacArthurGo/websocket"
 	"fmt"
@@ -40,25 +41,26 @@ func main() {
 		base.BuildTime = buildTime.In(tz).Format("2006-01-02 15:04:05")
 	}
 
-	conn, err := websocket.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
+	conn, err := client.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
 	// FIXME retry times not working
 	if err != nil {
 		if base.Config.RetryTimes == 0 {
 			for err != nil {
 				time.Sleep(time.Duration(base.Config.RetryTimes) * time.Second)
-				conn, err = websocket.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
+				conn, err = client.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
 			}
 		} else {
 			for i, n := int64(0), base.Config.RetryTimes; (i < n) && (err != nil); i++ {
 				time.Sleep(time.Duration(base.Config.WaitingSeconds) * time.Second)
-				conn, err = websocket.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
+				conn, err = client.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
 			}
 		}
 	}
-	client := &websocket.Client{Conn: conn, SendPump: make(chan *[]byte)}
+	c := &client.Client{Conn: conn, SendPump: make(chan *[]byte)}
 
 	go client.ReadPump()
 	go client.WritePump()
+	go c.ReadPump()
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
