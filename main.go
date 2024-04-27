@@ -5,7 +5,6 @@ import (
 	_ "MacArthurGo/base"
 	"MacArthurGo/client"
 	_ "MacArthurGo/plugins"
-	"MacArthurGo/websocket"
 	"fmt"
 	"io"
 	"log"
@@ -58,9 +57,8 @@ func main() {
 	}
 	c := &client.Client{Conn: conn, SendPump: make(chan *[]byte)}
 
-	go client.ReadPump()
-	go client.WritePump()
 	go c.ReadPump()
+	go c.WritePump()
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
@@ -69,6 +67,7 @@ func main() {
 		select {
 		case <-interrupt:
 			log.Println("interrupt")
+			c.Close()
 			return
 		}
 	}
