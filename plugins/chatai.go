@@ -182,7 +182,18 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	} else if essentials.CheckArgumentArray(&messageStruct.Message, &c.Gemini.Args) && c.Gemini.Enabled {
 		var action *[]byte
 		messageID := messageStruct.MessageId
-		res, action = c.Gemini.RequireAnswer(str, &message, messageID)
+		if len(c.Gemini.Args) < 3 {
+			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest")
+		} else {
+			if essentials.CheckArgument(&message, c.Gemini.Args[0]) {
+				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest")
+			} else if essentials.CheckArgument(&message, c.Gemini.Args[1]) {
+				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-pro-latest")
+			} else if essentials.CheckArgument(&message, c.Gemini.Args[2]) {
+				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-pro")
+			}
+		}
+
 		if action != nil {
 			value := essentials.Value{Value: *messageStruct, Time: time.Now().Unix()}
 			essentials.SetCache(strconv.FormatInt(messageID, 10), value)
@@ -245,7 +256,7 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 		var res *string
 		message := echoMessageStruct.Data.Message
 		rMessage := append(originMsg, message...)
-		res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0)
+		res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0, split[2])
 
 		if res == nil {
 			return nil
@@ -364,7 +375,7 @@ func (q *QWen) RequireAnswer(str string) *string {
 	return &res
 }
 
-func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64) (*string, *[]byte) {
+func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64, modelName string) (*string, *[]byte) {
 	var (
 		images []struct {
 			Data    *[]byte
@@ -378,7 +389,8 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 
 	for _, msg := range *message {
 		if msg.Type == "image" && msg.Data["url"] != nil {
-			data, imgType, err := g.ImageProcessing(msg.Data["url"].(string))
+			imgUrl, _ := essentials.GetUniversalImgURL(msg.Data["url"].(string))
+			data, imgType, err := g.ImageProcessing(imgUrl)
 			if err != nil {
 				log.Printf("Image processing error: %v", err)
 				continue
@@ -399,7 +411,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			OriginStr string
 		}{Data: *message, OriginStr: str})
 
-		echo := fmt.Sprintf("gemini|%d", messageID)
+		echo := fmt.Sprintf("gemini|%d|%s", messageID, modelName)
 		return nil, essentials.SendAction("get_msg", structs.GetMsg{Id: reply}, echo)
 	}
 
@@ -416,15 +428,19 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			log.Printf("Gemini client close error: %v", err)
 		}
 	}(client)
-	model = client.GenerativeModel("models/gemini-1.5-pro-latest")
-	res = "gemini-1.5-pro-latest: "
+
 	if len(images) != 0 {
 		for _, img := range images {
 			prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
 		}
+		if modelName == "gemini-pro" {
+			modelName += "-vision"
+		}
 	}
-
 	prompts = append(prompts, genai.Text(str))
+	res = modelName + ": "
+
+	model = client.GenerativeModel("models/" + modelName)
 	model.SafetySettings = []*genai.SafetySetting{
 		{
 			Category:  genai.HarmCategoryHarassment,
@@ -443,45 +459,11 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			Threshold: genai.HarmBlockNone,
 		},
 	}
-
 	resp, err := model.GenerateContent(ctx, prompts...)
 	if err != nil {
-		if len(images) != 0 {
-			model = client.GenerativeModel("gemini-pro-vision")
-			res = "gemini-1.0-pro-vision: "
-			for _, img := range images {
-				prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
-			}
-		} else {
-			model = client.GenerativeModel("gemini-pro")
-			res = "gemini-1.0-pro: "
-		}
-		model.SafetySettings = []*genai.SafetySetting{
-			{
-				Category:  genai.HarmCategoryHarassment,
-				Threshold: genai.HarmBlockNone,
-			},
-			{
-				Category:  genai.HarmCategoryHateSpeech,
-				Threshold: genai.HarmBlockNone,
-			},
-			{
-				Category:  genai.HarmCategorySexuallyExplicit,
-				Threshold: genai.HarmBlockNone,
-			},
-			{
-				Category:  genai.HarmCategoryDangerousContent,
-				Threshold: genai.HarmBlockNone,
-			},
-		}
-		respOld, err := model.GenerateContent(ctx, prompts...)
-		if err != nil {
-			log.Printf("Gemini generate error: %v", err)
-			res = fmt.Sprintf("Gemini generate error: %v", err)
-			return &res, nil
-		}
-
-		resp = respOld
+		log.Printf("Gemini generate error: %v", err)
+		res = fmt.Sprintf("Gemini generate error: %v", err)
+		return &res, nil
 	}
 
 	if len(resp.Candidates) == 0 {
