@@ -183,12 +183,12 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		var action *[]byte
 		messageID := messageStruct.MessageId
 		if len(c.Gemini.Args) < 3 {
-			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest")
+			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-pro")
 		} else {
 			if essentials.CheckArgument(&message, c.Gemini.Args[0]) {
-				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest")
-			} else if essentials.CheckArgument(&message, c.Gemini.Args[1]) {
 				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-pro-latest")
+			} else if essentials.CheckArgument(&message, c.Gemini.Args[1]) {
+				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest")
 			} else if essentials.CheckArgument(&message, c.Gemini.Args[2]) {
 				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-pro")
 			}
