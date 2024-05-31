@@ -28,7 +28,6 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
   - ChatGPT
   - Alibaba QianWen
   - Google Gemini Pro (with picture search)
-  - New Bing Chat
 - Music url parser
   - Netease Cloud Music
   - QQ Music
@@ -55,7 +54,6 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - [onebot-11](https://github.com/botuniverse/onebot-11)
 - [OpenShamrock](https://github.com/whitechi73/OpenShamrock)
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
-- [bing-lib](https://github.com/Harry-zklcdc/bing-lib)
 
 ## Special thanks
 ![JetBrains](https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.svg)
