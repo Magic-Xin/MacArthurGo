@@ -10,7 +10,6 @@ import (
 )
 
 type Corpus struct {
-	essentials.Plugin
 	rules *[]Rules
 }
 
@@ -47,13 +46,14 @@ func init() {
 	}
 
 	corpus := Corpus{
-		Plugin: essentials.Plugin{
-			Name:    "语料库回复",
-			Enabled: base.Config.Plugins.Corpus.Enable,
-		},
 		rules: &rules,
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &corpus})
+	plugin := &essentials.Plugin{
+		Name:      "语料库回复",
+		Enabled:   base.Config.Plugins.Corpus.Enable,
+		Interface: &corpus,
+	}
+	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
 func (c *Corpus) ReceiveAll() *[]byte {
@@ -61,10 +61,6 @@ func (c *Corpus) ReceiveAll() *[]byte {
 }
 
 func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if !c.Enabled {
-		return nil
-	}
-
 	message := messageStruct.Message
 	if message == nil || messageStruct.MessageType == "" {
 		return nil

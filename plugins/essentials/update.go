@@ -15,22 +15,21 @@ import (
 )
 
 type Update struct {
-	Plugin
 	sendCache  *[]byte
 	version    string
 	uploadTime time.Time
 }
 
 func init() {
-	update := Update{
-		Plugin: Plugin{
-			Name:    "更新",
-			Enabled: true,
-			Args:    []string{"/update"},
-		},
+	update := Update{}
+	plugin := &Plugin{
+		Name:      "update",
+		Enabled:   true,
+		Args:      []string{"/update"},
+		Interface: &update,
 	}
+	PluginArray = append(PluginArray, plugin)
 
-	PluginArray = append(PluginArray, &Plugin{Interface: &update})
 	if base.Config.UpdateUrl != "" && base.Config.UpdateInterval != 0 {
 		log.Println("Init update check goroutine...")
 		go update.UpdateWatcher()
@@ -56,7 +55,7 @@ func (u *Update) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	}
 
 	words := SplitArgument(&messageStruct.Message)
-	if !CheckArgument(&messageStruct.Message, u.Args[0]) {
+	if !CheckArgument(&messageStruct.Message, "/update") {
 		return nil
 	}
 	if len(words) == 1 {
@@ -107,7 +106,7 @@ func (u *Update) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	return nil
 }
 
-func (u *Update) ReceiveEcho(messageStruct *structs.EchoMessageStruct) *[]byte {
+func (u *Update) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
 	return nil
 }
 
@@ -198,9 +197,9 @@ func (u *Update) doUpdate(url string) error {
 
 	err = selfupdate.Apply(resp.Body, selfupdate.Options{})
 	if err != nil {
-		if rerr := selfupdate.RollbackError(err); rerr != nil {
-			fmt.Printf("Failed to rollback from bad update: %v\n", rerr)
-			return rerr
+		if err1 := selfupdate.RollbackError(err); err1 != nil {
+			fmt.Printf("Failed to rollback from bad update: %v\n", err1)
+			return err1
 		}
 	}
 	return err

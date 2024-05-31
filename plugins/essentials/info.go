@@ -12,7 +12,6 @@ import (
 )
 
 type LoginInfo struct {
-	Plugin
 	NickName string
 	UserId   string
 	Login    bool
@@ -21,14 +20,14 @@ type LoginInfo struct {
 var Info LoginInfo
 
 func init() {
-	Info = LoginInfo{
-		Plugin: Plugin{
-			Name:    "info",
-			Enabled: true,
-			Args:    []string{"/info", "/help"},
-		},
+	Info = LoginInfo{}
+	plugin := &Plugin{
+		Name:      "info",
+		Enabled:   true,
+		Args:      []string{"/info", "/help"},
+		Interface: &Info,
 	}
-	PluginArray = append(PluginArray, &Plugin{Interface: &Info})
+	PluginArray = append(PluginArray, plugin)
 }
 
 func (l *LoginInfo) ReceiveAll() *[]byte {
@@ -40,7 +39,7 @@ func (l *LoginInfo) ReceiveAll() *[]byte {
 }
 
 func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if CheckArgument(&messageStruct.Message, l.Args[0]) {
+	if CheckArgument(&messageStruct.Message, "/info") {
 		var mem runtime.MemStats
 		runtime.ReadMemStats(&mem)
 
@@ -58,8 +57,8 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 		message += "HeapAlloc = " + strconv.FormatUint(mem.HeapAlloc/1024/1024, 10) + " MB\n"
 
 		return SendMsg(messageStruct, message, nil, false, false)
-	} else if CheckArgument(&messageStruct.Message, l.Args[1]) {
-		result := []string{"插件\t\t触发指令"}
+	} else if CheckArgument(&messageStruct.Message, "/help") {
+		result := []string{"插件\t\t\t\t触发指令"}
 		for _, p := range PluginArray {
 			var res string
 			res += p.Name
@@ -67,12 +66,12 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 				res += "(已禁用)"
 			}
 
-			res += "\t\t"
+			res += "\t\t\t\t"
 			if p.Args == nil {
 				res += "无"
 			} else {
 				for _, arg := range p.Args {
-					res += arg + "	"
+					res += arg + "\t"
 				}
 			}
 

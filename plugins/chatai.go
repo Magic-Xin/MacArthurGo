@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	binglib "github.com/Harry-zklcdc/bing-lib"
 	"github.com/google/generative-ai-go/genai"
 	"github.com/google/go-cmp/cmp"
 	"github.com/sashabaranov/go-openai"
@@ -19,10 +18,7 @@ import (
 	"image/jpeg"
 	"io"
 	"log"
-	"math/rand"
-	"net"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,20 +46,11 @@ type Gemini struct {
 	ReplyMap sync.Map
 }
 
-type NewBing struct {
-	Enabled bool
-	Args    []string
-	model   string
-	ipRange *[][]string
-	chat    *binglib.Chat
-}
-
 type ChatAI struct {
-	essentials.Plugin
 	ChatGPT      *ChatGPT
 	QWen         *QWen
 	Gemini       *Gemini
-	NewBing      *NewBing
+	Args         []string
 	groupForward bool
 	panGu        bool
 }
@@ -86,44 +73,6 @@ func init() {
 		Args:    base.Config.Plugins.ChatAI.Gemini.Args,
 		apiKey:  base.Config.Plugins.ChatAI.Gemini.APIKey,
 	}
-	newBing := NewBing{
-		Enabled: base.Config.Plugins.ChatAI.NewBing.Enable,
-		Args:    base.Config.Plugins.ChatAI.NewBing.Args,
-		model:   base.Config.Plugins.ChatAI.NewBing.Model,
-		ipRange: &[][]string{
-			{"4.150.64.0", "4.150.127.255"},      // Azure Cloud EastUS2 16382
-			{"4.152.0.0", "4.153.255.255"},       // Azure Cloud EastUS2 131070
-			{"13.68.0.0", "13.68.127.255"},       // Azure Cloud EastUS2 32766
-			{"13.104.216.0", "13.104.216.255"},   // Azure EastUS2 256
-			{"20.1.128.0", "20.1.255.255"},       // Azure Cloud EastUS2 32766
-			{"20.7.0.0", "20.7.255.255"},         // Azure Cloud EastUS2 65534
-			{"20.22.0.0", "20.22.255.255"},       // Azure Cloud EastUS2 65534
-			{"40.84.0.0", "40.84.127.255"},       // Azure Cloud EastUS2 32766
-			{"40.123.0.0", "40.123.127.255"},     // Azure Cloud EastUS2 32766
-			{"4.214.0.0", "4.215.255.255"},       // Azure Cloud JapanEast 131070
-			{"4.241.0.0", "4.241.255.255"},       // Azure Cloud JapanEast 65534
-			{"40.115.128.0", "40.115.255.255"},   // Azure Cloud JapanEast 32766
-			{"52.140.192.0", "52.140.255.255"},   // Azure Cloud JapanEast 16382
-			{"104.41.160.0", "104.41.191.255"},   // Azure Cloud JapanEast 8190
-			{"138.91.0.0", "138.91.15.255"},      // Azure Cloud JapanEast 4094
-			{"151.206.65.0", "151.206.79.255"},   // Azure Cloud JapanEast 256
-			{"191.237.240.0", "191.237.241.255"}, // Azure Cloud JapanEast 512
-			{"4.208.0.0", "4.209.255.255"},       // Azure Cloud NorthEurope 131070
-			{"52.169.0.0", "52.169.255.255"},     // Azure Cloud NorthEurope 65534
-			{"68.219.0.0", "68.219.127.255"},     // Azure Cloud NorthEurope 32766
-			{"65.52.64.0", "65.52.79.255"},       // Azure Cloud NorthEurope 4094
-			{"98.71.0.0", "98.71.127.255"},       // Azure Cloud NorthEurope 32766
-			{"74.234.0.0", "74.234.127.255"},     // Azure Cloud NorthEurope 32766
-			{"4.151.0.0", "4.151.255.255"},       // Azure Cloud SouthCentralUS 65534
-			{"13.84.0.0", "13.85.255.255"},       // Azure Cloud SouthCentralUS 131070
-			{"4.255.128.0", "4.255.255.255"},     // Azure Cloud WestCentralUS 32766
-			{"13.78.128.0", "13.78.255.255"},     // Azure Cloud WestCentralUS 32766
-			{"4.175.0.0", "4.175.255.255"},       // Azure Cloud WestEurope 65534
-			{"13.80.0.0", "13.81.255.255"},       // Azure Cloud WestEurope 131070
-			{"20.73.0.0", "20.73.255.255"},       // Azure Cloud WestEurope 65534
-		},
-		chat: binglib.NewChat(base.Config.Plugins.ChatAI.NewBing.Token),
-	}
 
 	var args []string
 	if chatGPT.Enabled {
@@ -135,24 +84,22 @@ func init() {
 	if gemini.Enabled {
 		args = append(args, gemini.Args...)
 	}
-	if newBing.Enabled {
-		args = append(args, newBing.Args...)
-	}
 
 	chatAI := ChatAI{
-		Plugin: essentials.Plugin{
-			Name:    "ChatAI",
-			Enabled: base.Config.Plugins.ChatAI.Enable,
-			Args:    args,
-		},
 		ChatGPT:      &chatGPT,
 		QWen:         &qWen,
 		Gemini:       &gemini,
-		NewBing:      &newBing,
+		Args:         args,
 		groupForward: base.Config.Plugins.ChatAI.GroupForward,
 		panGu:        base.Config.Plugins.ChatAI.PanGu,
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &chatAI})
+	plugin := &essentials.Plugin{
+		Name:      "chatAI",
+		Enabled:   base.Config.Plugins.ChatAI.Enable,
+		Args:      args,
+		Interface: &chatAI,
+	}
+	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
 func (c *ChatAI) ReceiveAll() *[]byte {
@@ -160,7 +107,7 @@ func (c *ChatAI) ReceiveAll() *[]byte {
 }
 
 func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if !c.Enabled {
+	if !essentials.CheckArgumentArray(&messageStruct.Message, &c.Args) {
 		return nil
 	}
 
@@ -170,15 +117,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	}
 
 	message := messageStruct.Message
-	var str string
-	for _, msg := range message {
-		if msg.Type == "text" && msg.Data["text"] != nil {
-			str += msg.Data["text"].(string) + " "
-		}
-	}
-	for _, arg := range c.Args {
-		str = strings.Replace(str, arg, "", 1)
-	}
+	str := strings.Join(words[1:], " ")
 
 	var res *string
 	if essentials.CheckArgumentArray(&messageStruct.Message, &c.ChatGPT.Args) && c.ChatGPT.Enabled {
@@ -186,26 +125,25 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	} else if essentials.CheckArgumentArray(&messageStruct.Message, &c.QWen.Args) && c.QWen.Enabled {
 		res = c.QWen.RequireAnswer(str)
 	} else if essentials.CheckArgumentArray(&messageStruct.Message, &c.Gemini.Args) && c.Gemini.Enabled {
-		var (
-			action *[]byte
-			isNew  bool
-		)
-
-		if len(c.Gemini.Args) > 2 {
-			if essentials.CheckArgument(&messageStruct.Message, c.Gemini.Args[2]) {
-				isNew = true
+		var action *[]byte
+		messageID := messageStruct.MessageId
+		if len(c.Gemini.Args) < 3 {
+			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-pro")
+		} else {
+			if essentials.CheckArgument(&message, c.Gemini.Args[0]) {
+				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-pro-latest")
+			} else if essentials.CheckArgument(&message, c.Gemini.Args[1]) {
+				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest")
+			} else if essentials.CheckArgument(&message, c.Gemini.Args[2]) {
+				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-pro")
 			}
 		}
 
-		messageID := messageStruct.MessageId
-		res, action = c.Gemini.RequireAnswer(str, &message, messageID, isNew)
 		if action != nil {
 			value := essentials.Value{Value: *messageStruct, Time: time.Now().Unix()}
 			essentials.SetCache(strconv.FormatInt(messageID, 10), value)
 			return action
 		}
-	} else if essentials.CheckArgumentArray(&message, &c.NewBing.Args) && c.NewBing.Enabled {
-		res = c.NewBing.RequireAnswer(str)
 	} else {
 		return nil
 	}
@@ -222,8 +160,8 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		var data []structs.ForwardNode
 		uin := strconv.FormatInt(messageStruct.UserId, 10)
 		name := messageStruct.Sender.Nickname
-		message = append([]cqcode.ArrayMessage{*cqcode.Text("@" + name + ": ")}, message...)
-		data = append(data, *essentials.ConstructForwardNode(uin, name, &message), *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
+		originMessage := []cqcode.ArrayMessage{*cqcode.Text("@" + name + ": " + str)}
+		data = append(data, *essentials.ConstructForwardNode(uin, name, &originMessage), *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
 		return essentials.SendGroupForward(messageStruct, &data, "")
 	} else {
 		return essentials.SendMsg(messageStruct, *res, nil, false, false)
@@ -231,10 +169,6 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 }
 
 func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]byte {
-	if !c.Enabled {
-		return nil
-	}
-
 	echo := echoMessageStruct.Echo
 	split := strings.Split(echo, "|")
 
@@ -265,11 +199,7 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 		var res *string
 		message := echoMessageStruct.Data.Message
 		rMessage := append(originMsg, message...)
-		if split[2] == "true" {
-			res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0, true)
-		} else {
-			res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0, false)
-		}
+		res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0, split[2])
 
 		if res == nil {
 			return nil
@@ -388,7 +318,7 @@ func (q *QWen) RequireAnswer(str string) *string {
 	return &res
 }
 
-func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64, isNew bool) (*string, *[]byte) {
+func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64, modelName string) (*string, *[]byte) {
 	var (
 		images []struct {
 			Data    *[]byte
@@ -402,7 +332,8 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 
 	for _, msg := range *message {
 		if msg.Type == "image" && msg.Data["url"] != nil {
-			data, imgType, err := g.ImageProcessing(msg.Data["url"].(string))
+			imgUrl, _ := essentials.GetUniversalImgURL(msg.Data["url"].(string))
+			data, imgType, err := g.ImageProcessing(imgUrl)
 			if err != nil {
 				log.Printf("Image processing error: %v", err)
 				continue
@@ -423,7 +354,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			OriginStr string
 		}{Data: *message, OriginStr: str})
 
-		echo := fmt.Sprintf("gemini|%d|%v", messageID, isNew)
+		echo := fmt.Sprintf("gemini|%d|%s", messageID, modelName)
 		return nil, essentials.SendAction("get_msg", structs.GetMsg{Id: reply}, echo)
 	}
 
@@ -441,28 +372,18 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		}
 	}(client)
 
-	if isNew {
-		model = client.GenerativeModel("gemini-1.5-pro-latest")
-		res = "gemini-1.5-pro-latest: "
-		if len(images) != 0 {
-			for _, img := range images {
-				prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
-			}
+	if len(images) != 0 {
+		for _, img := range images {
+			prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
 		}
-	} else {
-		if len(images) != 0 {
-			model = client.GenerativeModel("gemini-pro-vision")
-			res = "gemini-1.0-pro-vision: "
-			for _, img := range images {
-				prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
-			}
-		} else {
-			model = client.GenerativeModel("gemini-pro")
-			res = "gemini-1.0-pro: "
+		if modelName == "gemini-pro" {
+			modelName += "-vision"
 		}
 	}
-
 	prompts = append(prompts, genai.Text(str))
+	res = modelName + ": "
+
+	model = client.GenerativeModel("models/" + modelName)
 	model.SafetySettings = []*genai.SafetySetting{
 		{
 			Category:  genai.HarmCategoryHarassment,
@@ -481,7 +402,6 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			Threshold: genai.HarmBlockNone,
 		},
 	}
-
 	resp, err := model.GenerateContent(ctx, prompts...)
 	if err != nil {
 		log.Printf("Gemini generate error: %v", err)
@@ -540,59 +460,4 @@ func (g *Gemini) ImageProcessing(url string) (*[]byte, string, error) {
 	default:
 		return nil, "", fmt.Errorf("unsupported image type: %s", imgType)
 	}
-}
-
-func (n *NewBing) RequireAnswer(str string) *string {
-	c := n.chat.Clone()
-	c.SetXFF(n.GetRandomIP())
-	c.SetCookies(n.chat.GetCookies())
-	err := c.NewConversation()
-	if err != nil {
-		res := fmt.Sprintf("NewBing new conversation error: %v", err)
-		log.Println(res)
-		return &res
-	}
-	c.SetStyle(n.model)
-	r, err := c.Chat("", str)
-	if err != nil {
-		res := fmt.Sprintf("NewBing chat error: %v", err)
-		log.Println(res)
-		return &res
-	}
-
-	r = n.model + ": " + regexp.MustCompile(`\(\^\d\^\)|\[\^[^\]]*\^\]`).ReplaceAllString(r, "")
-
-	return &r
-}
-
-func (n *NewBing) GetRandomIP() string {
-	seed := time.Now().UnixNano()
-	rng := rand.New(rand.NewSource(seed))
-
-	ipToUint32 := func(ip net.IP) uint32 {
-		ip = ip.To4()
-		var result uint32
-		result += uint32(ip[0]) << 24
-		result += uint32(ip[1]) << 16
-		result += uint32(ip[2]) << 8
-		result += uint32(ip[3])
-		return result
-	}
-	uint32ToIP := func(intIP uint32) string {
-		ip := fmt.Sprintf("%d.%d.%d.%d", byte(intIP>>24), byte(intIP>>16), byte(intIP>>8), byte(intIP))
-		return ip
-	}
-
-	randomIndex := rng.Intn(len(*n.ipRange))
-
-	startIP := (*n.ipRange)[randomIndex][0]
-	endIP := (*n.ipRange)[randomIndex][1]
-
-	startIPInt := ipToUint32(net.ParseIP(startIP))
-	endIPInt := ipToUint32(net.ParseIP(endIP))
-
-	randomIPInt := rng.Uint32()%(endIPInt-startIPInt+1) + startIPInt
-	randomIP := uint32ToIP(randomIPInt)
-
-	return randomIP
 }

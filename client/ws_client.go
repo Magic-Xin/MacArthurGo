@@ -1,4 +1,4 @@
-package websocket
+package client
 
 import (
 	"MacArthurGo/base"
@@ -96,4 +96,12 @@ func (c *Client) WritePump() {
 			}
 		}
 	}
+}
+
+func (c *Client) Close() {
+	if err := c.Conn.Close(); err != nil {
+		log.Printf("Failed to close websocket connection: %v", err)
+	}
+
+	close(c.SendPump)
 }

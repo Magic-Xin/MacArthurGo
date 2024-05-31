@@ -12,18 +12,15 @@ import (
 	"strings"
 )
 
-type Music struct {
-	essentials.Plugin
-}
+type Music struct{}
 
 func init() {
-	music := Music{
-		essentials.Plugin{
-			Name:    "音乐链接解析",
-			Enabled: base.Config.Plugins.Music.Enable,
-		},
+	plugin := &essentials.Plugin{
+		Name:      "音乐链接解析",
+		Enabled:   base.Config.Plugins.Music.Enable,
+		Interface: &Music{},
 	}
-	essentials.PluginArray = append(essentials.PluginArray, &essentials.Plugin{Interface: &music})
+	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
 func (m *Music) ReceiveAll() *[]byte {
@@ -31,10 +28,6 @@ func (m *Music) ReceiveAll() *[]byte {
 }
 
 func (m *Music) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if !m.Enabled {
-		return nil
-	}
-
 	var (
 		urlType string
 		res     string
