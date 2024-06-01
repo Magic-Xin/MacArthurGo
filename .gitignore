@@ -35,3 +35,4 @@ log/*
 *.log
 *.db
 img_cache/*
+TODO.md
