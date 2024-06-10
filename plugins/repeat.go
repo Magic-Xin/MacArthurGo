@@ -37,7 +37,7 @@ func (r *Repeat) ReceiveAll() *[]byte {
 }
 
 func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if messageStruct.MessageType != "group" || messageStruct.Message == nil || messageStruct.GroupId == 0 {
+	if messageStruct.MessageType != "group" || messageStruct.Message == nil || messageStruct.GroupId == 0 || len(messageStruct.Message) == 0 {
 		return nil
 	}
 
@@ -46,6 +46,11 @@ func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	}
 
 	message := messageStruct.Message
+
+	if message[0].Type == "text" && message[0].Data["text"].(string) == "[该接龙表情不支持查看，请使用QQ最新版本]" {
+		return nil
+	}
+
 	msg, err := json.Marshal(message)
 	if err != nil {
 		log.Printf("Repeat json marshal error: %v", err)
