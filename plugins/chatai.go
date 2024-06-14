@@ -127,15 +127,13 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	} else if essentials.CheckArgumentArray(&messageStruct.Message, &c.Gemini.Args) && c.Gemini.Enabled {
 		var action *[]byte
 		messageID := messageStruct.MessageId
-		if len(c.Gemini.Args) < 3 {
-			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-pro")
+		if len(c.Gemini.Args) < 2 {
+			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest")
 		} else {
 			if essentials.CheckArgument(&message, c.Gemini.Args[0]) {
 				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-pro-latest")
-			} else if essentials.CheckArgument(&message, c.Gemini.Args[1]) {
+			} else {
 				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest")
-			} else if essentials.CheckArgument(&message, c.Gemini.Args[2]) {
-				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-pro")
 			}
 		}
 
@@ -372,14 +370,6 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		}
 	}(client)
 
-	if len(images) != 0 {
-		for _, img := range images {
-			prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
-		}
-		if modelName == "gemini-pro" {
-			modelName += "-vision"
-		}
-	}
 	prompts = append(prompts, genai.Text(str))
 	res = modelName + ": "
 
