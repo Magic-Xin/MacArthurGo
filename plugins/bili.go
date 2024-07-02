@@ -370,6 +370,10 @@ func (b *Bili) getLiveData(roomId string) *LiveData {
 }
 
 func (a *AISummarize) Summarize(videoData *VideoData, sumOnly bool) (string, *[]string) {
+	if !a.Enabled {
+		return "", nil
+	}
+
 	if videoData == nil {
 		return "获取视频信息失败", nil
 	}
@@ -631,8 +635,6 @@ func (v *VideoData) ToArrayMessage() *[]cqcode.ArrayMessage {
 	messageArray = append(messageArray, *cqcode.Text(v.Url + "\n\n"))
 	if v.Summary != "" {
 		messageArray = append(messageArray, *cqcode.Text(v.Summary))
-	} else {
-		messageArray = append(messageArray, *cqcode.Text("该视频暂无 AI 总结"))
 	}
 	return &messageArray
 }
