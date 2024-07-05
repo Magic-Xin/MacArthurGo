@@ -405,6 +405,9 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	}
 
 	for _, c := range resp.Candidates {
+		if c.Content == nil {
+			continue
+		}
 		for _, part := range c.Content.Parts {
 			res += fmt.Sprintf("%s", part)
 		}
