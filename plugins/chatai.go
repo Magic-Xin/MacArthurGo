@@ -322,6 +322,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			Data    *[]byte
 			ImgType string
 		}
+
 		prompts []genai.Part
 		model   *genai.GenerativeModel
 		res     string
@@ -371,6 +372,11 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	}(client)
 
 	prompts = append(prompts, genai.Text(str))
+	if len(images) > 0 {
+		for _, img := range images {
+			prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
+		}
+	}
 	res = modelName + ": "
 
 	model = client.GenerativeModel("models/" + modelName)
