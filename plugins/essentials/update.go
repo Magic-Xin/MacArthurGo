@@ -50,7 +50,7 @@ func (u *Update) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		return nil
 	}
 	if base.Branch == "Release" {
-		return SendMsg(messageStruct, "暂时不支持 Release 版本自动更新", nil, false, false)
+		return SendMsg(messageStruct, "暂时不支持 Release 版本自动更新", nil, false, false, "")
 
 	}
 
@@ -61,7 +61,7 @@ func (u *Update) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	if len(words) == 1 {
 		err := u.getVersion()
 		if err != nil {
-			return SendMsg(messageStruct, fmt.Sprintf("获取最新版本失败: %v", err), nil, false, false)
+			return SendMsg(messageStruct, fmt.Sprintf("获取最新版本失败: %v", err), nil, false, false, "")
 		}
 
 		message := []cqcode.ArrayMessage{*cqcode.Text("本地版本:\n分支: " + base.Branch + "\n" + "版本: " + base.Version + "\n" + "编译时间: " + base.BuildTime),
@@ -71,24 +71,24 @@ func (u *Update) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		} else {
 			message = append(message, *cqcode.Text("\n\n版本一致，无需更新"))
 		}
-		return SendMsg(messageStruct, "", &message, false, false)
+		return SendMsg(messageStruct, "", &message, false, false, "")
 	}
 
 	if len(words) == 2 {
 		if messageStruct.UserId != base.Config.Admin {
-			return SendMsg(messageStruct, "没有更新权限", nil, false, true)
+			return SendMsg(messageStruct, "没有更新权限", nil, false, true, "")
 		}
 
 		if base.Version == u.version {
-			return SendMsg(messageStruct, "版本一致，无需更新", nil, false, true)
+			return SendMsg(messageStruct, "版本一致，无需更新", nil, false, true, "")
 		}
 
 		if runtime.GOOS != "windows" && runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
-			return SendMsg(messageStruct, "不支持当前操作系统，请手动更新", nil, false, true)
+			return SendMsg(messageStruct, "不支持当前操作系统，请手动更新", nil, false, true, "")
 		}
 
 		if words[1] != u.version {
-			return SendMsg(messageStruct, "版本不一致，无法更新", nil, false, true)
+			return SendMsg(messageStruct, "版本不一致，无法更新", nil, false, true, "")
 		}
 
 		updateUrl := base.Config.UpdateUrl + "MacArthurGo-" + runtime.GOOS + "-" + runtime.GOARCH
@@ -99,9 +99,9 @@ func (u *Update) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 
 		err := u.doUpdate(updateUrl)
 		if err != nil {
-			return SendMsg(messageStruct, fmt.Sprintf("更新失败: %v", err), nil, false, true)
+			return SendMsg(messageStruct, fmt.Sprintf("更新失败: %v", err), nil, false, true, "")
 		}
-		return SendMsg(messageStruct, "更新成功, 请重启 MacArthurGo", nil, false, true)
+		return SendMsg(messageStruct, "更新成功, 请重启 MacArthurGo", nil, false, true, "")
 	}
 	return nil
 }
@@ -125,7 +125,7 @@ func (u *Update) UpdateWatcher() {
 
 			message := []cqcode.ArrayMessage{*cqcode.Text("检测到版本更新！\n\n本地版本:\n分支: " + base.Branch + "\n" + "版本: " + base.Version + "\n" + "编译时间: " + base.BuildTime),
 				*cqcode.Text("\n\n最新版本 (dev):\n版本: " + u.version + "\n" + "上传时间: " + u.uploadTime.Format("2006-01-02 15:04:05"))}
-			u.sendCache = SendMsg(&sendStruct, "", &message, false, false)
+			u.sendCache = SendMsg(&sendStruct, "", &message, false, false, "")
 		}
 		time.Sleep(time.Duration(base.Config.UpdateInterval) * time.Second)
 	}

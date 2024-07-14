@@ -68,7 +68,7 @@ func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	if cache.([]any)[0].(string) == md5 {
 		if cache.([]any)[1].(int) >= int(r.Times) && r.getRand(false) {
 			r.repeatMap.Store(groupId, []any{md5, 1})
-			return essentials.SendMsg(messageStruct, "", &message, false, false)
+			return essentials.SendMsg(messageStruct, "", &message, false, false, "")
 		} else {
 			r.repeatMap.Store(groupId, []any{md5, cache.([]any)[1].(int) + 1})
 		}
@@ -77,7 +77,7 @@ func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	}
 
 	if r.getRand(true) {
-		return essentials.SendMsg(messageStruct, "", &message, false, false)
+		return essentials.SendMsg(messageStruct, "", &message, false, false, "")
 	}
 	return nil
 }

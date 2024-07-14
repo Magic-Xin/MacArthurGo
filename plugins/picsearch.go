@@ -98,7 +98,7 @@ func (p *PicSearch) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 		originCtx := value.(essentials.EchoCache).Value
 
 		if echoMessageStruct.Status == "failed" {
-			return essentials.SendMsg(&originCtx, "搜图失败", nil, false, false)
+			return essentials.SendMsg(&originCtx, "搜图失败", nil, false, false, "")
 		}
 
 		if len(split) == 3 {
@@ -222,7 +222,7 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 			}
 		} else {
 			for _, r := range result {
-				return essentials.SendMsg(messageStruct, "", &r, false, false)
+				return essentials.SendMsg(messageStruct, "", &r, false, false, "")
 			}
 		}
 	}

@@ -61,7 +61,7 @@ func (o *OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 	}
 
 	if len(reply) > 0 {
-		return essentials.SendMsg(messageStruct, "", &reply, false, false)
+		return essentials.SendMsg(messageStruct, "", &reply, false, false, "")
 	}
 	return nil
 }
@@ -104,7 +104,7 @@ func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 					}
 					return essentials.SendFile(&messageStruct, filePath, fmt.Sprintf("%d.gif", messageStruct.MessageId))
 				} else {
-					return essentials.SendMsg(&messageStruct, "", &[]cqcode.ArrayMessage{*cqcode.Image(imgUrl)}, false, false)
+					return essentials.SendMsg(&messageStruct, "", &[]cqcode.ArrayMessage{*cqcode.Image(imgUrl)}, false, false, "")
 				}
 			}
 		}

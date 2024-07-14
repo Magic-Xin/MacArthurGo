@@ -47,7 +47,7 @@ func (r *Roll) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	}
 
 	if result != "" {
-		return essentials.SendMsg(messageStruct, result, nil, false, true)
+		return essentials.SendMsg(messageStruct, result, nil, false, true, "")
 	}
 	return nil
 }

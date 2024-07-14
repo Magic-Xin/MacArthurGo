@@ -44,7 +44,7 @@ func SendFile(messageStruct *structs.MessageStruct, file string, name string) *[
 	return &jsonMsg
 }
 
-func SendMsg(messageStruct *structs.MessageStruct, message string, messageArray *[]cqcode.ArrayMessage, at bool, reply bool) *[]byte {
+func SendMsg(messageStruct *structs.MessageStruct, message string, messageArray *[]cqcode.ArrayMessage, at bool, reply bool, echo string) *[]byte {
 	if (message == "" && messageArray == nil) || messageStruct == nil {
 		return nil
 	}
@@ -63,7 +63,7 @@ func SendMsg(messageStruct *structs.MessageStruct, message string, messageArray 
 		arrayMessage = append([]cqcode.ArrayMessage{*cqcode.Reply(msgId)}, arrayMessage...)
 	}
 
-	return constructMessage(messageStruct, &arrayMessage)
+	return constructMessage(messageStruct, &arrayMessage, echo)
 }
 
 func SendPoke(messageStruct *structs.MessageStruct, uid int64) *[]byte {
@@ -83,7 +83,7 @@ func SendPoke(messageStruct *structs.MessageStruct, uid int64) *[]byte {
 }
 
 func SendMusic(messageStruct *structs.MessageStruct, urlType string, id int64) *[]byte {
-	return constructMessage(messageStruct, &[]cqcode.ArrayMessage{*cqcode.Music(urlType, id)})
+	return constructMessage(messageStruct, &[]cqcode.ArrayMessage{*cqcode.Music(urlType, id)}, "")
 }
 
 func SendPrivateForward(messageStruct *structs.MessageStruct, data *[]structs.ForwardNode, echo string) *[]byte {
@@ -191,7 +191,7 @@ func Md5(origin *[]byte) string {
 	return fmt.Sprintf("%x", md5.Sum(*origin))
 }
 
-func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.ArrayMessage) *[]byte {
+func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.ArrayMessage, echo string) *[]byte {
 	if messageStruct.MessageType == "" {
 		return nil
 	}
@@ -203,7 +203,7 @@ func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.Ar
 		GroupId:     messageStruct.GroupId,
 		Message:     *message,
 	}
-	act = structs.Action{Action: "send_msg", Params: msg}
+	act = structs.Action{Action: "send_msg", Params: msg, Echo: echo}
 
 	jsonMsg, _ := json.Marshal(act)
 	return &jsonMsg

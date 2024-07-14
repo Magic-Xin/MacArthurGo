@@ -131,11 +131,11 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 					return essentials.SendGroupForward(messageStruct, &data, "")
 				} else {
 					for _, msg := range *aiSum {
-						return essentials.SendMsg(messageStruct, msg, nil, false, false)
+						return essentials.SendMsg(messageStruct, msg, nil, false, false, "")
 					}
 				}
 			} else {
-				return essentials.SendMsg(messageStruct, e, nil, false, false)
+				return essentials.SendMsg(messageStruct, e, nil, false, false, "")
 			}
 		}
 		return nil
@@ -161,9 +161,9 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		} else {
 			videoData.Summary = e
 		}
-		return essentials.SendMsg(messageStruct, "", videoData.ToArrayMessage(), false, true)
+		return essentials.SendMsg(messageStruct, "", videoData.ToArrayMessage(), false, true, "")
 	} else if liveData != nil {
-		return essentials.SendMsg(messageStruct, "", liveData.ToArrayMessage(), false, true)
+		return essentials.SendMsg(messageStruct, "", liveData.ToArrayMessage(), false, true, "")
 	}
 	return nil
 }
@@ -214,7 +214,7 @@ func (b *Bili) ReceiveEcho(EchoMessageStruct *structs.EchoMessageStruct) *[]byte
 								MessageType: ctxData.MessageType,
 								UserId:      ctxData.UserId,
 							}
-							return essentials.SendMsg(&sendStruct, msg, nil, false, false)
+							return essentials.SendMsg(&sendStruct, msg, nil, false, false, "")
 						}
 					}
 				} else {
@@ -225,13 +225,13 @@ func (b *Bili) ReceiveEcho(EchoMessageStruct *structs.EchoMessageStruct) *[]byte
 							return nil
 						}
 						orgStruct := value.(essentials.EchoCache).Value
-						return essentials.SendMsg(&orgStruct, e, nil, false, false)
+						return essentials.SendMsg(&orgStruct, e, nil, false, false, "")
 					} else {
 						sendStruct := structs.MessageStruct{
 							MessageType: ctxData.MessageType,
 							UserId:      ctxData.UserId,
 						}
-						return essentials.SendMsg(&sendStruct, e, nil, false, false)
+						return essentials.SendMsg(&sendStruct, e, nil, false, false, "")
 					}
 				}
 			}
