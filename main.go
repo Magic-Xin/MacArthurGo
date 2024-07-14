@@ -55,20 +55,15 @@ func main() {
 			}
 		}
 	}
-	c := &client.Client{Conn: conn, SendPump: make(chan *[]byte)}
-
-	go c.ReadPump()
-	go c.WritePump()
+	wsClient := &client.Client{Conn: conn, SendPump: make(chan *[]byte)}
 
 	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
-	for {
-		select {
-		case <-interrupt:
-			log.Println("interrupt")
-			c.Close()
-			return
-		}
-	}
+	go wsClient.ReadPump()
+	go wsClient.WritePump()
+
+	<-interrupt
+	log.Println("Shutting down...")
+	wsClient.Close()
 }
