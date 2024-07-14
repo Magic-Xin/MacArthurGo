@@ -56,6 +56,17 @@ type ChatAI struct {
 	panGu        bool
 }
 
+type RMap struct {
+	Data      []cqcode.ArrayMessage
+	OriginStr string
+	Time      int64
+}
+
+type HMap struct {
+	History []*genai.Content
+	Time    int64
+}
+
 func init() {
 	chatGPT := ChatGPT{
 		Enabled: base.Config.Plugins.ChatAI.ChatGPT.Enable,
@@ -192,11 +203,7 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 			return nil
 		}
 
-		originStr := data.(struct {
-			Data      []cqcode.ArrayMessage
-			OriginStr string
-			Time      int64
-		}).OriginStr
+		originStr := data.(RMap).OriginStr
 
 		var res *string
 		message := echoMessageStruct.Data.Message
@@ -229,10 +236,6 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 			return essentials.SendMsg(&originCtx, *res, nil, false, false, echo)
 		}
 	} else if split[0] == "geminisend" {
-		type HMap struct {
-			History []*genai.Content
-			Time    int64
-		}
 		key, err := strconv.ParseInt(split[1], 10, 64)
 		if err != nil {
 			log.Printf("Gemini send id parse error: %v", err)
@@ -356,11 +359,6 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		reply   string
 	)
 
-	type HMap struct {
-		History []*genai.Content
-		Time    int64
-	}
-
 	for _, msg := range *message {
 		if msg.Type == "image" && msg.Data["url"] != nil {
 			imgUrl, _ := essentials.GetUniversalImgURL(msg.Data["url"].(string))
@@ -380,11 +378,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	}
 
 	if reply != "" && echoId == 0 {
-		g.ReplyMap.Store(strconv.FormatInt(messageID, 10), struct {
-			Data      []cqcode.ArrayMessage
-			OriginStr string
-			Time      int64
-		}{Data: *message, OriginStr: str, Time: time.Now().Unix()})
+		g.ReplyMap.Store(strconv.FormatInt(messageID, 10), RMap{Data: *message, OriginStr: str, Time: time.Now().Unix()})
 
 		echo := fmt.Sprintf("gemini|%d|%s", messageID, modelName)
 		return nil, essentials.SendAction("get_msg", structs.GetMsg{Id: reply}, echo)
@@ -509,17 +503,6 @@ func (g *Gemini) ImageProcessing(url string) (*[]byte, string, error) {
 }
 
 func (g *Gemini) DeleteExpiredCache(expiration int64, interval int64) {
-	type RMap struct {
-		Data      []cqcode.ArrayMessage
-		OriginStr string
-		Time      int64
-	}
-
-	type HMap struct {
-		History []*genai.Content
-		Time    int64
-	}
-
 	for {
 		g.ReplyMap.Range(func(key, value any) bool {
 			if time.Now().Unix()-value.(RMap).Time > expiration {
