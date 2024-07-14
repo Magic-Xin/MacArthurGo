@@ -40,10 +40,11 @@ type QWen struct {
 }
 
 type Gemini struct {
-	Enabled  bool
-	Args     []string
-	apiKey   string
-	ReplyMap sync.Map
+	Enabled    bool
+	Args       []string
+	apiKey     string
+	ReplyMap   sync.Map
+	HistoryMap sync.Map
 }
 
 type ChatAI struct {
@@ -100,6 +101,8 @@ func init() {
 		Interface: &chatAI,
 	}
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
+
+	go gemini.DeleteExpiredCache(3600, 1800)
 }
 
 func (c *ChatAI) ReceiveAll() *[]byte {
@@ -119,7 +122,10 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	message := messageStruct.Message
 	str := strings.Join(words[1:], " ")
 
-	var res *string
+	var (
+		res  *string
+		echo string
+	)
 	if essentials.CheckArgumentArray(&messageStruct.Message, &c.ChatGPT.Args) && c.ChatGPT.Enabled {
 		res = c.ChatGPT.RequireAnswer(str)
 	} else if essentials.CheckArgumentArray(&messageStruct.Message, &c.QWen.Args) && c.QWen.Enabled {
@@ -128,12 +134,12 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		var action *[]byte
 		messageID := messageStruct.MessageId
 		if len(c.Gemini.Args) < 2 {
-			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest")
+			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest", 0)
 		} else {
 			if essentials.CheckArgument(&message, c.Gemini.Args[0]) {
-				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-pro-latest")
+				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-pro-latest", 0)
 			} else {
-				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest")
+				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest", 0)
 			}
 		}
 
@@ -142,6 +148,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 			essentials.SetCache(strconv.FormatInt(messageID, 10), value)
 			return action
 		}
+		echo = "geminisend|" + strconv.FormatInt(messageID, 10)
 	} else {
 		return nil
 	}
@@ -160,15 +167,14 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		name := messageStruct.Sender.Nickname
 		originMessage := []cqcode.ArrayMessage{*cqcode.Text("@" + name + ": " + str)}
 		data = append(data, *essentials.ConstructForwardNode(uin, name, &originMessage), *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
-		return essentials.SendGroupForward(messageStruct, &data, "")
+		return essentials.SendGroupForward(messageStruct, &data, echo)
 	} else {
-		return essentials.SendMsg(messageStruct, *res, nil, false, false)
+		return essentials.SendMsg(messageStruct, *res, nil, false, false, "")
 	}
 }
 
 func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]byte {
-	echo := echoMessageStruct.Echo
-	split := strings.Split(echo, "|")
+	split := strings.Split(echoMessageStruct.Echo, "|")
 
 	if split[0] == "gemini" && !cmp.Equal(echoMessageStruct.Data, struct{}{}) {
 		value, ok := essentials.GetCache(split[1])
@@ -177,7 +183,7 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 		}
 		originCtx := value.(essentials.EchoCache).Value
 		if echoMessageStruct.Status != "ok" {
-			return essentials.SendMsg(&originCtx, "Gemini reply args error", nil, false, false)
+			return essentials.SendMsg(&originCtx, "Gemini reply args error", nil, false, false, "")
 		}
 
 		data, ok := c.Gemini.ReplyMap.Load(split[1])
@@ -186,22 +192,26 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 			return nil
 		}
 
-		originMsg, originStr := data.(struct {
+		originStr := data.(struct {
 			Data      []cqcode.ArrayMessage
 			OriginStr string
-		}).Data, data.(struct {
-			Data      []cqcode.ArrayMessage
-			OriginStr string
+			Time      int64
 		}).OriginStr
 
 		var res *string
 		message := echoMessageStruct.Data.Message
-		rMessage := append(originMsg, message...)
-		res, _ = c.Gemini.RequireAnswer(originStr, &rMessage, 0, split[2])
+		messageId, err := strconv.ParseInt(split[1], 10, 64)
+		if err != nil {
+			log.Printf("Echo id parse error: %v", err)
+			return nil
+		}
+		res, _ = c.Gemini.RequireAnswer(originStr, &message, messageId, split[2], echoMessageStruct.Data.MessageId)
 
 		if res == nil {
 			return nil
 		}
+
+		echo := "geminisend|" + split[1]
 
 		if c.panGu {
 			*res = pangu.SpacingText(*res)
@@ -211,13 +221,29 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 			var data []structs.ForwardNode
 			uin := strconv.FormatInt(originCtx.UserId, 10)
 			name := originCtx.Sender.Nickname
-			message := append([]cqcode.ArrayMessage{*cqcode.Text("@" + name + ": ")}, rMessage...)
+			message := append([]cqcode.ArrayMessage{*cqcode.Text("@" + name + ": " + originStr)}, message...)
 			data = append(data, *essentials.ConstructForwardNode(uin, name, &message))
 			data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
-			return essentials.SendGroupForward(&originCtx, &data, "")
+			return essentials.SendGroupForward(&originCtx, &data, echo)
 		} else {
-			return essentials.SendMsg(&originCtx, *res, nil, false, false)
+			return essentials.SendMsg(&originCtx, *res, nil, false, false, echo)
 		}
+	} else if split[0] == "geminisend" {
+		type HMap struct {
+			History []*genai.Content
+			Time    int64
+		}
+		key, err := strconv.ParseInt(split[1], 10, 64)
+		if err != nil {
+			log.Printf("Gemini send id parse error: %v", err)
+			return nil
+		}
+		value, ok := c.Gemini.HistoryMap.Load(key)
+		if !ok {
+			log.Println("Gemini history map load error")
+			return nil
+		}
+		c.Gemini.HistoryMap.Store(echoMessageStruct.Data.MessageId, value)
 	}
 	return nil
 }
@@ -316,7 +342,7 @@ func (q *QWen) RequireAnswer(str string) *string {
 	return &res
 }
 
-func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64, modelName string) (*string, *[]byte) {
+func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64, modelName string, echoId int64) (*string, *[]byte) {
 	var (
 		images []struct {
 			Data    *[]byte
@@ -325,9 +351,15 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 
 		prompts []genai.Part
 		model   *genai.GenerativeModel
+		history []*genai.Content
 		res     string
 		reply   string
 	)
+
+	type HMap struct {
+		History []*genai.Content
+		Time    int64
+	}
 
 	for _, msg := range *message {
 		if msg.Type == "image" && msg.Data["url"] != nil {
@@ -342,16 +374,17 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 				ImgType string
 			}{Data: data, ImgType: imgType})
 		}
-		if msg.Type == "reply" && messageID != 0 {
+		if msg.Type == "reply" {
 			reply = msg.Data["id"].(string)
 		}
 	}
 
-	if reply != "" && messageID != 0 {
+	if reply != "" && echoId == 0 {
 		g.ReplyMap.Store(strconv.FormatInt(messageID, 10), struct {
 			Data      []cqcode.ArrayMessage
 			OriginStr string
-		}{Data: *message, OriginStr: str})
+			Time      int64
+		}{Data: *message, OriginStr: str, Time: time.Now().Unix()})
 
 		echo := fmt.Sprintf("gemini|%d|%s", messageID, modelName)
 		return nil, essentials.SendAction("get_msg", structs.GetMsg{Id: reply}, echo)
@@ -398,17 +431,22 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			Threshold: genai.HarmBlockNone,
 		},
 	}
-	resp, err := model.GenerateContent(ctx, prompts...)
+	cs := model.StartChat()
+	if echoId != 0 {
+		value, ok := g.HistoryMap.Load(echoId)
+		if ok {
+			cs.History = value.(HMap).History
+		}
+	}
+
+	resp, err := cs.SendMessage(ctx, prompts...)
 	if err != nil {
 		log.Printf("Gemini generate error: %v", err)
 		res = fmt.Sprintf("Gemini generate error: %v", err)
 		return &res, nil
 	}
 
-	if len(resp.Candidates) == 0 {
-		res = "Gemini generate empty"
-		return &res, nil
-	}
+	var cts []*genai.Content
 
 	for _, c := range resp.Candidates {
 		if c.Content == nil {
@@ -417,7 +455,16 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		for _, part := range c.Content.Parts {
 			res += fmt.Sprintf("%s", part)
 		}
+		cts = append(cts, c.Content)
 	}
+
+	history = append(history, &genai.Content{
+		Parts: prompts,
+		Role:  "user",
+	})
+	history = append(history, cts...)
+
+	g.HistoryMap.Store(messageID, HMap{History: history, Time: time.Now().Unix()})
 
 	return &res, nil
 }
@@ -458,5 +505,34 @@ func (g *Gemini) ImageProcessing(url string) (*[]byte, string, error) {
 		return &imgData, "jpeg", nil
 	default:
 		return nil, "", fmt.Errorf("unsupported image type: %s", imgType)
+	}
+}
+
+func (g *Gemini) DeleteExpiredCache(expiration int64, interval int64) {
+	type RMap struct {
+		Data      []cqcode.ArrayMessage
+		OriginStr string
+		Time      int64
+	}
+
+	type HMap struct {
+		History []*genai.Content
+		Time    int64
+	}
+
+	for {
+		g.ReplyMap.Range(func(key, value any) bool {
+			if time.Now().Unix()-value.(RMap).Time > expiration {
+				g.ReplyMap.Delete(key)
+			}
+			return true
+		})
+		g.HistoryMap.Range(func(key, value any) bool {
+			if time.Now().Unix()-value.(HMap).Time > expiration {
+				g.HistoryMap.Delete(key)
+			}
+			return true
+		})
+		time.Sleep(time.Duration(interval) * time.Second)
 	}
 }
