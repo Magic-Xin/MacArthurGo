@@ -67,7 +67,7 @@ func MessageFactory(msg *[]byte) *[]byte {
 		select {
 		case r := <-ch:
 			if r != nil {
-				cancel()
+				//cancel()
 				return r
 			}
 		case <-ctx.Done():
