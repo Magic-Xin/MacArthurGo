@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-type Value struct {
+type EchoCache struct {
 	Value structs.MessageStruct
 	Time  int64
 }
@@ -17,7 +17,7 @@ func init() {
 
 var cache sync.Map
 
-func SetCache(key string, value Value) {
+func SetCache(key string, value EchoCache) {
 	cache.Store(key, value)
 }
 
@@ -28,7 +28,7 @@ func GetCache(key string) (value any, ok bool) {
 func DeleteExpiredCache(expiration int64, interval int64) {
 	for {
 		cache.Range(func(key, value any) bool {
-			if time.Now().Unix()-value.(Value).Time > expiration {
+			if time.Now().Unix()-value.(EchoCache).Time > expiration {
 				cache.Delete(key)
 			}
 			return true

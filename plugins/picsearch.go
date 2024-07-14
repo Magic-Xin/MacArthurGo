@@ -95,7 +95,7 @@ func (p *PicSearch) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 			log.Println("Pic search get cache error")
 			return nil
 		}
-		originCtx := value.(essentials.Value).Value
+		originCtx := value.(essentials.EchoCache).Value
 
 		if echoMessageStruct.Status == "failed" {
 			return essentials.SendMsg(&originCtx, "搜图失败", nil, false, false)
@@ -173,7 +173,7 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 			wgResponse.Wait()
 		}
 		if c.Type == "reply" && !isEcho {
-			value := essentials.Value{Value: *messageStruct, Time: time.Now().Unix()}
+			value := essentials.EchoCache{Value: *messageStruct, Time: time.Now().Unix()}
 			essentials.SetCache(strconv.FormatInt(messageStruct.MessageId, 10), value)
 			echo := fmt.Sprintf("picSearch|%d", messageStruct.MessageId)
 			if isPurge {

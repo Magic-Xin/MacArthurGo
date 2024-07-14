@@ -108,7 +108,7 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 				echo := "BiliAI"
 				if messageStruct.MessageType == "group" {
 					echo += fmt.Sprintf("|%d", messageStruct.MessageId)
-					value := essentials.Value{
+					value := essentials.EchoCache{
 						Value: *messageStruct,
 						Time:  time.Now().Unix(),
 					}
@@ -201,7 +201,7 @@ func (b *Bili) ReceiveEcho(EchoMessageStruct *structs.EchoMessageStruct) *[]byte
 							log.Println("BiliAI cache not found")
 							return nil
 						}
-						orgStruct := value.(essentials.Value).Value
+						orgStruct := value.(essentials.EchoCache).Value
 						var data []structs.ForwardNode
 						data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, videoData.ToArrayMessage()))
 						for _, msg := range *aiSum {
@@ -224,7 +224,7 @@ func (b *Bili) ReceiveEcho(EchoMessageStruct *structs.EchoMessageStruct) *[]byte
 							log.Println("BiliAI cache not found")
 							return nil
 						}
-						orgStruct := value.(essentials.Value).Value
+						orgStruct := value.(essentials.EchoCache).Value
 						return essentials.SendMsg(&orgStruct, e, nil, false, false)
 					} else {
 						sendStruct := structs.MessageStruct{

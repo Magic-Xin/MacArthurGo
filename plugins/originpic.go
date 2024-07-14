@@ -54,7 +54,7 @@ func (o *OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 		}
 		if m.Type == "reply" {
 			echo := fmt.Sprintf("originPic|%d", messageStruct.MessageId)
-			value := essentials.Value{Value: *messageStruct, Time: time.Now().Unix()}
+			value := essentials.EchoCache{Value: *messageStruct, Time: time.Now().Unix()}
 			essentials.SetCache(strconv.FormatInt(messageStruct.MessageId, 10), value)
 			return essentials.SendAction("get_msg", structs.GetMsg{Id: m.Data["id"].(string)}, echo)
 		}
@@ -86,7 +86,7 @@ func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 			log.Println("Origin picture cache not found")
 			return nil
 		}
-		messageStruct := value.(essentials.Value).Value
+		messageStruct := value.(essentials.EchoCache).Value
 
 		for _, m := range message {
 			if m.Type == "image" {

@@ -138,7 +138,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		}
 
 		if action != nil {
-			value := essentials.Value{Value: *messageStruct, Time: time.Now().Unix()}
+			value := essentials.EchoCache{Value: *messageStruct, Time: time.Now().Unix()}
 			essentials.SetCache(strconv.FormatInt(messageID, 10), value)
 			return action
 		}
@@ -175,7 +175,7 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 		if !ok {
 			log.Println("Gemini get cache error")
 		}
-		originCtx := value.(essentials.Value).Value
+		originCtx := value.(essentials.EchoCache).Value
 		if echoMessageStruct.Status != "ok" {
 			return essentials.SendMsg(&originCtx, "Gemini reply args error", nil, false, false)
 		}
