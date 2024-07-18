@@ -176,8 +176,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		var data []structs.ForwardNode
 		uin := strconv.FormatInt(messageStruct.UserId, 10)
 		name := messageStruct.Sender.Nickname
-		originMessage := []cqcode.ArrayMessage{*cqcode.Text("@" + name + ": " + str)}
-		data = append(data, *essentials.ConstructForwardNode(uin, name, &originMessage), *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
+		data = append(data, *essentials.ConstructForwardNode(uin, name, &message), *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
 		return essentials.SendGroupForward(messageStruct, &data, echo)
 	} else {
 		return essentials.SendMsg(messageStruct, *res, nil, false, false, "")
@@ -204,6 +203,7 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 		}
 
 		originStr := data.(RMap).OriginStr
+		originMessage := data.(RMap).Data
 
 		var res *string
 		message := echoMessageStruct.Data.Message
@@ -228,8 +228,8 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 			var data []structs.ForwardNode
 			uin := strconv.FormatInt(originCtx.UserId, 10)
 			name := originCtx.Sender.Nickname
-			message := append([]cqcode.ArrayMessage{*cqcode.Text("@" + name + ": " + originStr)}, message...)
-			data = append(data, *essentials.ConstructForwardNode(uin, name, &message))
+			originMessage = append(originMessage, message...)
+			data = append(data, *essentials.ConstructForwardNode(uin, name, &originMessage))
 			data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
 			return essentials.SendGroupForward(&originCtx, &data, echo)
 		} else {
@@ -374,6 +374,9 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		}
 		if msg.Type == "reply" {
 			reply = msg.Data["id"].(string)
+		}
+		if echoId != 0 && msg.Type == "text" {
+			prompts = append(prompts, genai.Text(msg.Data["text"].(string)))
 		}
 	}
 
