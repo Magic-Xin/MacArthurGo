@@ -38,9 +38,9 @@ func init() {
 
 func (u *Update) ReceiveAll() *[]byte {
 	if u.sendCache != nil {
-		r := *u.sendCache
+		r := u.sendCache
 		u.sendCache = nil
-		return &r
+		return r
 	}
 	return nil
 }
