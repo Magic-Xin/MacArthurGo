@@ -148,9 +148,9 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest", 0)
 		} else {
 			if essentials.CheckArgument(&message, c.Gemini.Args[0]) {
-				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-pro-latest", 0)
-			} else {
 				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest", 0)
+			} else {
+				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-pro-latest", 0)
 			}
 		}
 
