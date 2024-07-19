@@ -113,23 +113,14 @@ func ConstructForwardNode(uin string, name string, data *[]cqcode.ArrayMessage) 
 	return node
 }
 
-func CheckArgument(message *[]cqcode.ArrayMessage, arg string) bool {
-	if split := SplitArgument(message); len(split) > 0 {
-		return split[0] == arg
-	}
-	return false
-}
-
-func CheckArgumentArray(message *[]cqcode.ArrayMessage, args *[]string) bool {
+func CheckArgumentArray(command string, args *[]string) bool {
 	if args == nil {
 		return false
 	}
 
 	for _, arg := range *args {
-		if split := SplitArgument(message); len(split) > 0 {
-			if split[0] == arg {
-				return true
-			}
+		if arg == command {
+			return true
 		}
 	}
 	return false
@@ -206,4 +197,28 @@ func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.Ar
 
 	jsonMsg, _ := json.Marshal(act)
 	return &jsonMsg
+}
+
+func CleanMessage(message *[]cqcode.ArrayMessage) (*[]cqcode.ArrayMessage, string) {
+	var (
+		res     []cqcode.ArrayMessage
+		command string
+	)
+	for _, m := range *message {
+		if m.Type == "text" && command == "" {
+			words := strings.Fields(m.Data["text"].(string))
+			if len(words) == 0 {
+				continue
+			}
+			if strings.HasPrefix(words[0], "/") {
+				command = words[0]
+				res = append(res, []cqcode.ArrayMessage{{Type: "text", Data: map[string]any{
+					"text": strings.Join(words[1:], " "),
+				}}}...)
+			}
+		} else {
+			res = append(res, m)
+		}
+	}
+	return &res, command
 }

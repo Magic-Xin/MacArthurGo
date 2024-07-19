@@ -36,6 +36,8 @@ func MessageFactory(msg *[]byte, sendPump chan *[]byte) {
 			return
 		}
 
+		messageStruct.CleanMessage, messageStruct.Command = essentials.CleanMessage(&messageStruct.Message)
+
 		for _, p := range essentials.PluginArray {
 			go func() {
 				r := p.GoroutineMessage(ctx, &messageStruct)

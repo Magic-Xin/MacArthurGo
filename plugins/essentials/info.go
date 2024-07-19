@@ -39,7 +39,7 @@ func (l *LoginInfo) ReceiveAll() *[]byte {
 }
 
 func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if CheckArgument(&messageStruct.Message, "/info") {
+	if messageStruct.Command == "/info" {
 		var mem runtime.MemStats
 		runtime.ReadMemStats(&mem)
 
@@ -57,7 +57,7 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 		message += "HeapAlloc = " + strconv.FormatUint(mem.HeapAlloc/1024/1024, 10) + " MB\n"
 
 		return SendMsg(messageStruct, message, nil, false, false, "")
-	} else if CheckArgument(&messageStruct.Message, "/help") {
+	} else if messageStruct.Command == "/help" {
 		result := []string{"插件\t\t\t\t触发指令"}
 		for _, p := range PluginArray {
 			var res string

@@ -37,7 +37,7 @@ func (o *OriginPic) ReceiveAll() *[]byte {
 }
 
 func (o *OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if !essentials.CheckArgumentArray(&messageStruct.Message, &base.Config.Plugins.OriginPic.Args) {
+	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.OriginPic.Args) {
 		return nil
 	}
 

@@ -101,7 +101,7 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		}
 	}
 
-	if essentials.CheckArgumentArray(&messageStruct.Message, &b.AiSummarize.Args) {
+	if essentials.CheckArgumentArray(messageStruct.Command, &b.AiSummarize.Args) {
 		message := messageStruct.Message
 		for _, msg := range message {
 			if msg.Type == "reply" {

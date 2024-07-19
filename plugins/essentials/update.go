@@ -54,10 +54,11 @@ func (u *Update) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 
 	}
 
-	words := SplitArgument(&messageStruct.Message)
-	if !CheckArgument(&messageStruct.Message, "/update") {
+	if messageStruct.Command != "/update" {
 		return nil
 	}
+
+	words := SplitArgument(&messageStruct.Message)
 	if len(words) == 1 {
 		err := u.getVersion()
 		if err != nil {

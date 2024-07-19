@@ -77,33 +77,33 @@ func (c *ChatAI) ReceiveAll() *[]byte {
 }
 
 func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if !essentials.CheckArgumentArray(&messageStruct.Message, &c.Args) {
+	if !essentials.CheckArgumentArray(messageStruct.Command, &c.Args) {
 		return nil
 	}
 
-	words := essentials.SplitArgument(&messageStruct.Message)
-	if len(words) < 2 {
+	if len(*messageStruct.CleanMessage) < 1 {
 		return nil
 	}
 
-	message := messageStruct.Message
-	str := strings.Join(words[1:], " ")
+	message := *messageStruct.CleanMessage
+	textArray := essentials.SplitArgument(&message)
+	str := strings.Join(textArray, " ")
 
 	var (
 		res  *string
 		echo string
 	)
-	if essentials.CheckArgumentArray(&messageStruct.Message, &c.ChatGPT.Args) && c.ChatGPT.Enabled {
+	if essentials.CheckArgumentArray(messageStruct.Command, &c.ChatGPT.Args) && c.ChatGPT.Enabled {
 		res = c.ChatGPT.RequireAnswer(str)
-	} else if essentials.CheckArgumentArray(&messageStruct.Message, &c.QWen.Args) && c.QWen.Enabled {
+	} else if essentials.CheckArgumentArray(messageStruct.Command, &c.QWen.Args) && c.QWen.Enabled {
 		res = c.QWen.RequireAnswer(str)
-	} else if essentials.CheckArgumentArray(&messageStruct.Message, &c.Gemini.Args) && c.Gemini.Enabled {
+	} else if essentials.CheckArgumentArray(messageStruct.Command, &c.Gemini.Args) && c.Gemini.Enabled {
 		var action *[]byte
 		messageID := messageStruct.MessageId
 		if len(c.Gemini.Args) < 2 {
 			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest", 0)
 		} else {
-			if essentials.CheckArgument(&message, c.Gemini.Args[0]) {
+			if messageStruct.Command == c.Gemini.Args[0] {
 				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest", 0)
 			} else {
 				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-pro-latest", 0)
@@ -132,7 +132,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		var data []structs.ForwardNode
 		uin := strconv.FormatInt(messageStruct.UserId, 10)
 		name := messageStruct.Sender.Nickname
-		data = append(data, *essentials.ConstructForwardNode(uin, name, &message), *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
+		data = append(data, *essentials.ConstructForwardNode(uin, name, messageStruct.CleanMessage), *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
 		return essentials.SendGroupForward(messageStruct, &data, echo)
 	} else {
 		return essentials.SendMsg(messageStruct, *res, nil, false, false, "")

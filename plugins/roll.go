@@ -27,7 +27,7 @@ func (r *Roll) ReceiveAll() *[]byte {
 }
 
 func (r *Roll) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if !essentials.CheckArgumentArray(&messageStruct.Message, &base.Config.Plugins.Roll.Args) {
+	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.Roll.Args) {
 		return nil
 	}
 

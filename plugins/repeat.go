@@ -37,11 +37,9 @@ func (r *Repeat) ReceiveAll() *[]byte {
 }
 
 func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if messageStruct.MessageType != "group" || messageStruct.Message == nil || messageStruct.GroupId == 0 || len(messageStruct.Message) == 0 {
-		return nil
-	}
-
-	if essentials.CheckArgument(&messageStruct.Message, "/") {
+	if messageStruct.MessageType != "group" || messageStruct.Message == nil ||
+		messageStruct.GroupId == 0 || len(messageStruct.Message) == 0 ||
+		messageStruct.Command != "" {
 		return nil
 	}
 

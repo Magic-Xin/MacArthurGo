@@ -15,6 +15,9 @@ type MessageStruct struct {
 	Message    []cqcode.ArrayMessage `json:"message"`
 	RawMessage string                `json:"raw_message"`
 	Echo       string                `json:"echo"`
+
+	Command      string
+	CleanMessage *[]cqcode.ArrayMessage
 }
 
 type EchoMessageStruct struct {

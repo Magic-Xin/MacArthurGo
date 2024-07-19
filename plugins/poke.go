@@ -24,39 +24,24 @@ func (p *Poke) ReceiveAll() *[]byte {
 }
 
 func (p *Poke) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if !essentials.CheckArgumentArray(&messageStruct.Message, &base.Config.Plugins.Poke.Args) {
+	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.Poke.Args) {
 		return nil
 	}
 
-	words := essentials.SplitArgument(&messageStruct.Message)
+	var uid int64
 
-	var (
-		uid int64
-		err error
-	)
-
-	for _, m := range messageStruct.Message {
+	for _, m := range *messageStruct.CleanMessage {
 		if m.Type == "at" {
-			uid, err = strconv.ParseInt(m.Data["qq"].(string), 10, 64)
-			if err != nil {
-				break
-			}
+			uid, _ = strconv.ParseInt(m.Data["qq"].(string), 10, 64)
+		}
+		if m.Type == "text" && uid == 0 {
+			uid, _ = strconv.ParseInt(m.Data["text"].(string), 10, 64)
 		}
 	}
-
-	if uid == 0 {
-		if len(words) > 1 {
-			uid, err = strconv.ParseInt((words)[1], 10, 64)
-			if err != nil {
-				uid = messageStruct.UserId
-			}
-		} else {
-			uid = messageStruct.UserId
-		}
-	}
-
 	if uid != 0 {
 		return essentials.SendPoke(messageStruct, uid)
+	} else if messageStruct.UserId != 0 {
+		return essentials.SendPoke(messageStruct, messageStruct.UserId)
 	}
 
 	return nil
