@@ -70,13 +70,13 @@ func SendPoke(messageStruct *structs.MessageStruct, uid int64) *[]byte {
 	if messageStruct.MessageType == "group" {
 		return SendAction("group_poke",
 			struct {
-				GroupId int64
-				UserId  int64
+				GroupId int64 `json:"group_id"`
+				UserId  int64 `json:"user_id"`
 			}{GroupId: messageStruct.GroupId, UserId: uid}, "")
 	} else if messageStruct.MessageType == "private" {
 		return SendAction("friend_poke",
 			struct {
-				UserId int64
+				UserId int64 `json:"user_id"`
 			}{UserId: uid}, "")
 	}
 	return nil

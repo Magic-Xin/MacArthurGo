@@ -35,25 +35,23 @@ func (p *Poke) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		err error
 	)
 
-	if len(words) < 2 {
-		uid = messageStruct.UserId
-	} else {
-		msg := messageStruct.Message
-		if msg != nil {
-			for _, m := range msg {
-				if m.Type == "at" {
-					uid, err = strconv.ParseInt(m.Data["qq"].(string), 10, 64)
-					if err != nil {
-						break
-					}
-				}
-			}
+	for _, m := range messageStruct.Message {
+		if m.Type == "at" {
+			uid, err = strconv.ParseInt(m.Data["qq"].(string), 10, 64)
 			if err != nil {
-				uid, err = strconv.ParseInt((words)[1], 10, 64)
-				if err != nil {
-					uid = messageStruct.UserId
-				}
+				break
 			}
+		}
+	}
+
+	if uid == 0 {
+		if len(words) > 1 {
+			uid, err = strconv.ParseInt((words)[1], 10, 64)
+			if err != nil {
+				uid = messageStruct.UserId
+			}
+		} else {
+			uid = messageStruct.UserId
 		}
 	}
 
