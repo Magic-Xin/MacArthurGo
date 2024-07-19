@@ -135,14 +135,13 @@ func CheckArgumentArray(message *[]cqcode.ArrayMessage, args *[]string) bool {
 	return false
 }
 
-func SplitArgument(message *[]cqcode.ArrayMessage) []string {
-	var res string
+func SplitArgument(message *[]cqcode.ArrayMessage) (res []string) {
 	for _, msg := range *message {
 		if msg.Type == "text" {
-			res += msg.Data["text"].(string) + " "
+			res = append(res, strings.Fields(msg.Data["text"].(string))...)
 		}
 	}
-	return strings.Fields(res)
+	return res
 }
 
 func GetUniversalImgURL(url string) (string, string) {
