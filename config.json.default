@@ -2,8 +2,6 @@
   "debug": false,
   "address": "ws://example.com:8080",
   "authToken": "",
-  "retryTimes": 0,
-  "waitingSeconds": 30,
   "admin": 0,
   "updateUrl": "https://github.com/Magic-Xin/MacArthurGo/releases/download/Prerelease-dev/",
   "updateInterval": 86400,

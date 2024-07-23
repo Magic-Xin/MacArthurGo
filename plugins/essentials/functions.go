@@ -44,7 +44,7 @@ func SendFile(messageStruct *structs.MessageStruct, file string, name string) *[
 	return &jsonMsg
 }
 
-func SendMsg(messageStruct *structs.MessageStruct, message string, messageArray *[]cqcode.ArrayMessage, at bool, reply bool) *[]byte {
+func SendMsg(messageStruct *structs.MessageStruct, message string, messageArray *[]cqcode.ArrayMessage, at bool, reply bool, echo string) *[]byte {
 	if (message == "" && messageArray == nil) || messageStruct == nil {
 		return nil
 	}
@@ -63,27 +63,27 @@ func SendMsg(messageStruct *structs.MessageStruct, message string, messageArray 
 		arrayMessage = append([]cqcode.ArrayMessage{*cqcode.Reply(msgId)}, arrayMessage...)
 	}
 
-	return constructMessage(messageStruct, &arrayMessage)
+	return constructMessage(messageStruct, &arrayMessage, echo)
 }
 
 func SendPoke(messageStruct *structs.MessageStruct, uid int64) *[]byte {
 	if messageStruct.MessageType == "group" {
 		return SendAction("group_poke",
 			struct {
-				GroupId int64
-				UserId  int64
+				GroupId int64 `json:"group_id"`
+				UserId  int64 `json:"user_id"`
 			}{GroupId: messageStruct.GroupId, UserId: uid}, "")
 	} else if messageStruct.MessageType == "private" {
 		return SendAction("friend_poke",
 			struct {
-				UserId int64
+				UserId int64 `json:"user_id"`
 			}{UserId: uid}, "")
 	}
 	return nil
 }
 
 func SendMusic(messageStruct *structs.MessageStruct, urlType string, id int64) *[]byte {
-	return constructMessage(messageStruct, &[]cqcode.ArrayMessage{*cqcode.Music(urlType, id)})
+	return constructMessage(messageStruct, &[]cqcode.ArrayMessage{*cqcode.Music(urlType, id)}, "")
 }
 
 func SendPrivateForward(messageStruct *structs.MessageStruct, data *[]structs.ForwardNode, echo string) *[]byte {
@@ -113,36 +113,26 @@ func ConstructForwardNode(uin string, name string, data *[]cqcode.ArrayMessage) 
 	return node
 }
 
-func CheckArgument(message *[]cqcode.ArrayMessage, arg string) bool {
-	if split := SplitArgument(message); len(split) > 0 {
-		return split[0] == arg
-	}
-	return false
-}
-
-func CheckArgumentArray(message *[]cqcode.ArrayMessage, args *[]string) bool {
+func CheckArgumentArray(command string, args *[]string) bool {
 	if args == nil {
 		return false
 	}
 
 	for _, arg := range *args {
-		if split := SplitArgument(message); len(split) > 0 {
-			if split[0] == arg {
-				return true
-			}
+		if arg == command {
+			return true
 		}
 	}
 	return false
 }
 
-func SplitArgument(message *[]cqcode.ArrayMessage) []string {
-	var res string
+func SplitArgument(message *[]cqcode.ArrayMessage) (res []string) {
 	for _, msg := range *message {
 		if msg.Type == "text" {
-			res += msg.Data["text"].(string) + " "
+			res = append(res, strings.Fields(msg.Data["text"].(string))...)
 		}
 	}
-	return strings.Fields(res)
+	return res
 }
 
 func GetUniversalImgURL(url string) (string, string) {
@@ -191,7 +181,7 @@ func Md5(origin *[]byte) string {
 	return fmt.Sprintf("%x", md5.Sum(*origin))
 }
 
-func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.ArrayMessage) *[]byte {
+func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.ArrayMessage, echo string) *[]byte {
 	if messageStruct.MessageType == "" {
 		return nil
 	}
@@ -203,8 +193,32 @@ func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.Ar
 		GroupId:     messageStruct.GroupId,
 		Message:     *message,
 	}
-	act = structs.Action{Action: "send_msg", Params: msg}
+	act = structs.Action{Action: "send_msg", Params: msg, Echo: echo}
 
 	jsonMsg, _ := json.Marshal(act)
 	return &jsonMsg
+}
+
+func CleanMessage(message *[]cqcode.ArrayMessage) (*[]cqcode.ArrayMessage, string) {
+	var (
+		res     []cqcode.ArrayMessage
+		command string
+	)
+	for _, m := range *message {
+		if m.Type == "text" && command == "" {
+			words := strings.Fields(m.Data["text"].(string))
+			if len(words) == 0 {
+				continue
+			}
+			if strings.HasPrefix(words[0], "/") {
+				command = words[0]
+				res = append(res, []cqcode.ArrayMessage{{Type: "text", Data: map[string]any{
+					"text": strings.Join(words[1:], " "),
+				}}}...)
+			}
+		} else {
+			res = append(res, m)
+		}
+	}
+	return &res, command
 }

@@ -19,8 +19,6 @@ type config struct {
 	Debug          bool    `json:"debug"`
 	Address        string  `json:"address"`
 	AuthToken      string  `json:"authToken"`
-	RetryTimes     int64   `json:"retryTimes"`
-	WaitingSeconds int64   `json:"waitingSeconds"`
 	Admin          int64   `json:"admin"`
 	UpdateUrl      string  `json:"updateUrl"`
 	UpdateInterval int64   `json:"updateInterval"`

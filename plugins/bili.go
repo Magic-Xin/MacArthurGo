@@ -43,9 +43,11 @@ type VideoData struct {
 	Aid          string
 	Bvid         string
 	Cid          string
+	Mid          string
 	Playtime     string
 	Danmaku      string
 	Url          string
+	Summary      string
 }
 
 type LiveData struct {
@@ -99,14 +101,14 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		}
 	}
 
-	if essentials.CheckArgumentArray(&messageStruct.Message, &b.AiSummarize.Args) {
+	if essentials.CheckArgumentArray(messageStruct.Command, &b.AiSummarize.Args) {
 		message := messageStruct.Message
 		for _, msg := range message {
 			if msg.Type == "reply" {
 				echo := "BiliAI"
 				if messageStruct.MessageType == "group" {
 					echo += fmt.Sprintf("|%d", messageStruct.MessageId)
-					value := essentials.Value{
+					value := essentials.EchoCache{
 						Value: *messageStruct,
 						Time:  time.Now().Unix(),
 					}
@@ -118,7 +120,7 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 
 		if match := regexp.MustCompile(video).FindAllStringSubmatch(rawMsg, -1); match != nil {
 			videoData := b.getVideoData(match[0][1])
-			aiSum := b.AiSummarize.Summarize(videoData)
+			e, aiSum := b.AiSummarize.Summarize(videoData, false)
 			if aiSum != nil {
 				if messageStruct.MessageType == "group" && b.AiSummarize.GroupForward && len(*aiSum) > 1 {
 					var data []structs.ForwardNode
@@ -129,9 +131,11 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 					return essentials.SendGroupForward(messageStruct, &data, "")
 				} else {
 					for _, msg := range *aiSum {
-						return essentials.SendMsg(messageStruct, msg, nil, false, false)
+						return essentials.SendMsg(messageStruct, msg, nil, false, false, "")
 					}
 				}
+			} else {
+				return essentials.SendMsg(messageStruct, e, nil, false, false, "")
 			}
 		}
 		return nil
@@ -151,9 +155,15 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	}
 
 	if videoData != nil {
-		return essentials.SendMsg(messageStruct, "", videoData.ToArrayMessage(), false, false)
+		e, r := b.AiSummarize.Summarize(videoData, true)
+		if r != nil {
+			videoData.Summary = "AI 视频总结：" + (*r)[0]
+		} else {
+			videoData.Summary = e
+		}
+		return essentials.SendMsg(messageStruct, "", videoData.ToArrayMessage(), false, true, "")
 	} else if liveData != nil {
-		return essentials.SendMsg(messageStruct, "", liveData.ToArrayMessage(), false, false)
+		return essentials.SendMsg(messageStruct, "", liveData.ToArrayMessage(), false, true, "")
 	}
 	return nil
 }
@@ -183,7 +193,7 @@ func (b *Bili) ReceiveEcho(EchoMessageStruct *structs.EchoMessageStruct) *[]byte
 
 			if match := regexp.MustCompile(video).FindAllStringSubmatch(text, -1); match != nil {
 				videoData := b.getVideoData(match[0][1])
-				aiSum := b.AiSummarize.Summarize(videoData)
+				e, aiSum := b.AiSummarize.Summarize(videoData, false)
 				if aiSum != nil {
 					if ctxData.MessageType == "group" && b.AiSummarize.GroupForward && len(*aiSum) > 1 {
 						value, ok := essentials.GetCache(split[1])
@@ -191,7 +201,7 @@ func (b *Bili) ReceiveEcho(EchoMessageStruct *structs.EchoMessageStruct) *[]byte
 							log.Println("BiliAI cache not found")
 							return nil
 						}
-						orgStruct := value.(essentials.Value).Value
+						orgStruct := value.(essentials.EchoCache).Value
 						var data []structs.ForwardNode
 						data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, videoData.ToArrayMessage()))
 						for _, msg := range *aiSum {
@@ -199,14 +209,29 @@ func (b *Bili) ReceiveEcho(EchoMessageStruct *structs.EchoMessageStruct) *[]byte
 						}
 						return essentials.SendGroupForward(&orgStruct, &data, "")
 					} else {
-						log.Println("AI Summarize: ", *aiSum)
 						for _, msg := range *aiSum {
 							sendStruct := structs.MessageStruct{
 								MessageType: ctxData.MessageType,
 								UserId:      ctxData.UserId,
 							}
-							return essentials.SendMsg(&sendStruct, msg, nil, false, false)
+							return essentials.SendMsg(&sendStruct, msg, nil, false, false, "")
 						}
+					}
+				} else {
+					if ctxData.MessageType == "group" {
+						value, ok := essentials.GetCache(split[1])
+						if !ok {
+							log.Println("BiliAI cache not found")
+							return nil
+						}
+						orgStruct := value.(essentials.EchoCache).Value
+						return essentials.SendMsg(&orgStruct, e, nil, false, false, "")
+					} else {
+						sendStruct := structs.MessageStruct{
+							MessageType: ctxData.MessageType,
+							UserId:      ctxData.UserId,
+						}
+						return essentials.SendMsg(&sendStruct, e, nil, false, false, "")
 					}
 				}
 			}
@@ -264,6 +289,7 @@ func (b *Bili) getVideoData(vid string) *VideoData {
 		Aid:          strconv.FormatInt(int64(ctx["data"].(map[string]any)["aid"].(float64)), 10),
 		Bvid:         ctx["data"].(map[string]any)["bvid"].(string),
 		Cid:          strconv.FormatInt(int64(ctx["data"].(map[string]any)["cid"].(float64)), 10),
+		Mid:          strconv.FormatInt(int64(ctx["data"].(map[string]any)["owner"].(map[string]any)["mid"].(float64)), 10),
 		Playtime:     b.iToS(int64(ctx["data"].(map[string]any)["stat"].(map[string]any)["view"].(float64))),
 		Danmaku:      b.iToS(int64(ctx["data"].(map[string]any)["stat"].(map[string]any)["danmaku"].(float64))),
 		Url:          "https://www.bilibili.com/video/" + vid,
@@ -343,45 +369,46 @@ func (b *Bili) getLiveData(roomId string) *LiveData {
 	return data
 }
 
-func (a *AISummarize) Summarize(videoData *VideoData) *[]string {
+func (a *AISummarize) Summarize(videoData *VideoData, sumOnly bool) (string, *[]string) {
 	if !a.Enabled {
-		return nil
+		return "", nil
 	}
 
 	if videoData == nil {
-		return &[]string{"获取视频信息失败"}
+		return "获取视频信息失败", nil
 	}
 
-	const api = "https://api.bilibili.com/x/web-interface/view/conclusion/get"
+	const api = "https://api.bilibili.com/x/web-interface/view/conclusion/get?"
 	params := url.Values{
-		"aid":  {videoData.Aid},
-		"bvid": {videoData.Bvid},
-		"cid":  {videoData.Cid},
+		"aid":    {videoData.Aid},
+		"bvid":   {videoData.Bvid},
+		"cid":    {videoData.Cid},
+		"up_mid": {videoData.Mid},
 	}
-	ctx, err := a.requireSummarize(api + "?" + params.Encode())
+	ctx, err := a.requireSummarize(api + params.Encode())
 	if err != nil {
-		return &[]string{err.Error()}
+		return err.Error(), nil
 	}
 
 	if (*ctx)["code"].(float64) != 0 {
-		return &[]string{"获取视频 AI 总结失败" + (*ctx)["message"].(string)}
+		return "获取视频 AI 总结失败" + (*ctx)["message"].(string), nil
 	}
 
 	dataCode := int64((*ctx)["data"].(map[string]any)["code"].(float64))
 	if dataCode == -1 {
-		return &[]string{"该视频可能内含敏感内容，不支持 AI 总结"}
+		return "该视频可能内含敏感内容或其他异常，不支持 AI 总结", nil
 	}
 	if dataCode == 1 {
 		if (*ctx)["data"].(map[string]any)["stid"].(string) == "" {
-			return &[]string{"该视频未识别到语音，暂不支持 AI 总结"}
+			return "该视频未识别到语音，暂不支持 AI 总结", nil
 		} else if (*ctx)["data"].(map[string]any)["stid"].(string) == "0" {
-			return &[]string{"该视频正在 AI 总结等待队列，请稍后再试"}
+			return "该视频正在 AI 总结等待队列，请稍后再试", nil
 		} else {
-			return &[]string{"由于未知问题，无法获得该视频的 AI 总结"}
+			return "由于未知问题，无法获得该视频的 AI 总结", nil
 		}
 	}
 	if (*ctx)["data"].(map[string]any)["model_result"] == nil {
-		return &[]string{"该视频的 AI 总结摘要为空"}
+		return "该视频的 AI 总结摘要为空", nil
 	}
 
 	var res struct {
@@ -399,12 +426,16 @@ func (a *AISummarize) Summarize(videoData *VideoData) *[]string {
 	jsonRes, err := json.Marshal((*ctx)["data"].(map[string]any)["model_result"])
 	if err != nil {
 		log.Printf("Model result marshal error: %v", err)
-		return &[]string{"AI 总结摘要解析失败，详细信息见日志"}
+		return "AI 总结摘要解析失败，详细信息见日志", nil
 	}
 	err = json.Unmarshal(jsonRes, &res)
 	if err != nil {
 		log.Printf("Model result unmarshal error: %v", err)
-		return &[]string{"AI 总结摘要解析失败，详细信息见日志"}
+		return "AI 总结摘要解析失败，详细信息见日志", nil
+	}
+
+	if sumOnly {
+		return "", &[]string{res.Summary}
 	}
 
 	var sum []string
@@ -412,7 +443,7 @@ func (a *AISummarize) Summarize(videoData *VideoData) *[]string {
 		sum = append(sum, fmt.Sprintf("摘要: %s\n", res.Summary))
 	}
 	if len(res.Outline) == 0 {
-		return &sum
+		return "", &sum
 	}
 
 	for i, o := range res.Outline {
@@ -422,7 +453,7 @@ func (a *AISummarize) Summarize(videoData *VideoData) *[]string {
 		}
 		sum = append(sum, contents)
 	}
-	return &sum
+	return "", &sum
 }
 
 func (a *AISummarize) requireSummarize(url string) (*map[string]any, error) {
@@ -437,6 +468,7 @@ func (a *AISummarize) requireSummarize(url string) (*map[string]any, error) {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+	req.Header.Set("Referer", "https://www.bilibili.com/")
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Printf("Request failed: %s", err)
@@ -551,20 +583,28 @@ func (a *AISummarize) getWbiKeysCached() (string, string) {
 }
 
 func (a *AISummarize) getWbiKeys() (string, string) {
-	resp, err := http.Get("https://api.bilibili.com/x/web-interface/nav")
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", "https://api.bilibili.com/x/web-interface/nav", nil)
 	if err != nil {
-		fmt.Printf("Error: %s", err)
+		fmt.Printf("Error creating request: %s", err)
+		return "", ""
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+	req.Header.Set("Referer", "https://www.bilibili.com/")
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("Error sending request: %s", err)
 		return "", ""
 	}
 	defer func(Body io.ReadCloser) {
-		err = Body.Close()
+		err := Body.Close()
 		if err != nil {
-			fmt.Printf("Failed to close response body: %s", err)
+			fmt.Printf("Error closing response: %s", err)
 		}
 	}(resp.Body)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Error: %s", err)
+		fmt.Printf("Error reading response: %s", err)
 		return "", ""
 	}
 	jsonBody := string(body)
@@ -592,7 +632,10 @@ func (v *VideoData) ToArrayMessage() *[]cqcode.ArrayMessage {
 	messageArray = append(messageArray, *cqcode.Text(v.Title + "\n"))
 	messageArray = append(messageArray, *cqcode.Text("UP: " + v.Author + "\n"))
 	messageArray = append(messageArray, *cqcode.Text("播放: " + v.Playtime + "	弹幕: " + v.Danmaku + "\n"))
-	messageArray = append(messageArray, *cqcode.Text(v.Url))
+	messageArray = append(messageArray, *cqcode.Text(v.Url + "\n\n"))
+	if v.Summary != "" {
+		messageArray = append(messageArray, *cqcode.Text(v.Summary))
+	}
 	return &messageArray
 }
 

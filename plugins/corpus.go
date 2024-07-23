@@ -93,7 +93,7 @@ func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 			}
 
 			if v.Message != nil {
-				return essentials.SendMsg(messageStruct, "", v.Message, v.IsAt, v.IsReply)
+				return essentials.SendMsg(messageStruct, "", v.Message, v.IsAt, v.IsReply, "")
 			}
 			break
 		}

@@ -9,15 +9,16 @@ import (
 	"time"
 )
 
-func MessageFactory(msg *[]byte) *[]byte {
+func MessageFactory(msg *[]byte, sendPump chan *[]byte) {
 	var messageStruct structs.MessageStruct
 	err := json.Unmarshal(*msg, &messageStruct)
 	if err != nil {
 		log.Printf("Unmarshal error: %v", err)
-		return nil
+		return
 	}
 
 	ch := make(chan *[]byte)
+	allCh := make(chan *[]byte)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -25,15 +26,17 @@ func MessageFactory(msg *[]byte) *[]byte {
 		go func() {
 			r := p.GoroutineAll(ctx)
 			if r != nil {
-				ch <- r
+				allCh <- r
 			}
 		}()
 	}
 
 	if messageStruct.Message != nil {
 		if essentials.BanList.IsBanned(messageStruct.UserId) {
-			return nil
+			return
 		}
+
+		messageStruct.CleanMessage, messageStruct.Command = essentials.CleanMessage(&messageStruct.Message)
 
 		for _, p := range essentials.PluginArray {
 			go func() {
@@ -50,7 +53,7 @@ func MessageFactory(msg *[]byte) *[]byte {
 		err := json.Unmarshal(*msg, &echoMessageStruct)
 		if err != nil {
 			log.Printf("Unmarshal error: %v", err)
-			return nil
+			return
 		}
 
 		for _, p := range essentials.PluginArray {
@@ -65,13 +68,17 @@ func MessageFactory(msg *[]byte) *[]byte {
 
 	for {
 		select {
+		case r := <-allCh:
+			if r != nil {
+				sendPump <- r
+			}
 		case r := <-ch:
 			if r != nil {
 				cancel()
-				return r
+				sendPump <- r
 			}
 		case <-ctx.Done():
-			return nil
+			return
 		}
 	}
 }

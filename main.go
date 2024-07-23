@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -41,34 +42,20 @@ func main() {
 	}
 
 	conn, err := client.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
-	// FIXME retry times not working
-	if err != nil {
-		if base.Config.RetryTimes == 0 {
-			for err != nil {
-				time.Sleep(time.Duration(base.Config.RetryTimes) * time.Second)
-				conn, err = client.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
-			}
-		} else {
-			for i, n := int64(0), base.Config.RetryTimes; (i < n) && (err != nil); i++ {
-				time.Sleep(time.Duration(base.Config.WaitingSeconds) * time.Second)
-				conn, err = client.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
-			}
-		}
+	for err != nil {
+		time.Sleep(30 * time.Second)
+		log.Println("Can not connect to server, retrying...")
+		conn, err = client.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
 	}
-	c := &client.Client{Conn: conn, SendPump: make(chan *[]byte)}
-
-	go c.ReadPump()
-	go c.WritePump()
+	wsClient := &client.Client{Conn: conn, SendPump: make(chan *[]byte)}
 
 	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
-	for {
-		select {
-		case <-interrupt:
-			log.Println("interrupt")
-			c.Close()
-			return
-		}
-	}
+	go wsClient.ReadPump()
+	go wsClient.WritePump()
+
+	<-interrupt
+	log.Println("Shutting down...")
+	wsClient.Close()
 }

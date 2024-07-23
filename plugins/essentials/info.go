@@ -39,7 +39,7 @@ func (l *LoginInfo) ReceiveAll() *[]byte {
 }
 
 func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	if CheckArgument(&messageStruct.Message, "/info") {
+	if messageStruct.Command == "/info" {
 		var mem runtime.MemStats
 		runtime.ReadMemStats(&mem)
 
@@ -56,8 +56,8 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 		message += "Sys = " + strconv.FormatUint(mem.Sys/1024/1024, 10) + " MB\n"
 		message += "HeapAlloc = " + strconv.FormatUint(mem.HeapAlloc/1024/1024, 10) + " MB\n"
 
-		return SendMsg(messageStruct, message, nil, false, false)
-	} else if CheckArgument(&messageStruct.Message, "/help") {
+		return SendMsg(messageStruct, message, nil, false, false, "")
+	} else if messageStruct.Command == "/help" {
 		result := []string{"插件\t\t\t\t触发指令"}
 		for _, p := range PluginArray {
 			var res string
@@ -78,7 +78,7 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 			result = append(result, res)
 		}
 
-		return SendMsg(messageStruct, strings.Join(result, "\n"), nil, false, false)
+		return SendMsg(messageStruct, strings.Join(result, "\n"), nil, false, false, "")
 	}
 	return nil
 }
@@ -97,7 +97,7 @@ func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 		UserId:      base.Config.Admin,
 	}
 
-	return SendMsg(&sendStruct, "MacArthurGo 已上线", nil, false, false)
+	return SendMsg(&sendStruct, "MacArthurGo 已上线", nil, false, false, "")
 }
 
 func (l *LoginInfo) timeToString(time int64) string {

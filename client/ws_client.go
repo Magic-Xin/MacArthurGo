@@ -48,7 +48,7 @@ func (c *Client) ReadPump() {
 		}
 
 		go func() {
-			c.SendPump <- MessageFactory(&message)
+			MessageFactory(&message, c.SendPump)
 		}()
 	}
 }
@@ -99,8 +99,9 @@ func (c *Client) WritePump() {
 }
 
 func (c *Client) Close() {
-	if err := c.Conn.Close(); err != nil {
+	if err := c.Conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")); err != nil {
 		log.Printf("Failed to close websocket connection: %v", err)
+		return
 	}
 
 	close(c.SendPump)
