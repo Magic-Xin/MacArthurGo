@@ -82,8 +82,8 @@ func SendPoke(messageStruct *structs.MessageStruct, uid int64) *[]byte {
 	return nil
 }
 
-func SendMusic(messageStruct *structs.MessageStruct, mType string, url string, audio string, title string, content string, image string) *[]byte {
-	return constructMessage(messageStruct, &[]cqcode.ArrayMessage{*cqcode.Music(mType, url, audio, title, content, image)}, "")
+func SendMusic(messageStruct *structs.MessageStruct, urlType string, id string) *[]byte {
+	return constructMessage(messageStruct, &[]cqcode.ArrayMessage{*cqcode.Music(urlType, id)}, "")
 }
 
 func SendPrivateForward(messageStruct *structs.MessageStruct, data *[]structs.ForwardNode, echo string) *[]byte {

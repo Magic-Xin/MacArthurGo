@@ -22,8 +22,8 @@ func Poke(id int64) *ArrayMessage {
 	return &ArrayMessage{Type: "touch", Data: map[string]any{"id": id}}
 }
 
-func Music(mType string, url string, audio string, title string, content string, image string) *ArrayMessage {
-	return &ArrayMessage{Type: "music", Data: map[string]any{"type": mType, "url": url, "audio": audio, "title": title, "content": content, "image": image}}
+func Music(urlType string, id string) *ArrayMessage {
+	return &ArrayMessage{Type: "music", Data: map[string]any{"type": urlType, "id": id}}
 }
 
 func Image(file string) *ArrayMessage {
