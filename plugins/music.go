@@ -4,15 +4,26 @@ import (
 	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
+	"encoding/json"
 	"io"
 	"log"
 	"net/http"
 	"regexp"
-	"strconv"
-	"strings"
 )
 
 type Music struct{}
+
+type musicInfo struct {
+	Songs []struct {
+		Name string `json:"name"`
+		Ar   []struct {
+			Name string `json:"name"`
+		} `json:"ar"`
+		Al struct {
+			PicURL string `json:"picUrl"`
+		} `json:"al"`
+	} `json:"songs"`
+}
 
 func init() {
 	plugin := &essentials.Plugin{
@@ -28,10 +39,7 @@ func (m *Music) ReceiveAll() *[]byte {
 }
 
 func (m *Music) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	var (
-		urlType string
-		res     string
-	)
+	var url string
 	message := messageStruct.Message
 	if message == nil {
 		return nil
@@ -40,38 +48,37 @@ func (m *Music) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	for _, msg := range message {
 		if msg.Type == "text" && msg.Data["text"] != nil {
 			str := msg.Data["text"].(string)
-			if strings.Contains(str, "//music.163.com/") {
-				urlType = "163"
-				res = str
-			} else if strings.Contains(str, "//i.y.qq.com/") {
-				urlType = "qq"
-				res = str
-			} else if match := regexp.MustCompile(`((http|https)://163cn.tv/\w+)`).FindAllStringSubmatch(str, -1); match != nil {
-				if url := essentials.GetOriginUrl(match[0][1]); url != nil {
-					urlType = "163"
-					res = *url
+			if match := regexp.MustCompile(`(https?://music.163.com/song\?id=\d+)`).FindAllStringSubmatch(str, -1); match != nil {
+				url = match[0][1]
+			} else if match = regexp.MustCompile(`(https?://163cn.tv/\w+)|(https?://y.music.163.com/m/song/\d+)`).FindAllStringSubmatch(str, -1); match != nil {
+				if res := essentials.GetOriginUrl(match[0][1]); res != nil {
+					url = *res
 				}
-			} else if match = regexp.MustCompile(`((http|https)://c6.y.qq.com/\S+)`).FindAllStringSubmatch(str, -1); match != nil {
-				if url := essentials.GetOriginUrl(match[0][1]); url != nil {
-					urlType = "qq"
-					res = "id=" + *m.getQQMusicID(url) + "&"
-				}
-			} else if match = regexp.MustCompile(`(http|https)://y.music.163.com/m/song/(\d+)`).FindAllStringSubmatch(str, -1); match != nil {
-				urlType = "163"
-				res = "id=" + match[0][2] + "&"
 			}
 		}
 	}
 
-	if urlType != "" {
-		match := regexp.MustCompile(`id=(\d+)`).FindAllStringSubmatch(res, -1)
-		if match != nil {
-			id, err := strconv.ParseInt(match[0][1], 10, 64)
-			if err == nil {
-				return essentials.SendMusic(messageStruct, urlType, id)
+	if url != "" {
+		if match := regexp.MustCompile(`id=(\d+)`).FindAllStringSubmatch(url, -1); match != nil {
+			info := m.getNeteaseMusicInfo(match[0][1])
+			if info != nil {
+				if info.Songs == nil || len(info.Songs) == 0 {
+					return nil
+				}
+				var artists string
+				for _, ar := range info.Songs[0].Ar {
+					if ar.Name != "" {
+						if artists != "" {
+							artists += " / "
+						}
+						artists += ar.Name
+					}
+				}
+				return essentials.SendMusic(messageStruct, "163", url, url, info.Songs[0].Name, artists, info.Songs[0].Al.PicURL)
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -107,4 +114,41 @@ func (*Music) getQQMusicID(url *string) *string {
 
 	}
 	return nil
+}
+
+func (*Music) getNeteaseMusicInfo(id string) *musicInfo {
+	const api = "https://docs-neteasecloudmusicapi.vercel.app/song/detail?ids="
+
+	req, err := http.NewRequest("GET", api+id, nil)
+	if err != nil {
+		log.Printf("Music parser request error: %v", err)
+		return nil
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("Music parser response error: %v", err)
+		return nil
+	}
+	defer func(Body io.ReadCloser) {
+		err := resp.Body.Close()
+		if err != nil {
+			log.Printf("Music parser close body error: %v", err)
+		}
+	}(resp.Body)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Music parser read body error: %v", err)
+		return nil
+	}
+
+	var info musicInfo
+	err = json.Unmarshal(body, &info)
+	if err != nil {
+		log.Printf("Music parser unmarshal error: %v", err)
+		return nil
+	}
+
+	return &info
 }
