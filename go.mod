@@ -11,17 +11,17 @@ require (
 	github.com/minio/selfupdate v0.6.0
 	github.com/ncruces/go-sqlite3 v0.17.1
 	github.com/sashabaranov/go-openai v1.27.1
-	github.com/tidwall/gjson v1.17.1
+	github.com/tidwall/gjson v1.17.3
 	github.com/tidwall/pretty v1.2.1
 	github.com/vinta/pangu v3.0.0+incompatible
-	google.golang.org/api v0.189.0
+	google.golang.org/api v0.190.0
 )
 
 require (
 	aead.dev/minisign v0.3.0 // indirect
 	cloud.google.com/go v0.115.0 // indirect
 	cloud.google.com/go/ai v0.8.2 // indirect
-	cloud.google.com/go/auth v0.7.2 // indirect
+	cloud.google.com/go/auth v0.7.3 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.3 // indirect
 	cloud.google.com/go/compute/metadata v0.5.0 // indirect
 	cloud.google.com/go/longrunning v0.5.11 // indirect
@@ -54,8 +54,8 @@ require (
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240725223205-93522f1f2a9f // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240725223205-93522f1f2a9f // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240730163845-b1a4ccb954bf // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240730163845-b1a4ccb954bf // indirect
 	google.golang.org/grpc v1.65.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 )
