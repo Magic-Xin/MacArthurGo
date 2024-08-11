@@ -141,7 +141,7 @@ func SplitArgument(message *[]cqcode.ArrayMessage) (res []string) {
 func GetUniversalImgURL(url string) (string, string) {
 	if match := regexp.MustCompile("https://(multimedia.nt.qq.com.cn/.*)").FindAllStringSubmatch(url, -1); match != nil {
 		url = "http://" + match[0][1]
-		if matchUid := regexp.MustCompile("rkey=(.*)").FindAllStringSubmatch(url, -1); matchUid != nil {
+		if matchUid := regexp.MustCompile("rkey=(.*)&?").FindAllStringSubmatch(url, -1); matchUid != nil {
 			return url, matchUid[0][1]
 		}
 		return url, ""
