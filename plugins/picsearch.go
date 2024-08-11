@@ -5,6 +5,8 @@ import (
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +15,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -164,7 +167,7 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 
 			wg.Add(2)
 			limiter <- true
-			go p.sauceNAO(fileUrl, response, limiter, wg)
+			go p.sauceNAO(fileUrl, essentials.GetNTQQImageData(fileUrl), response, limiter, wg)
 			limiter <- true
 			go p.ascii2d(fileUrl, response, limiter, wg)
 
@@ -229,36 +232,93 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 	return nil
 }
 
-func (p *PicSearch) sauceNAO(img string, response chan []cqcode.ArrayMessage, limiter chan bool, wg *sync.WaitGroup) {
+func (p *PicSearch) sauceNAO(img string, imgData *bytes.Buffer, response chan []cqcode.ArrayMessage, limiter chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
-	const api = "https://saucenao.com/search.php?db=999&output_type=2&testmode=1&numres=1"
+	const api = "https://saucenao.com/search.php"
 
-	reqUrl := api + "&api_key=" + p.sauceNAOToken + "&url=" + img
-	client := web.NewTLS12Client()
-	req, err := http.NewRequest("GET", reqUrl, nil)
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	if imgData != nil {
+		part, err := writer.CreateFormFile("file", "image.jpg")
+		if err != nil {
+			log.Println("Create file field error:", err)
+			response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+			return
+		}
+		_, err = io.Copy(part, imgData)
+		if err != nil {
+			log.Println("Write image data error:", err)
+			response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+			return
+		}
+	} else {
+		err := writer.WriteField("url", img)
+		if err != nil {
+			return
+		}
+	}
+
+	err := writer.WriteField("db", "999")
 	if err != nil {
+		return
+	}
+	err = writer.WriteField("output_type", "2")
+	if err != nil {
+		return
+	}
+	err = writer.WriteField("testmode", "1")
+	if err != nil {
+		return
+	}
+	err = writer.WriteField("numres", "1")
+	if err != nil {
+		return
+	}
+	err = writer.WriteField("api_key", p.sauceNAOToken)
+	if err != nil {
+		return
+	}
+
+	err = writer.Close()
+	if err != nil {
+		log.Println("Writer close error:", err)
 		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
 		return
 	}
+
+	client := http.DefaultClient
+	req, err := http.NewRequest("POST", api, body)
+	if err != nil {
+		log.Println("Request error:", err)
+		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		return
+	}
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
 	resp, err := client.Do(req)
 	if err != nil {
+		log.Println("Response error:", err)
 		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
 		return
 	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
-		return
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
+
+	defer func() {
+		err := resp.Body.Close()
 		if err != nil {
 			log.Printf("SauceNAO response close error: %v", err)
 		}
-	}(resp.Body)
+	}()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		return
+	}
 
 	var i any
-	err = json.Unmarshal(body, &i)
+	err = json.Unmarshal(respBody, &i)
 	if err != nil {
 		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
 		return
@@ -299,7 +359,7 @@ func (p *PicSearch) sauceNAO(img string, response chan []cqcode.ArrayMessage, li
 		}
 	}
 	r := []cqcode.ArrayMessage{*cqcode.Text("SauceNAO\n")}
-	r = append(r, *cqcode.Image(thumbNail))
+	r = append(r, *cqcode.Image(*p.ThumbnailToBase64(thumbNail)))
 	msg := fmt.Sprintf("\n相似度: %.2f%%\n", similarity)
 	if title != "" {
 		msg += "「" + title + "」"
@@ -406,7 +466,7 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 				}
 
 				r := []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("ascii2d %s\n", checkType[i]))}
-				r = append(r, *cqcode.Image(Thumb))
+				r = append(r, *cqcode.Image(*p.ThumbnailToBase64(Thumb)))
 				msg := fmt.Sprintf("\n%s %s\n「%s」/「%s」\n%s\nArthor:%s", Info, Type, Name, AuthNm, Link, Author)
 				r = append(r, *cqcode.Text(msg))
 
@@ -452,4 +512,37 @@ func (p *PicSearch) HandleBannedHostsArray(str *string) {
 		*str = strings.Replace(*str, host, strings.Replace(host, ".", ".\u200B", -1), -1)
 	}
 	return
+}
+
+func (p *PicSearch) ThumbnailToBase64(url string) *string {
+	client := web.NewTLS12Client()
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Printf("Thumbnail request error: %v", err)
+		return nil
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:6.0) Gecko/20100101 Firefox/6.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Thumbnail response error: %v", err)
+		return nil
+	}
+
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			log.Printf("Thumbnail response close error: %v", err)
+		}
+	}()
+
+	imageData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Thumbnail read error: %v", err)
+		return nil
+	}
+
+	imageBase64 := "base64://" + base64.StdEncoding.EncodeToString(imageData)
+	return &imageBase64
 }
