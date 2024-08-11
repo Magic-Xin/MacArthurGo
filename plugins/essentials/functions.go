@@ -3,9 +3,12 @@ package essentials
 import (
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
+	"bytes"
 	"crypto/md5"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"regexp"
@@ -159,6 +162,48 @@ func GetUniversalImgURL(url string) (string, string) {
 	}
 
 	return url, ""
+}
+
+func GetNTQQImageData(url string) *bytes.Buffer {
+	tlsConfig := &tls.Config{
+		ServerName: "multimedia.nt.qq.com.cn",
+		CipherSuites: []uint16{
+			tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_RSA_WITH_AES_128_CBC_SHA256,
+			tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+			tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
+		},
+		InsecureSkipVerify: false,
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+
+	client := &http.Client{
+		Transport: transport,
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		panic(err)
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("Image fetch close error: %v", err)
+		}
+	}(resp.Body)
+
+	var imageData bytes.Buffer
+	_, err = io.Copy(&imageData, resp.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	return &imageData
 }
 
 func GetOriginUrl(url string) *string {
