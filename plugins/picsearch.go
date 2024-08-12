@@ -131,8 +131,8 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 	start := time.Now()
 	for _, c := range *msg {
 		if c.Type == "image" {
-			fileUrl := c.Data["url"].(string)
-			fileUrl, key = essentials.GetUniversalImgURL(fileUrl)
+			imgUrl := c.Data["url"].(string)
+			key = essentials.GetImageKey(imgUrl)
 			selectRes := essentials.SelectDB("picSearch", "res", fmt.Sprintf("uid='%s'", key))
 			if selectRes != nil {
 				if len(*selectRes) > 0 {
@@ -167,9 +167,9 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 
 			wg.Add(2)
 			limiter <- true
-			go p.sauceNAO(fileUrl, essentials.GetNTQQImageData(fileUrl), response, limiter, wg)
+			go p.sauceNAO(essentials.GetImageData(imgUrl), response, limiter, wg)
 			limiter <- true
-			go p.ascii2d(fileUrl, response, limiter, wg)
+			go p.ascii2d(imgUrl, response, limiter, wg)
 
 			wg.Wait()
 			close(response)
@@ -232,34 +232,27 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 	return nil
 }
 
-func (p *PicSearch) sauceNAO(img string, imgData *bytes.Buffer, response chan []cqcode.ArrayMessage, limiter chan bool, wg *sync.WaitGroup) {
+func (p *PicSearch) sauceNAO(imgData *bytes.Buffer, response chan []cqcode.ArrayMessage, limiter chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	const api = "https://saucenao.com/search.php"
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	if imgData != nil {
-		part, err := writer.CreateFormFile("file", "image.jpg")
-		if err != nil {
-			log.Println("Create file field error:", err)
-			response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
-			return
-		}
-		_, err = io.Copy(part, imgData)
-		if err != nil {
-			log.Println("Write image data error:", err)
-			response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
-			return
-		}
-	} else {
-		err := writer.WriteField("url", img)
-		if err != nil {
-			return
-		}
+	part, err := writer.CreateFormFile("file", "image.jpg")
+	if err != nil {
+		log.Println("Create file field error:", err)
+		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		return
+	}
+	_, err = io.Copy(part, imgData)
+	if err != nil {
+		log.Println("Write image data error:", err)
+		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		return
 	}
 
-	err := writer.WriteField("db", "999")
+	err = writer.WriteField("db", "999")
 	if err != nil {
 		return
 	}

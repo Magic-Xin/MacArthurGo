@@ -4,7 +4,7 @@ import (
 	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
-	"MacArthurGo/structs/cqcode"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -46,12 +46,7 @@ func (o *OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 		return nil
 	}
 
-	var reply []cqcode.ArrayMessage
 	for _, m := range message {
-		if m.Type == "image" {
-			fileUrl, _ := essentials.GetUniversalImgURL(m.Data["url"].(string))
-			reply = append(reply, *cqcode.Image(fileUrl))
-		}
 		if m.Type == "reply" {
 			echo := fmt.Sprintf("originPic|%d", messageStruct.MessageId)
 			value := essentials.EchoCache{Value: *messageStruct, Time: time.Now().Unix()}
@@ -60,9 +55,6 @@ func (o *OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 		}
 	}
 
-	if len(reply) > 0 {
-		return essentials.SendMsg(messageStruct, "", &reply, false, false, "")
-	}
 	return nil
 }
 
@@ -90,49 +82,31 @@ func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 
 		for _, m := range message {
 			if m.Type == "image" {
-				imgUrl, _ := essentials.GetUniversalImgURL(m.Data["url"].(string))
-				imgType, err := o.getFileType(imgUrl)
+				imgData := essentials.GetImageData(m.Data["url"].(string))
+				imgType, err := o.getImageType(imgData)
 				if err != nil {
-					log.Printf("Image type error: %v", err)
+					log.Printf("Get image type error: %v", err)
 					continue
 				}
-				if imgType == "gif" {
-					filePath, err := o.downloadGIF(imgUrl)
-					if err != nil {
-						log.Printf("Download gif error: %v", err)
-						continue
-					}
-					return essentials.SendFile(&messageStruct, filePath, fmt.Sprintf("%d.gif", messageStruct.MessageId))
-				} else {
-					return essentials.SendMsg(&messageStruct, "", &[]cqcode.ArrayMessage{*cqcode.Image(imgUrl)}, false, false, "")
+				filePath, err := o.saveFile(imgData, imgType)
+				if err != nil {
+					log.Printf("Save file error: %v", err)
+					continue
 				}
+				return essentials.SendFile(&messageStruct, filePath, fmt.Sprintf("%d.%s", messageStruct.MessageId, imgType))
 			}
 		}
 	}
 	return nil
 }
 
-func (o *OriginPic) getFileType(url string) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
+func (o *OriginPic) getImageType(imgData *bytes.Buffer) (string, error) {
+	data, err := io.ReadAll(imgData)
 	if err != nil {
 		return "", err
 	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func(Body io.ReadCloser) {
-		err = Body.Close()
-		if err != nil {
-			log.Printf("Image fetch close error: %v", err)
-		}
-	}(resp.Body)
 
-	imgData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	switch imgType := http.DetectContentType(imgData); imgType {
+	switch imgType := http.DetectContentType(data); imgType {
 	case "image/jpeg":
 		return "jpeg", nil
 	case "image/png":
@@ -144,23 +118,8 @@ func (o *OriginPic) getFileType(url string) (string, error) {
 	}
 }
 
-func (o *OriginPic) downloadGIF(url string) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	body := resp.Body
-	defer func(Body io.ReadCloser) {
-		err = Body.Close()
-		if err != nil {
-			log.Printf("Image fetch close error: %v", err)
-		}
-	}(body)
-	imgData, err := io.ReadAll(body)
+func (o *OriginPic) saveFile(imgData *bytes.Buffer, imgType string) (string, error) {
+	data, err := io.ReadAll(imgData)
 	if err != nil {
 		return "", err
 	}
@@ -171,7 +130,7 @@ func (o *OriginPic) downloadGIF(url string) (string, error) {
 			log.Fatalf("Can not create log folder error: %v", err)
 		}
 	}
-	file, err := os.Create(filepath.Join(imagePath, fmt.Sprintf("%d.gif", time.Now().Unix())))
+	file, err := os.Create(filepath.Join(imagePath, fmt.Sprintf("%d.%s", time.Now().Unix(), imgType)))
 	if err != nil {
 		return "", err
 	}
@@ -181,7 +140,7 @@ func (o *OriginPic) downloadGIF(url string) (string, error) {
 			log.Printf("Image file close error: %v", err)
 		}
 	}(file)
-	_, err = file.Write(imgData)
+	_, err = file.Write(data)
 	if err != nil {
 		return "", err
 	}

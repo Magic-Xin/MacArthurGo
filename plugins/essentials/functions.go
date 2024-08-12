@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -164,7 +165,26 @@ func GetUniversalImgURL(url string) (string, string) {
 	return url, ""
 }
 
-func GetNTQQImageData(url string) *bytes.Buffer {
+func GetImageKey(url string) string {
+	const pattern = "rkey=(.*)&?"
+	if match := regexp.MustCompile(pattern).FindAllStringSubmatch(url, -1); match != nil {
+		return match[0][1]
+	}
+	return ""
+}
+
+func GetImageBase64(url string) *string {
+	imageData, err := io.ReadAll(GetImageData(url))
+	if err != nil {
+		log.Printf("Image fetch error: %v", err)
+		return nil
+	}
+	imageBase64 := "base64://" + base64.StdEncoding.EncodeToString(imageData)
+
+	return &imageBase64
+}
+
+func GetImageData(url string) *bytes.Buffer {
 	tlsConfig := &tls.Config{
 		ServerName: "multimedia.nt.qq.com.cn",
 		CipherSuites: []uint16{
@@ -242,28 +262,4 @@ func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.Ar
 
 	jsonMsg, _ := json.Marshal(act)
 	return &jsonMsg
-}
-
-func CleanMessage(message *[]cqcode.ArrayMessage) (*[]cqcode.ArrayMessage, string) {
-	var (
-		res     []cqcode.ArrayMessage
-		command string
-	)
-	for _, m := range *message {
-		if m.Type == "text" && command == "" {
-			words := strings.Fields(m.Data["text"].(string))
-			if len(words) == 0 {
-				continue
-			}
-			if strings.HasPrefix(words[0], "/") {
-				command = words[0]
-				res = append(res, []cqcode.ArrayMessage{{Type: "text", Data: map[string]any{
-					"text": strings.Join(words[1:], " "),
-				}}}...)
-			}
-		} else {
-			res = append(res, m)
-		}
-	}
-	return &res, command
 }
