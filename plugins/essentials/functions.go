@@ -139,32 +139,6 @@ func SplitArgument(message *[]cqcode.ArrayMessage) (res []string) {
 	return res
 }
 
-func GetUniversalImgURL(url string) (string, string) {
-	if match := regexp.MustCompile("https://(multimedia.nt.qq.com.cn/.*)").FindAllStringSubmatch(url, -1); match != nil {
-		url = "http://" + match[0][1]
-		if matchUid := regexp.MustCompile("rkey=(.*)&?").FindAllStringSubmatch(url, -1); matchUid != nil {
-			return url, matchUid[0][1]
-		}
-		return url, ""
-	}
-
-	pattern := regexp.MustCompile(`^https?://(c2cpicdw|gchat)\.qpic\.cn/(offpic|gchatpic)_new/`)
-	if pattern.MatchString(url) {
-		url = strings.Replace(url, "/c2cpicdw.qpic.cn/offpic_new/", "/gchat.qpic.cn/gchatpic_new/", 1)
-		url = strings.Replace(url, "/gchat.qpic.cn/offpic_new/", "/gchat.qpic.cn/gchatpic_new/", 1)
-		url = regexp.MustCompile(`/\d+/+\d+-\d+-`).ReplaceAllString(url, "/0/0-0-")
-		url = strings.TrimSuffix(url, "?.*$")
-	}
-
-	uidPattern := regexp.MustCompile(`/0/0-0-(\w+)/`)
-	match := uidPattern.FindAllStringSubmatch(url, -1)
-	if match != nil {
-		return url, match[0][1]
-	}
-
-	return url, ""
-}
-
 func GetImageKey(url string) string {
 	const pattern = "rkey=(.*)&?"
 	if match := regexp.MustCompile(pattern).FindAllStringSubmatch(url, -1); match != nil {
