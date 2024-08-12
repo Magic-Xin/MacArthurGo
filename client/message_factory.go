@@ -3,9 +3,11 @@ package client
 import (
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
+	"MacArthurGo/structs/cqcode"
 	"context"
 	"encoding/json"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -36,7 +38,7 @@ func MessageFactory(msg *[]byte, sendPump chan *[]byte) {
 			return
 		}
 
-		messageStruct.CleanMessage, messageStruct.Command = essentials.CleanMessage(&messageStruct.Message)
+		messageStruct.CleanMessage, messageStruct.Command = CleanMessage(&messageStruct.Message)
 
 		for _, p := range essentials.PluginArray {
 			go func() {
@@ -81,4 +83,28 @@ func MessageFactory(msg *[]byte, sendPump chan *[]byte) {
 			return
 		}
 	}
+}
+
+func CleanMessage(message *[]cqcode.ArrayMessage) (*[]cqcode.ArrayMessage, string) {
+	var (
+		res     []cqcode.ArrayMessage
+		command string
+	)
+	for _, m := range *message {
+		if m.Type == "text" && command == "" {
+			words := strings.Fields(m.Data["text"].(string))
+			if len(words) == 0 {
+				continue
+			}
+			if strings.HasPrefix(words[0], "/") {
+				command = words[0]
+				res = append(res, []cqcode.ArrayMessage{{Type: "text", Data: map[string]any{
+					"text": strings.Join(words[1:], " "),
+				}}}...)
+			}
+		} else {
+			res = append(res, m)
+		}
+	}
+	return &res, command
 }
