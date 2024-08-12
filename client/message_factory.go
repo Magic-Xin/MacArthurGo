@@ -54,8 +54,15 @@ func MessageFactory(msg *[]byte, sendPump chan *[]byte) {
 		var echoMessageStruct structs.EchoMessageStruct
 		err := json.Unmarshal(*msg, &echoMessageStruct)
 		if err != nil {
-			log.Printf("Unmarshal error: %v", err)
-			return
+			var echoMessageArrayStruct structs.EchoMessageArrayStruct
+			err := json.Unmarshal(*msg, &echoMessageArrayStruct)
+			if err != nil {
+				log.Printf("Unmarshal error: %v", err)
+				return
+			}
+			echoMessageStruct.DataArray = echoMessageArrayStruct.Data
+			echoMessageStruct.Echo = echoMessageArrayStruct.Echo
+			echoMessageStruct.Status = echoMessageArrayStruct.Status
 		}
 
 		for _, p := range essentials.PluginArray {
