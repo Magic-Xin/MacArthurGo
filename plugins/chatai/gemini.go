@@ -7,14 +7,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/chai2010/webp"
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
-	"image"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
+	"image/gif"
+	"image/jpeg"
+	"io"
 	"log"
+	"net/http"
 	"strconv"
 	"sync"
 	"time"
@@ -52,8 +51,12 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	for _, msg := range *message {
 		if msg.Type == "image" && msg.Data["url"] != nil {
 			imgData := essentials.GetImageData(msg.Data["url"].(string))
-			data := g.ImageToWebp(imgData)
-			img := genai.ImageData("webp", *data)
+			data, imgType, err := g.ImageProcessing(imgData)
+			if err != nil {
+				log.Printf("Image processing error: %v", err)
+				continue
+			}
+			img := genai.ImageData(imgType, *data)
 			images = append(images, &img)
 		}
 		if msg.Type == "reply" {
@@ -150,20 +153,32 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	return &res, nil
 }
 
-func (*Gemini) ImageToWebp(imageData *bytes.Buffer) *[]byte {
-	img, _, err := image.Decode(imageData)
+func (g *Gemini) ImageProcessing(imgData *bytes.Buffer) (*[]byte, string, error) {
+	imgBody, err := io.ReadAll(imgData)
 	if err != nil {
-		log.Printf("Image decode error: %v", err)
-		return nil
+		return nil, "", err
 	}
+	switch imgType := http.DetectContentType(imgBody); imgType {
+	case "image/jpeg":
+		return &imgBody, "jpeg", nil
+	case "image/png":
+		return &imgBody, "png", nil
+	case "image/gif":
+		imgTemp, err := gif.Decode(bytes.NewReader(imgBody))
+		if err != nil {
+			return nil, "", err
+		}
+		buf := new(bytes.Buffer)
+		err = jpeg.Encode(buf, imgTemp, nil)
+		if err != nil {
+			return nil, "", err
+		}
+		imgBody = buf.Bytes()
 
-	webpBytes, err := webp.EncodeRGBA(img, 50)
-	if err != nil {
-		log.Printf("Webp encode error: %v", err)
-		return nil
+		return &imgBody, "jpeg", nil
+	default:
+		return nil, "", fmt.Errorf("unsupported image type: %s", imgType)
 	}
-
-	return &webpBytes
 }
 
 func (g *Gemini) DeleteExpiredCache(expiration int64, interval int64) {

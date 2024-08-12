@@ -5,7 +5,6 @@ go 1.22.5
 require (
 	github.com/FloatTech/floatbox v0.0.0-20240505082030-226ec6713e14
 	github.com/antchfx/htmlquery v1.3.2
-	github.com/chai2010/webp v1.1.1
 	github.com/google/generative-ai-go v0.17.0
 	github.com/google/go-cmp v0.6.0
 	github.com/gorilla/websocket v1.5.3
