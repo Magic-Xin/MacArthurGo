@@ -22,7 +22,7 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (m *Music) ReceiveAll() *[]byte {
+func (*Music) ReceiveAll() *[]byte {
 	return nil
 }
 
@@ -71,7 +71,7 @@ func (m *Music) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	return nil
 }
 
-func (m *Music) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
+func (*Music) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
 	return nil
 }
 

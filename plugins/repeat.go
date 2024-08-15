@@ -32,7 +32,7 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (r *Repeat) ReceiveAll() *[]byte {
+func (*Repeat) ReceiveAll() *[]byte {
 	return nil
 }
 
@@ -80,7 +80,7 @@ func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	return nil
 }
 
-func (r *Repeat) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
+func (*Repeat) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
 	return nil
 }
 

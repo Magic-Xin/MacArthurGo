@@ -32,11 +32,11 @@ func init() {
 	go originPic.deleteCache()
 }
 
-func (o *OriginPic) ReceiveAll() *[]byte {
+func (*OriginPic) ReceiveAll() *[]byte {
 	return nil
 }
 
-func (o *OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+func (*OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.OriginPic.Args) {
 		return nil
 	}
@@ -100,7 +100,7 @@ func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 	return nil
 }
 
-func (o *OriginPic) getImageType(imgData *bytes.Buffer) (string, error) {
+func (*OriginPic) getImageType(imgData *bytes.Buffer) (string, error) {
 	data, err := io.ReadAll(imgData)
 	if err != nil {
 		return "", err
@@ -118,7 +118,7 @@ func (o *OriginPic) getImageType(imgData *bytes.Buffer) (string, error) {
 	}
 }
 
-func (o *OriginPic) saveFile(imgData *bytes.Buffer, imgType string) (string, error) {
+func (*OriginPic) saveFile(imgData *bytes.Buffer, imgType string) (string, error) {
 	data, err := io.ReadAll(imgData)
 	if err != nil {
 		return "", err
@@ -152,7 +152,7 @@ func (o *OriginPic) saveFile(imgData *bytes.Buffer, imgType string) (string, err
 	return filePath, nil
 }
 
-func (o *OriginPic) deleteCache() {
+func (*OriginPic) deleteCache() {
 	for {
 		time.Sleep(1 * time.Hour)
 		imagePath := filepath.Join(".", "img_cache")

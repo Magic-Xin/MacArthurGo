@@ -22,7 +22,7 @@ func init() {
 	PluginArray = append(PluginArray, plugin)
 }
 
-func (b *Ban) ReceiveAll() *[]byte {
+func (*Ban) ReceiveAll() *[]byte {
 	return nil
 }
 
@@ -92,11 +92,11 @@ func (b *Ban) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	return nil
 }
 
-func (b *Ban) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
+func (*Ban) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
 	return nil
 }
 
-func (b *Ban) IsBanned(qq int64) bool {
+func (*Ban) IsBanned(qq int64) bool {
 	if qq == base.Config.Admin {
 		return false
 	}

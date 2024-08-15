@@ -161,7 +161,7 @@ func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 	return nil
 }
 
-func (l *LoginInfo) timeToString(time int64) string {
+func (*LoginInfo) timeToString(time int64) string {
 	if time/60 == 0 {
 		return fmt.Sprintf("%d秒", time)
 	} else if time/3600 == 0 {

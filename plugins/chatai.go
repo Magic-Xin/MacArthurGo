@@ -72,7 +72,7 @@ func init() {
 	go gemini.DeleteExpiredCache(3600, 1800)
 }
 
-func (c *ChatAI) ReceiveAll() *[]byte {
+func (*ChatAI) ReceiveAll() *[]byte {
 	return nil
 }
 

@@ -153,7 +153,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	return &res, nil
 }
 
-func (g *Gemini) ImageProcessing(imgData *bytes.Buffer) (*[]byte, string, error) {
+func (*Gemini) ImageProcessing(imgData *bytes.Buffer) (*[]byte, string, error) {
 	imgBody, err := io.ReadAll(imgData)
 	if err != nil {
 		return nil, "", err
