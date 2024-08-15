@@ -41,7 +41,7 @@ jobs:
 
       - name: Set LDFLAGS
         run: |
-          echo "LDFLAGS=-w -s -X 'MacArthurGo/base.Version=${SHASHORT}' -X 'MacArthurGo/base.Branch=Beta/dev' -X 'MacArthurGo/base.BuildTime=${{ env.BUILDTIME }}'" >> $GITHUB_ENV
+          echo "LDFLAGS=-w -s -checklinkname=0 -X 'MacArthurGo/base.Version=${SHASHORT}' -X 'MacArthurGo/base.Branch=Beta/dev' -X 'MacArthurGo/base.BuildTime=${{ env.BUILDTIME }}'" >> $GITHUB_ENV
 
       - name: Setup UPX
         run: |
