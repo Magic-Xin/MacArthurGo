@@ -9,7 +9,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/ncruces/go-sqlite3 v0.18.0
-	github.com/sashabaranov/go-openai v1.28.1
+	github.com/sashabaranov/go-openai v1.28.2
 	github.com/tidwall/gjson v1.17.3
 	github.com/tidwall/pretty v1.2.1
 	github.com/vinta/pangu v3.0.0+incompatible
@@ -27,7 +27,7 @@ require (
 	github.com/RomiChan/syncx v0.0.0-20240418144900-b7402ffdebc7 // indirect
 	github.com/antchfx/xpath v1.3.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/fumiama/terasu v0.0.0-20240502091919-c887e26289a8 // indirect
+	github.com/fumiama/terasu v0.0.0-20240710095334-67a8daa3a979 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
