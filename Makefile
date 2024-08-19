@@ -1,7 +1,7 @@
 NAME=MacArthurGo
 BINDIR=bin
 OUTDIR=out
-LDFLAGS=-s -w -checklinkname=0 -X MacArthurGo/base.Version=$(shell git describe --tags --always --dirty)  -X MacArthurGo/base.Branch=Release -X MacArthurGo/base.BuildTime=$(shell date +'%Y-%m-%dT%H:%M:%SZ' -u)
+LDFLAGS=-s -w -X MacArthurGo/base.Version=$(shell git describe --tags --always --dirty)  -X MacArthurGo/base.Branch=Release -X MacArthurGo/base.BuildTime=$(shell date +'%Y-%m-%dT%H:%M:%SZ' -u)
 
 DARWIN_PLATFORM_LIST = \
 	darwin-amd64 \
