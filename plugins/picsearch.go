@@ -352,7 +352,11 @@ func (p *PicSearch) sauceNAO(imgData *bytes.Buffer, response chan []cqcode.Array
 		}
 	}
 	r := []cqcode.ArrayMessage{*cqcode.Text("SauceNAO\n")}
-	r = append(r, *cqcode.Image(*p.ThumbnailToBase64(thumbNail)))
+
+	if imageBase64 := p.ThumbnailToBase64(thumbNail); imageBase64 != nil {
+		r = append(r, *cqcode.Image(*imageBase64))
+	}
+
 	msg := fmt.Sprintf("\n相似度: %.2f%%\n", similarity)
 	if title != "" {
 		msg += "「" + title + "」"
@@ -459,7 +463,11 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 				}
 
 				r := []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("ascii2d %s\n", checkType[i]))}
-				r = append(r, *cqcode.Image(*p.ThumbnailToBase64(Thumb)))
+
+				if imageBase64 := p.ThumbnailToBase64(Thumb); imageBase64 != nil {
+					r = append(r, *cqcode.Image(*imageBase64))
+				}
+
 				msg := fmt.Sprintf("\n%s %s\n「%s」/「%s」\n%s\nArthor:%s", Info, Type, Name, AuthNm, Link, Author)
 				r = append(r, *cqcode.Text(msg))
 
