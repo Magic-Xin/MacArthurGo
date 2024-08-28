@@ -53,7 +53,9 @@ func (m *Music) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 			} else if match = regexp.MustCompile(`((http|https)://c6.y.qq.com/\S+)`).FindAllStringSubmatch(str, -1); match != nil {
 				if url := essentials.GetOriginUrl(match[0][1]); url != nil {
 					urlType = "qq"
-					res = "id=" + *m.getQQMusicID(url) + "&"
+					if id := m.getQQMusicID(url); id != nil {
+						res = "id=" + *id + "&"
+					}
 				}
 			} else if match = regexp.MustCompile(`(http|https)://y.music.163.com/m/song/(\d+)`).FindAllStringSubmatch(str, -1); match != nil {
 				urlType = "163"
