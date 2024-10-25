@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/FloatTech/floatbox/web"
 	xpath "github.com/antchfx/htmlquery"
 	"github.com/google/go-cmp/cmp"
 	"io"
@@ -385,9 +384,10 @@ func (p *PicSearch) sauceNAO(imgData *bytes.Buffer, response chan []cqcode.Array
 func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, limiter chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	const api = "https://ascii2d.net/search/uri"
-	client := web.NewTLS12Client()
+
+	client := essentials.NewClient()
 	data := url.Values{}
-	data.Set("uri", img) // 图片链接
+	data.Set("uri", img)
 	fromData := strings.NewReader(data.Encode())
 
 	reqC, err := http.NewRequest("POST", api, fromData)
@@ -436,7 +436,6 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 		if err != nil {
 			return
 		}
-		// 取出每个返回的结果
 		list := xpath.Find(doc, `//div[@class="row item-box"]`)
 		if len(list) == 0 {
 			err := errors.New("ascii2d not found")
@@ -516,7 +515,7 @@ func (p *PicSearch) HandleBannedHostsArray(str *string) {
 }
 
 func (p *PicSearch) ThumbnailToBase64(url string) *string {
-	client := web.NewTLS12Client()
+	client := essentials.NewClient()
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		log.Printf("Thumbnail request error: %v", err)
