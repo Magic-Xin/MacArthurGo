@@ -192,17 +192,18 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 			return essentials.SendMsg(&originCtx, *res, nil, false, false, echo)
 		}
 	} else if split[0] == "geminisend" {
-		key, err := strconv.ParseInt(split[1], 10, 64)
-		if err != nil {
-			log.Printf("Gemini send id parse error: %v", err)
-			return nil
-		}
-		value, ok := c.Gemini.HistoryMap.Load(key)
-		if !ok {
-			log.Println("Gemini history map load error")
-			return nil
-		}
-		c.Gemini.HistoryMap.Store(echoMessageStruct.Data.MessageId, value)
+		// TODO: Fix this
+		//key, err := strconv.ParseInt(split[1], 10, 64)
+		//if err != nil {
+		//	log.Printf("Gemini send id parse error: %v", err)
+		//	return nil
+		//}
+		//value, ok := c.Gemini.HistoryMap.Load(key)
+		//if !ok {
+		//	log.Println("Gemini history map load error")
+		//	return nil
+		//}
+		//c.Gemini.HistoryMap.Store(echoMessageStruct.Data.MessageId, value)
 	}
 	return nil
 }
