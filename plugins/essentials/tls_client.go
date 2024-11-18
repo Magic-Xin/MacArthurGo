@@ -80,7 +80,7 @@ func (*uTransport) newSpec() *tls.ClientHelloSpec {
 		Extensions: []tls.TLSExtension{
 			&tls.UtlsGREASEExtension{},
 			&tls.SNIExtension{},
-			&tls.UtlsExtendedMasterSecretExtension{},
+			&tls.ExtendedMasterSecretExtension{},
 			&tls.RenegotiationInfoExtension{},
 			&tls.SupportedCurvesExtension{Curves: []tls.CurveID{tls.GREASE_PLACEHOLDER, tls.X25519, tls.CurveP256, tls.CurveP384}},
 			&tls.SupportedPointsExtension{SupportedPoints: []byte{0x0}}, // uncompressed
