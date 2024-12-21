@@ -48,6 +48,8 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		reply   string
 	)
 
+	prompts = append(prompts, genai.Text("你是一名 AI 助手，请尽量使用和提问相同的语言回答以下问题："))
+
 	for _, msg := range *message {
 		if msg.Type == "image" && msg.Data["url"] != nil {
 			imgData := essentials.GetImageData(msg.Data["url"].(string))
