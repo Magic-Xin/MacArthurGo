@@ -137,14 +137,9 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			continue
 		}
 		for _, part := range c.Content.Parts {
-			res = append(res, fmt.Sprintln(part))
+			res = append(res, essentials.RemoveMarkdown(fmt.Sprintln(part)))
 		}
 		cts = append(cts, c.Content)
-	}
-
-	if modelName == "gemini-2.0-flash-thinking-exp" {
-		res[0] = "Thinking..." + res[0]
-		res = append(res[1:], res[0])
 	}
 
 	history = append(history, &genai.Content{

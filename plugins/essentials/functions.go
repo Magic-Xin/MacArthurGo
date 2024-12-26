@@ -237,3 +237,26 @@ func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.Ar
 	jsonMsg, _ := json.Marshal(act)
 	return &jsonMsg
 }
+
+func RemoveMarkdown(input string) string {
+	replacements := map[string]string{
+		`(?m)^#{1,6}\s*`:          "",   // Headers
+		`\*\*([^*]+)\*\*`:         "$1", // Bold
+		`\*([^*]+)\*`:             "$1", // Italic
+		`\[([^\]]+)\]\([^)]+\)`:   "$1", // Links
+		"`([^`]+)`":               "$1", // Inline code
+		`~~([^~]+)~~`:             "$1", // Strikethrough
+		`!\[([^\]]*)\]\([^)]+\)`:  "$1", // Images
+		`(?m)^>\s*`:               "",   // Blockquotes
+		`(?m)^(\s*[-*+]\s+)`:      "",   // Unordered lists
+		`(?m)^\d+\.\s+`:           "",   // Ordered lists
+		`(?m)^(\s*[-*_]{3,}\s*)$`: "",   // Horizontal rules
+	}
+
+	for pattern, replacement := range replacements {
+		re := regexp.MustCompile(pattern)
+		input = re.ReplaceAllString(input, replacement)
+	}
+
+	return input
+}
