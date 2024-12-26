@@ -38,17 +38,15 @@ type HMap struct {
 	Time    int64
 }
 
-func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64, modelName string, echoId int64) (*string, *[]byte) {
+func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64, modelName string, echoId int64) (*[]string, *[]byte) {
 	var (
 		images  []*genai.Blob
 		prompts []genai.Part
 		model   *genai.GenerativeModel
 		history []*genai.Content
-		res     string
+		res     []string
 		reply   string
 	)
-
-	prompts = append(prompts, genai.Text("你是一名 AI 助手，请尽量使用和提问相同的语言回答以下问题："))
 
 	for _, msg := range *message {
 		if msg.Type == "image" && msg.Data["url"] != nil {
@@ -80,7 +78,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	client, err := genai.NewClient(ctx, option.WithAPIKey(g.ApiKey))
 	if err != nil {
 		log.Printf("Gemini client error: %v", err)
-		res = fmt.Sprintf("Gemini client error: %v", err)
+		res = append(res, fmt.Sprintf("Gemini client error: %v", err))
 		return &res, nil
 	}
 	defer func(client *genai.Client) {
@@ -96,7 +94,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			prompts = append(prompts, img)
 		}
 	}
-	res = modelName + ": "
+	res = append(res, modelName+" response: ")
 
 	model = client.GenerativeModel("models/" + modelName)
 	model.SafetySettings = []*genai.SafetySetting{
@@ -128,7 +126,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	resp, err := cs.SendMessage(ctx, prompts...)
 	if err != nil {
 		log.Printf("Gemini generate error: %v", err)
-		res = fmt.Sprintf("Gemini generate error: %v", err)
+		res = append(res, fmt.Sprintf("Gemini generate error: %v", err))
 		return &res, nil
 	}
 
@@ -139,9 +137,14 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			continue
 		}
 		for _, part := range c.Content.Parts {
-			res += fmt.Sprintf("%s", part)
+			res = append(res, fmt.Sprintln(part))
 		}
 		cts = append(cts, c.Content)
+	}
+
+	if modelName == "gemini-2.0-flash-thinking-exp" {
+		res[0] = "Thinking..." + res[0]
+		res = append(res[1:], res[0])
 	}
 
 	history = append(history, &genai.Content{

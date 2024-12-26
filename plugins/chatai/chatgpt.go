@@ -14,7 +14,8 @@ type ChatGPT struct {
 	ApiKey  string
 }
 
-func (c *ChatGPT) RequireAnswer(str string) *string {
+func (c *ChatGPT) RequireAnswer(str string) *[]string {
+	var res []string
 	client := openai.NewClient(c.ApiKey)
 	resp, err := client.CreateChatCompletion(
 		context.Background(),
@@ -31,10 +32,10 @@ func (c *ChatGPT) RequireAnswer(str string) *string {
 
 	if err != nil {
 		log.Printf("ChatCompletion error: %v", err)
-		res := fmt.Sprintf("ChatCompletion error: %v", err)
+		res = append(res, fmt.Sprintf("ChatCompletion error: %v", err))
 		return &res
 	}
 
-	res := c.Model + ": " + resp.Choices[0].Message.Content
+	res = append(res, c.Model+": "+resp.Choices[0].Message.Content)
 	return &res
 }
