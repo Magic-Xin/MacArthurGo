@@ -84,13 +84,13 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (b *Bili) ReceiveAll() *[]byte {
+func (*Bili) ReceiveAll() *[]byte {
 	return nil
 }
 
 func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	const biliShort = `(b23.tv\\?/\w+)`
-	const video = `www.bilibili.com/video/(\w+)`
+	const biliShort = `((b23.tv|bili2233.cn)\\?/\w+)`
+	const video = `[m|www].bilibili.com/video/(\w+)`
 	const live = `live.bilibili.com/(\d+)`
 
 	rawMsg := messageStruct.RawMessage
@@ -557,7 +557,7 @@ func (a *AISummarize) getMixinKey(orig string) string {
 	return str.String()[:32]
 }
 
-func (a *AISummarize) sanitizeString(s string) string {
+func (*AISummarize) sanitizeString(s string) string {
 	unwantedChars := []string{"!", "'", "(", ")", "*"}
 	for _, char := range unwantedChars {
 		s = strings.ReplaceAll(s, char, "")
@@ -582,7 +582,7 @@ func (a *AISummarize) getWbiKeysCached() (string, string) {
 	return imgKeyI.(string), subKeyI.(string)
 }
 
-func (a *AISummarize) getWbiKeys() (string, string) {
+func (*AISummarize) getWbiKeys() (string, string) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://api.bilibili.com/x/web-interface/nav", nil)
 	if err != nil {
@@ -615,7 +615,7 @@ func (a *AISummarize) getWbiKeys() (string, string) {
 	return imgKey, subKey
 }
 
-func (a *AISummarize) timestampToString(timestamp int64) string {
+func (*AISummarize) timestampToString(timestamp int64) string {
 	hour := timestamp / 3600
 	minute := timestamp % 3600 / 60
 	second := timestamp % 60

@@ -22,7 +22,7 @@ func Poke(id int64) *ArrayMessage {
 	return &ArrayMessage{Type: "touch", Data: map[string]any{"id": id}}
 }
 
-func Music(urlType string, id int64) *ArrayMessage {
+func Music(urlType string, id string) *ArrayMessage {
 	return &ArrayMessage{Type: "music", Data: map[string]any{"type": urlType, "id": id}}
 }
 

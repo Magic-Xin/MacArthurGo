@@ -72,7 +72,7 @@ func init() {
 	go gemini.DeleteExpiredCache(3600, 1800)
 }
 
-func (c *ChatAI) ReceiveAll() *[]byte {
+func (*ChatAI) ReceiveAll() *[]byte {
 	return nil
 }
 
@@ -90,7 +90,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	str := strings.Join(textArray, " ")
 
 	var (
-		res  *string
+		res  *[]string
 		echo string
 	)
 	if essentials.CheckArgumentArray(messageStruct.Command, &c.ChatGPT.Args) && c.ChatGPT.Enabled {
@@ -101,12 +101,12 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		var action *[]byte
 		messageID := messageStruct.MessageId
 		if len(c.Gemini.Args) < 2 {
-			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest", 0)
+			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-flash-exp", 0)
 		} else {
 			if messageStruct.Command == c.Gemini.Args[0] {
-				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-flash-latest", 0)
+				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-flash-exp", 0)
 			} else {
-				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-1.5-pro-latest", 0)
+				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-flash-thinking-exp", 0)
 			}
 		}
 
@@ -125,17 +125,23 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	}
 
 	if c.panGu {
-		*res = pangu.SpacingText(*res)
+		for i, r := range *res {
+			(*res)[i] = pangu.SpacingText(r)
+		}
 	}
 
 	if messageStruct.MessageType == "group" && c.groupForward {
 		var data []structs.ForwardNode
 		uin := strconv.FormatInt(messageStruct.UserId, 10)
 		name := messageStruct.Sender.Nickname
-		data = append(data, *essentials.ConstructForwardNode(uin, name, messageStruct.CleanMessage), *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
+		data = append(data, *essentials.ConstructForwardNode(uin, name, messageStruct.CleanMessage))
+		for _, r := range *res {
+			data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(r)}))
+		}
 		return essentials.SendGroupForward(messageStruct, &data, echo)
 	} else {
-		return essentials.SendMsg(messageStruct, *res, nil, false, false, "")
+		text := strings.Join(*res, "\n")
+		return essentials.SendMsg(messageStruct, text, nil, false, false, "")
 	}
 }
 
@@ -161,7 +167,7 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 		originStr := data.(chatai.RMap).OriginStr
 		originMessage := data.(chatai.RMap).Data
 
-		var res *string
+		var res *[]string
 		message := echoMessageStruct.Data.Message
 		messageId, err := strconv.ParseInt(split[1], 10, 64)
 		if err != nil {
@@ -177,7 +183,9 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 		echo := "geminisend|" + split[1]
 
 		if c.panGu {
-			*res = pangu.SpacingText(*res)
+			for i, r := range *res {
+				(*res)[i] = pangu.SpacingText(r)
+			}
 		}
 
 		if originCtx.MessageType == "group" && c.groupForward {
@@ -186,23 +194,27 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]by
 			name := originCtx.Sender.Nickname
 			originMessage = append(originMessage, message...)
 			data = append(data, *essentials.ConstructForwardNode(uin, name, &originMessage))
-			data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(*res)}))
+			for _, r := range *res {
+				data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(r)}))
+			}
 			return essentials.SendGroupForward(&originCtx, &data, echo)
 		} else {
-			return essentials.SendMsg(&originCtx, *res, nil, false, false, echo)
+			text := strings.Join(*res, "\n")
+			return essentials.SendMsg(&originCtx, text, nil, false, false, echo)
 		}
 	} else if split[0] == "geminisend" {
-		key, err := strconv.ParseInt(split[1], 10, 64)
-		if err != nil {
-			log.Printf("Gemini send id parse error: %v", err)
-			return nil
-		}
-		value, ok := c.Gemini.HistoryMap.Load(key)
-		if !ok {
-			log.Println("Gemini history map load error")
-			return nil
-		}
-		c.Gemini.HistoryMap.Store(echoMessageStruct.Data.MessageId, value)
+		// TODO: Fix this
+		//key, err := strconv.ParseInt(split[1], 10, 64)
+		//if err != nil {
+		//	log.Printf("Gemini send id parse error: %v", err)
+		//	return nil
+		//}
+		//value, ok := c.Gemini.HistoryMap.Load(key)
+		//if !ok {
+		//	log.Println("Gemini history map load error")
+		//	return nil
+		//}
+		//c.Gemini.HistoryMap.Store(echoMessageStruct.Data.MessageId, value)
 	}
 	return nil
 }

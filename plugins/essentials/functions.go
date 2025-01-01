@@ -3,9 +3,13 @@ package essentials
 import (
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
+	"bytes"
 	"crypto/md5"
+	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"regexp"
@@ -82,7 +86,7 @@ func SendPoke(messageStruct *structs.MessageStruct, uid int64) *[]byte {
 	return nil
 }
 
-func SendMusic(messageStruct *structs.MessageStruct, urlType string, id int64) *[]byte {
+func SendMusic(messageStruct *structs.MessageStruct, urlType string, id string) *[]byte {
 	return constructMessage(messageStruct, &[]cqcode.ArrayMessage{*cqcode.Music(urlType, id)}, "")
 }
 
@@ -135,30 +139,65 @@ func SplitArgument(message *[]cqcode.ArrayMessage) (res []string) {
 	return res
 }
 
-func GetUniversalImgURL(url string) (string, string) {
-	if match := regexp.MustCompile("https://(multimedia.nt.qq.com.cn/.*)").FindAllStringSubmatch(url, -1); match != nil {
-		url = "http://" + match[0][1]
-		if matchUid := regexp.MustCompile("rkey=(.*)&").FindAllStringSubmatch(url, -1); matchUid != nil {
-			return url, matchUid[0][1]
+func GetImageKey(url string) string {
+	const pattern = "rkey=(.*)&?"
+	if match := regexp.MustCompile(pattern).FindAllStringSubmatch(url, -1); match != nil {
+		return match[0][1]
+	}
+	return ""
+}
+
+func GetImageBase64(url string) *string {
+	imageData, err := io.ReadAll(GetImageData(url))
+	if err != nil {
+		log.Printf("Image fetch error: %v", err)
+		return nil
+	}
+	imageBase64 := "base64://" + base64.StdEncoding.EncodeToString(imageData)
+
+	return &imageBase64
+}
+
+func GetImageData(url string) *bytes.Buffer {
+	tlsConfig := &tls.Config{
+		ServerName: "multimedia.nt.qq.com.cn",
+		CipherSuites: []uint16{
+			tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_RSA_WITH_AES_128_CBC_SHA256,
+			tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+			tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
+		},
+		InsecureSkipVerify: false,
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+
+	client := &http.Client{
+		Transport: transport,
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		panic(err)
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("Image fetch close error: %v", err)
 		}
-		return url, ""
+	}(resp.Body)
+
+	var imageData bytes.Buffer
+	_, err = io.Copy(&imageData, resp.Body)
+	if err != nil {
+		panic(err)
 	}
 
-	pattern := regexp.MustCompile(`^https?://(c2cpicdw|gchat)\.qpic\.cn/(offpic|gchatpic)_new/`)
-	if pattern.MatchString(url) {
-		url = strings.Replace(url, "/c2cpicdw.qpic.cn/offpic_new/", "/gchat.qpic.cn/gchatpic_new/", 1)
-		url = strings.Replace(url, "/gchat.qpic.cn/offpic_new/", "/gchat.qpic.cn/gchatpic_new/", 1)
-		url = regexp.MustCompile(`/\d+/+\d+-\d+-`).ReplaceAllString(url, "/0/0-0-")
-		url = strings.TrimSuffix(url, "?.*$")
-	}
-
-	uidPattern := regexp.MustCompile(`/0/0-0-(\w+)/`)
-	match := uidPattern.FindAllStringSubmatch(url, -1)
-	if match != nil {
-		return url, match[0][1]
-	}
-
-	return url, ""
+	return &imageData
 }
 
 func GetOriginUrl(url string) *string {
@@ -199,26 +238,25 @@ func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.Ar
 	return &jsonMsg
 }
 
-func CleanMessage(message *[]cqcode.ArrayMessage) (*[]cqcode.ArrayMessage, string) {
-	var (
-		res     []cqcode.ArrayMessage
-		command string
-	)
-	for _, m := range *message {
-		if m.Type == "text" && command == "" {
-			words := strings.Fields(m.Data["text"].(string))
-			if len(words) == 0 {
-				continue
-			}
-			if strings.HasPrefix(words[0], "/") {
-				command = words[0]
-				res = append(res, []cqcode.ArrayMessage{{Type: "text", Data: map[string]any{
-					"text": strings.Join(words[1:], " "),
-				}}}...)
-			}
-		} else {
-			res = append(res, m)
-		}
+func RemoveMarkdown(input string) string {
+	replacements := map[string]string{
+		`(?m)^#{1,6}\s*`:          "",   // Headers
+		`\*\*([^*]+)\*\*`:         "$1", // Bold
+		`\*([^*]+)\*`:             "$1", // Italic
+		`\[([^\]]+)\]\([^)]+\)`:   "$1", // Links
+		"`([^`]+)`":               "$1", // Inline code
+		`~~([^~]+)~~`:             "$1", // Strikethrough
+		`!\[([^\]]*)\]\([^)]+\)`:  "$1", // Images
+		`(?m)^>\s*`:               "",   // Blockquotes
+		`(?m)^(\s*[-*+]\s+)`:      "",   // Unordered lists
+		`(?m)^\d+\.\s+`:           "",   // Ordered lists
+		`(?m)^(\s*[-*_]{3,}\s*)$`: "",   // Horizontal rules
 	}
-	return &res, command
+
+	for pattern, replacement := range replacements {
+		re := regexp.MustCompile(pattern)
+		input = re.ReplaceAllString(input, replacement)
+	}
+
+	return input
 }

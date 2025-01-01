@@ -56,7 +56,7 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (c *Corpus) ReceiveAll() *[]byte {
+func (*Corpus) ReceiveAll() *[]byte {
 	return nil
 }
 
@@ -101,11 +101,11 @@ func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	return nil
 }
 
-func (c *Corpus) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
+func (*Corpus) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
 	return nil
 }
 
-func (c *Corpus) Contain(arr []int64, item int64) bool {
+func (*Corpus) Contain(arr []int64, item int64) bool {
 	for _, v := range arr {
 		if v == item {
 			return true

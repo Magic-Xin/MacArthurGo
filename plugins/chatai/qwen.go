@@ -16,7 +16,8 @@ type QWen struct {
 	ApiKey  string
 }
 
-func (q *QWen) RequireAnswer(str string) *string {
+func (q *QWen) RequireAnswer(str string) *[]string {
+	var res []string
 	const api = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
 
 	payload := map[string]interface{}{
@@ -36,14 +37,14 @@ func (q *QWen) RequireAnswer(str string) *string {
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		log.Printf("QWen marshal error: %v", err)
-		res := fmt.Sprintf("QWen marshal error: %v", err)
+		res = append(res, fmt.Sprintf("QWen marshal error: %v", err))
 		return &res
 	}
 
 	req, err := http.NewRequest("POST", api, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		log.Printf("QWen request error: %v", err)
-		res := fmt.Sprintf("QWen request error: %v", err)
+		res = append(res, fmt.Sprintf("QWen request error: %v", err))
 		return &res
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", q.ApiKey))
@@ -51,7 +52,7 @@ func (q *QWen) RequireAnswer(str string) *string {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Printf("QWen response error: %v", err)
-		res := fmt.Sprintf("QWen response error: %v", err)
+		res = append(res, fmt.Sprintf("QWen response error: %v", err))
 		return &res
 	}
 	defer func(Body io.ReadCloser) {
@@ -63,7 +64,7 @@ func (q *QWen) RequireAnswer(str string) *string {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("QWen read body error: %v", err)
-		res := fmt.Sprintf("QWen read body error: %v", err)
+		res = append(res, fmt.Sprintf("QWen read body error: %v", err))
 		return &res
 	}
 
@@ -71,16 +72,16 @@ func (q *QWen) RequireAnswer(str string) *string {
 	err = json.Unmarshal(body, &i)
 	if err != nil {
 		log.Printf("QWen unmarshal error: %v", err)
-		res := fmt.Sprintf("QWen unmarshal error: %v", err)
+		res = append(res, fmt.Sprintf("QWen unmarshal error: %v", err))
 		return &res
 	}
 	ctx := i.(map[string]any)
 	if ctx["output"] != nil {
 		if ctx["output"].(map[string]any)["text"] != nil {
-			res := q.Model + ": " + ctx["output"].(map[string]any)["text"].(string)
+			res = append(res, q.Model+": "+ctx["output"].(map[string]any)["text"].(string))
 			return &res
 		}
 	}
-	res := "QWen json error"
+	res = append(res, fmt.Sprintf("QWen response error: %v", ctx))
 	return &res
 }

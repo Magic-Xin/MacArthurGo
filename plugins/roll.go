@@ -22,7 +22,7 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (r *Roll) ReceiveAll() *[]byte {
+func (*Roll) ReceiveAll() *[]byte {
 	return nil
 }
 
@@ -52,7 +52,7 @@ func (r *Roll) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	return nil
 }
 
-func (r *Roll) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
+func (*Roll) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
 	return nil
 }
 

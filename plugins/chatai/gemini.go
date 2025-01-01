@@ -38,32 +38,26 @@ type HMap struct {
 	Time    int64
 }
 
-func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64, modelName string, echoId int64) (*string, *[]byte) {
+func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64, modelName string, echoId int64) (*[]string, *[]byte) {
 	var (
-		images []struct {
-			Data    *[]byte
-			ImgType string
-		}
-
+		images  []*genai.Blob
 		prompts []genai.Part
 		model   *genai.GenerativeModel
 		history []*genai.Content
-		res     string
+		res     []string
 		reply   string
 	)
 
 	for _, msg := range *message {
 		if msg.Type == "image" && msg.Data["url"] != nil {
-			imgUrl, _ := essentials.GetUniversalImgURL(msg.Data["url"].(string))
-			data, imgType, err := g.ImageProcessing(imgUrl)
+			imgData := essentials.GetImageData(msg.Data["url"].(string))
+			data, imgType, err := g.ImageProcessing(imgData)
 			if err != nil {
 				log.Printf("Image processing error: %v", err)
 				continue
 			}
-			images = append(images, struct {
-				Data    *[]byte
-				ImgType string
-			}{Data: data, ImgType: imgType})
+			img := genai.ImageData(imgType, *data)
+			images = append(images, &img)
 		}
 		if msg.Type == "reply" {
 			reply = msg.Data["id"].(string)
@@ -84,7 +78,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	client, err := genai.NewClient(ctx, option.WithAPIKey(g.ApiKey))
 	if err != nil {
 		log.Printf("Gemini client error: %v", err)
-		res = fmt.Sprintf("Gemini client error: %v", err)
+		res = append(res, fmt.Sprintf("Gemini client error: %v", err))
 		return &res, nil
 	}
 	defer func(client *genai.Client) {
@@ -97,10 +91,10 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	prompts = append(prompts, genai.Text(str))
 	if len(images) > 0 {
 		for _, img := range images {
-			prompts = append(prompts, genai.ImageData(img.ImgType, *img.Data))
+			prompts = append(prompts, img)
 		}
 	}
-	res = modelName + ": "
+	res = append(res, modelName+" response: ")
 
 	model = client.GenerativeModel("models/" + modelName)
 	model.SafetySettings = []*genai.SafetySetting{
@@ -132,7 +126,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	resp, err := cs.SendMessage(ctx, prompts...)
 	if err != nil {
 		log.Printf("Gemini generate error: %v", err)
-		res = fmt.Sprintf("Gemini generate error: %v", err)
+		res = append(res, fmt.Sprintf("Gemini generate error: %v", err))
 		return &res, nil
 	}
 
@@ -143,7 +137,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			continue
 		}
 		for _, part := range c.Content.Parts {
-			res += fmt.Sprintf("%s", part)
+			res = append(res, essentials.RemoveMarkdown(fmt.Sprintln(part)))
 		}
 		cts = append(cts, c.Content)
 	}
@@ -159,29 +153,18 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	return &res, nil
 }
 
-func (g *Gemini) ImageProcessing(url string) (*[]byte, string, error) {
-	resp, err := http.Get(url)
+func (*Gemini) ImageProcessing(imgData *bytes.Buffer) (*[]byte, string, error) {
+	imgBody, err := io.ReadAll(imgData)
 	if err != nil {
 		return nil, "", err
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Printf("Image fetch close error: %v", err)
-		}
-	}(resp.Body)
-
-	imgData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, "", err
-	}
-	switch imgType := http.DetectContentType(imgData); imgType {
+	switch imgType := http.DetectContentType(imgBody); imgType {
 	case "image/jpeg":
-		return &imgData, "jpeg", nil
+		return &imgBody, "jpeg", nil
 	case "image/png":
-		return &imgData, "png", nil
+		return &imgBody, "png", nil
 	case "image/gif":
-		imgTemp, err := gif.Decode(bytes.NewReader(imgData))
+		imgTemp, err := gif.Decode(bytes.NewReader(imgBody))
 		if err != nil {
 			return nil, "", err
 		}
@@ -190,9 +173,9 @@ func (g *Gemini) ImageProcessing(url string) (*[]byte, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		imgData = buf.Bytes()
+		imgBody = buf.Bytes()
 
-		return &imgData, "jpeg", nil
+		return &imgBody, "jpeg", nil
 	default:
 		return nil, "", fmt.Errorf("unsupported image type: %s", imgType)
 	}

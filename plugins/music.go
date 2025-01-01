@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -23,7 +22,7 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (m *Music) ReceiveAll() *[]byte {
+func (*Music) ReceiveAll() *[]byte {
 	return nil
 }
 
@@ -54,7 +53,9 @@ func (m *Music) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 			} else if match = regexp.MustCompile(`((http|https)://c6.y.qq.com/\S+)`).FindAllStringSubmatch(str, -1); match != nil {
 				if url := essentials.GetOriginUrl(match[0][1]); url != nil {
 					urlType = "qq"
-					res = "id=" + *m.getQQMusicID(url) + "&"
+					if id := m.getQQMusicID(url); id != nil {
+						res = "id=" + *id + "&"
+					}
 				}
 			} else if match = regexp.MustCompile(`(http|https)://y.music.163.com/m/song/(\d+)`).FindAllStringSubmatch(str, -1); match != nil {
 				urlType = "163"
@@ -66,16 +67,13 @@ func (m *Music) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	if urlType != "" {
 		match := regexp.MustCompile(`id=(\d+)`).FindAllStringSubmatch(res, -1)
 		if match != nil {
-			id, err := strconv.ParseInt(match[0][1], 10, 64)
-			if err == nil {
-				return essentials.SendMusic(messageStruct, urlType, id)
-			}
+			return essentials.SendMusic(messageStruct, urlType, match[0][1])
 		}
 	}
 	return nil
 }
 
-func (m *Music) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
+func (*Music) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
 	return nil
 }
 
