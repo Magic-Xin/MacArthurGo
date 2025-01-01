@@ -89,7 +89,7 @@ func (*Bili) ReceiveAll() *[]byte {
 }
 
 func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
-	const biliShort = `([b23.tv|bili2233.cn]\\?/\w+)`
+	const biliShort = `((b23.tv|bili2233.cn)\\?/\w+)`
 	const video = `[m|www].bilibili.com/video/(\w+)`
 	const live = `live.bilibili.com/(\d+)`
 
