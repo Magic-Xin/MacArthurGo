@@ -12,7 +12,7 @@ import (
 )
 
 type Waifu struct {
-	UserId   string
+	UserId   int64
 	NickName string
 	Card     string
 }
@@ -62,11 +62,11 @@ func (d *DailyWaifu) ReceiveMessage(messageStruct *structs.MessageStruct, send c
 		var msg []cqcode.ArrayMessage
 
 		if wife.Card != "" {
-			msg = append(msg, *cqcode.Text(fmt.Sprintf("你今天的老婆是: %s(%s)\n%s", wife.Card, wife.NickName, wife.UserId)))
+			msg = append(msg, *cqcode.Text(fmt.Sprintf("你今天的老婆是: %s(%s)\n%d", wife.Card, wife.NickName, wife.UserId)))
 		} else {
-			msg = append(msg, *cqcode.Text(fmt.Sprintf("你今天的老婆是: %s\n%s", wife.NickName, wife.UserId)))
+			msg = append(msg, *cqcode.Text(fmt.Sprintf("你今天的老婆是: %s\n%d", wife.NickName, wife.UserId)))
 		}
-		msg = append(msg, *cqcode.Image(avatarApi + wife.UserId))
+		msg = append(msg, *cqcode.Image(fmt.Sprintf("%s%d", avatarApi, wife.UserId)))
 		send <- essentials.SendMsg(messageStruct, "", &msg, false, true, "")
 		return
 	}
@@ -74,7 +74,7 @@ func (d *DailyWaifu) ReceiveMessage(messageStruct *structs.MessageStruct, send c
 	send <- essentials.SendMsg(messageStruct, "获取老婆失败", nil, false, true, "")
 }
 
-func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- *[]byte) {
+func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, _ chan<- *[]byte) {
 	if echoMessageStruct.Status != "ok" || echoMessageStruct.Echo != "groupMemberList" {
 		return
 	}
@@ -86,7 +86,7 @@ func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, s
 	groupId := echoMessageStruct.DataArray[0].GroupId
 	for _, data := range echoMessageStruct.DataArray {
 		waifus = append(waifus, Waifu{
-			UserId:   fmt.Sprintf("%d", data.UserId),
+			UserId:   data.UserId,
 			NickName: data.Nickname,
 			Card:     data.Card,
 		})
@@ -94,15 +94,32 @@ func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, s
 
 	src := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(src)
-
 	r.Shuffle(len(waifus), func(i, j int) {
 		waifus[i], waifus[j] = waifus[j], waifus[i]
 	})
 
 	pairings := make(map[int64]Waifu, len(waifus))
+	visited := make(map[int64]bool)
+
 	for i, u := range echoMessageStruct.DataArray {
+		if visited[u.UserId] {
+			continue
+		}
+
 		targetIdx := (i + 1) % len(waifus)
+		for visited[waifus[targetIdx].UserId] {
+			targetIdx = (targetIdx + 1) % len(waifus)
+		}
+
 		pairings[u.UserId] = waifus[targetIdx]
+		visited[u.UserId] = true
+		visited[waifus[targetIdx].UserId] = true
+
+		pairings[waifus[targetIdx].UserId] = Waifu{
+			UserId:   u.UserId,
+			NickName: u.Nickname,
+			Card:     u.Card,
+		}
 	}
 
 	d.Cache.Store(groupId, pairings)
