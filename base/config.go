@@ -49,9 +49,8 @@ type config struct {
 		Bili struct {
 			Enable      bool `json:"enable"`
 			AiSummarize struct {
-				Enable       bool     `json:"enable"`
-				Args         []string `json:"args"`
-				GroupForward bool     `json:"groupForward"`
+				Enable       bool `json:"enable"`
+				GroupForward bool `json:"groupForward"`
 			} `json:"aiSummarize"`
 		} `json:"bili"`
 		Poke struct {
@@ -97,6 +96,10 @@ type config struct {
 			GroupForward bool `json:"groupForward"`
 			PanGu        bool `json:"panGu"`
 		} `json:"chatAI"`
+		Waifu struct {
+			Enable bool     `json:"enable"`
+			Args   []string `json:"args"`
+		} `json:"waifu"`
 	} `json:"plugins"`
 }
 

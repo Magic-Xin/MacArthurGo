@@ -45,7 +45,6 @@
       "enable": false,
       "aiSummarize": {
         "enable": true,
-        "args": ["/summarize", "/sum"],
         "groupForward": true
       }
     },
@@ -91,6 +90,10 @@
       },
       "groupForward": true,
       "panGu": true
-    }
+    },
+    "waifu": {
+      "enable": false,
+      "args": ["/waifu", "wife", "/w"]
+    },
   }
 }
