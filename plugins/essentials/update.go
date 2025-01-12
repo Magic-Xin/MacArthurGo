@@ -34,31 +34,31 @@ func init() {
 	}
 }
 
-func (u *Update) ReceiveAll() *[]byte {
+func (u *Update) ReceiveAll(send chan<- *[]byte) {
 	if u.sendCache != nil {
-		r := u.sendCache
+		send <- u.sendCache
 		u.sendCache = nil
-		return r
 	}
-	return nil
+	return
 }
 
-func (u *Update) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+func (u *Update) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
 	if base.Config.UpdateUrl == "" {
-		return nil
+		return
 	}
 	if base.Branch == "Release" {
-		return SendMsg(messageStruct, "暂时不支持 Release 版本自动更新", nil, false, false, "")
-
+		send <- SendMsg(messageStruct, "暂时不支持 Release 版本自动更新", nil, false, false, "")
+		return
 	}
 
 	if messageStruct.Command != "/update" {
-		return nil
+		return
 	}
 
 	err := u.getVersion()
 	if err != nil {
-		return SendMsg(messageStruct, fmt.Sprintf("获取最新版本失败: %v", err), nil, false, false, "")
+		send <- SendMsg(messageStruct, fmt.Sprintf("获取最新版本失败: %v", err), nil, false, false, "")
+		return
 	}
 
 	message := []cqcode.ArrayMessage{*cqcode.Text("本地版本:\n分支: " + base.Branch + "\n" + "版本: " + base.Version + "\n" + "编译时间: " + base.BuildTime),
@@ -68,12 +68,11 @@ func (u *Update) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	} else {
 		message = append(message, *cqcode.Text("\n\n版本一致，无需更新"))
 	}
-	return SendMsg(messageStruct, "", &message, false, false, "")
+	send <- SendMsg(messageStruct, "", &message, false, false, "")
+	return
 }
 
-func (*Update) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
-	return nil
-}
+func (*Update) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
 
 func (u *Update) UpdateWatcher() {
 	for {

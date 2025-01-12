@@ -46,23 +46,23 @@ func init() {
 	PluginArray = append(PluginArray, plugin)
 }
 
-func (l *LoginInfo) ReceiveAll() *[]byte {
+func (l *LoginInfo) ReceiveAll(send chan<- *[]byte) {
 	switch l.status {
 	case 0:
 		l.status++
-		return SendAction("get_login_info", struct{}{}, "info")
+		send <- SendAction("get_login_info", struct{}{}, "info")
 	case 1:
 		l.status++
-		return SendAction("get_friend_list", struct{}{}, "friendList")
+		send <- SendAction("get_friend_list", struct{}{}, "friendList")
 	case 2:
 		l.status++
-		return SendAction("get_group_list", struct{}{}, "groupList")
+		send <- SendAction("get_group_list", struct{}{}, "groupList")
 	default:
-		return nil
+		return
 	}
 }
 
-func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
 	if messageStruct.Command == "/info" {
 		var mem runtime.MemStats
 		runtime.ReadMemStats(&mem)
@@ -83,7 +83,7 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 		message += "Sys = " + strconv.FormatUint(mem.Sys/1024/1024, 10) + " MB\n"
 		message += "HeapAlloc = " + strconv.FormatUint(mem.HeapAlloc/1024/1024, 10) + " MB\n"
 
-		return SendMsg(messageStruct, message, nil, false, false, "")
+		send <- SendMsg(messageStruct, message, nil, false, false, "")
 	} else if messageStruct.Command == "/help" {
 		result := []string{"插件\t\t\t\t触发指令"}
 		for _, p := range PluginArray {
@@ -105,14 +105,14 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte
 			result = append(result, res)
 		}
 
-		return SendMsg(messageStruct, strings.Join(result, "\n"), nil, false, false, "")
+		send <- SendMsg(messageStruct, strings.Join(result, "\n"), nil, false, false, "")
 	}
-	return nil
+	return
 }
 
-func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]byte {
+func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- *[]byte) {
 	if echoMessageStruct.Status != "ok" {
-		return nil
+		return
 	}
 
 	sendStruct := structs.MessageStruct{
@@ -125,40 +125,40 @@ func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 		data := echoMessageStruct.Data
 		l.NickName, l.UserId = data.Nickname, strconv.FormatInt(data.UserId, 10)
 		log.Printf("Get account nickname: %s, id: %s", l.NickName, l.UserId)
-		return SendMsg(&sendStruct, "MacArthurGo 已上线", nil, false, false, "")
+		send <- SendMsg(&sendStruct, "MacArthurGo 已上线", nil, false, false, "")
 	case "friendList":
 		data := echoMessageStruct.DataArray
 		bytesData, err := json.Marshal(data)
 		if err != nil {
 			log.Printf("FriendList Marshal error: %v", err)
-			return nil
+			return
 		}
 		err = json.Unmarshal(bytesData, &l.FriendList)
 		if err != nil {
 			log.Printf("FriendList Unmarshal error: %v", err)
-			return nil
+			return
 		}
 
 		log.Printf("Get friend list count: %d", len(l.FriendList))
-		return SendMsg(&sendStruct, fmt.Sprintf("好友列表加载成功，好友数量: %d", len(l.FriendList)), nil, false, false, "")
+		send <- SendMsg(&sendStruct, fmt.Sprintf("好友列表加载成功，好友数量: %d", len(l.FriendList)), nil, false, false, "")
 	case "groupList":
 		data := echoMessageStruct.DataArray
 		bytesData, err := json.Marshal(data)
 		if err != nil {
 			log.Printf("GroupList Marshal error: %v", err)
-			return nil
+			return
 		}
 		err = json.Unmarshal(bytesData, &l.GroupList)
 		if err != nil {
 			log.Printf("GroupList Unmarshal error: %v", err)
-			return nil
+			return
 		}
 
 		log.Printf("Get group list count: %d", len(l.GroupList))
-		return SendMsg(&sendStruct, fmt.Sprintf("群组列表加载成功，群组数量: %d", len(l.GroupList)), nil, false, false, "")
+		send <- SendMsg(&sendStruct, fmt.Sprintf("群组列表加载成功，群组数量: %d", len(l.GroupList)), nil, false, false, "")
 	}
 
-	return nil
+	return
 }
 
 func (*LoginInfo) timeToString(time int64) string {

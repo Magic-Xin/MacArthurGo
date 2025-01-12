@@ -58,34 +58,32 @@ func init() {
 	go essentials.DeleteExpired("picSearch", "created", base.Config.Plugins.PicSearch.ExpirationTime, base.Config.Plugins.PicSearch.IntervalTime)
 }
 
-func (p *PicSearch) ReceiveAll() *[]byte {
-	return nil
-}
+func (p *PicSearch) ReceiveAll(chan<- *[]byte) {}
 
-func (p *PicSearch) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+func (p *PicSearch) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
 	rawMsg := messageStruct.RawMessage
 
 	if messageStruct.MessageType == "group" {
 		if p.checkArgs(rawMsg, &base.Config.Plugins.PicSearch.Args) {
-			return p.picSearch(messageStruct, &messageStruct.Message, false, true, p.checkArgs(rawMsg, &[]string{"purge"}))
+			send <- p.picSearch(messageStruct, &messageStruct.Message, send, false, true, p.checkArgs(rawMsg, &[]string{"purge"}))
 		}
 	} else if p.allowPrivate {
 		if p.checkArgs(rawMsg, &base.Config.Plugins.PicSearch.Args) {
-			return p.picSearch(messageStruct, &messageStruct.Message, false, false, p.checkArgs(rawMsg, &[]string{"purge"}))
+			send <- p.picSearch(messageStruct, &messageStruct.Message, send, false, false, p.checkArgs(rawMsg, &[]string{"purge"}))
 		} else {
 			words := essentials.SplitArgument(&messageStruct.Message)
 			if len(words) == 0 {
-				return p.picSearch(messageStruct, &messageStruct.Message, false, false, p.checkArgs(rawMsg, &[]string{"purge"}))
+				send <- p.picSearch(messageStruct, &messageStruct.Message, send, false, false, p.checkArgs(rawMsg, &[]string{"purge"}))
 			} else if !strings.HasPrefix(words[0], "/") {
-				return p.picSearch(messageStruct, &messageStruct.Message, false, false, p.checkArgs(rawMsg, &[]string{"purge"}))
+				send <- p.picSearch(messageStruct, &messageStruct.Message, send, false, false, p.checkArgs(rawMsg, &[]string{"purge"}))
 			}
 		}
 
 	}
-	return nil
+	return
 }
 
-func (p *PicSearch) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]byte {
+func (p *PicSearch) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- *[]byte) {
 	echo := echoMessageStruct.Echo
 	split := strings.Split(echo, "|")
 
@@ -95,24 +93,25 @@ func (p *PicSearch) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 		value, ok := essentials.GetCache(split[1])
 		if !ok {
 			log.Println("Pic search get cache error")
-			return nil
+			return
 		}
 		originCtx := value.(essentials.EchoCache).Value
 
 		if echoMessageStruct.Status == "failed" {
-			return essentials.SendMsg(&originCtx, "搜图失败", nil, false, false, "")
+			send <- essentials.SendMsg(&originCtx, "搜图失败", nil, false, false, "")
+			return
 		}
 
 		if len(split) == 3 {
-			return p.picSearch(&originCtx, &msg, true, originCtx.MessageType == "group", split[2] == "purge")
+			send <- p.picSearch(&originCtx, &msg, send, true, originCtx.MessageType == "group", split[2] == "purge")
 		} else {
-			return p.picSearch(&originCtx, &msg, true, originCtx.MessageType == "group", false)
+			send <- p.picSearch(&originCtx, &msg, send, true, originCtx.MessageType == "group", false)
 		}
 	}
-	return nil
 }
 
-func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcode.ArrayMessage, isEcho bool, isGroup bool, isPurge bool) *[]byte {
+func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcode.ArrayMessage, send chan<- *[]byte,
+	isEcho bool, isGroup bool, isPurge bool) *[]byte {
 	if !isGroup && !p.allowPrivate {
 		return nil
 	}
@@ -130,6 +129,7 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 	start := time.Now()
 	for _, c := range *msg {
 		if c.Type == "image" {
+			send <- essentials.SendMsg(messageStruct, "正在搜索中，请稍等", nil, false, false, "")
 			imgUrl := c.Data["url"].(string)
 			key = essentials.GetImageKey(imgUrl)
 			selectRes := essentials.SelectDB("picSearch", "res", fmt.Sprintf("uid='%s'", key))

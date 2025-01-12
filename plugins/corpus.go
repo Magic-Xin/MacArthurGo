@@ -56,14 +56,12 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (*Corpus) ReceiveAll() *[]byte {
-	return nil
-}
+func (*Corpus) ReceiveAll(chan<- *[]byte) {}
 
-func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
 	message := messageStruct.Message
 	if message == nil || messageStruct.MessageType == "" {
-		return nil
+		return
 	}
 	var text string
 	for _, msg := range message {
@@ -93,17 +91,15 @@ func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 			}
 
 			if v.Message != nil {
-				return essentials.SendMsg(messageStruct, "", v.Message, v.IsAt, v.IsReply, "")
+				send <- essentials.SendMsg(messageStruct, "", v.Message, v.IsAt, v.IsReply, "")
 			}
 			break
 		}
 	}
-	return nil
+	return
 }
 
-func (*Corpus) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
-	return nil
-}
+func (*Corpus) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
 
 func (*Corpus) Contain(arr []int64, item int64) bool {
 	for _, v := range arr {

@@ -22,18 +22,16 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (*Music) ReceiveAll() *[]byte {
-	return nil
-}
+func (*Music) ReceiveAll(chan<- *[]byte) {}
 
-func (m *Music) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+func (m *Music) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
 	var (
 		urlType string
 		res     string
 	)
 	message := messageStruct.Message
 	if message == nil {
-		return nil
+		return
 	}
 
 	for _, msg := range message {
@@ -67,15 +65,13 @@ func (m *Music) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	if urlType != "" {
 		match := regexp.MustCompile(`id=(\d+)`).FindAllStringSubmatch(res, -1)
 		if match != nil {
-			return essentials.SendMusic(messageStruct, urlType, match[0][1])
+			send <- essentials.SendMusic(messageStruct, urlType, match[0][1])
 		}
 	}
-	return nil
+	return
 }
 
-func (*Music) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
-	return nil
-}
+func (*Music) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
 
 func (*Music) getQQMusicID(url *string) *string {
 	if mid := regexp.MustCompile(`songmid=(\w+)&`).FindAllStringSubmatch(*url, -1); mid != nil {

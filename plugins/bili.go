@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
 	"github.com/tidwall/gjson"
 	"io"
 	"log"
@@ -29,7 +28,6 @@ type Bili struct {
 
 type AISummarize struct {
 	Enabled        bool
-	Args           []string
 	GroupForward   bool
 	mixinKeyEncTab []int
 	cache          sync.Map
@@ -63,7 +61,6 @@ type LiveData struct {
 func init() {
 	aiSummarize := AISummarize{
 		Enabled:      base.Config.Plugins.Bili.AiSummarize.Enable,
-		Args:         base.Config.Plugins.Bili.AiSummarize.Args,
 		GroupForward: base.Config.Plugins.Bili.AiSummarize.GroupForward,
 		mixinKeyEncTab: []int{
 			46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49,
@@ -78,17 +75,14 @@ func init() {
 	plugin := &essentials.Plugin{
 		Name:      "B 站链接解析",
 		Enabled:   base.Config.Plugins.Bili.Enable,
-		Args:      aiSummarize.Args,
 		Interface: &bili,
 	}
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (*Bili) ReceiveAll() *[]byte {
-	return nil
-}
+func (*Bili) ReceiveAll(chan<- *[]byte) {}
 
-func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
 	const biliShort = `((b23.tv|bili2233.cn)\\?/\w+)`
 	const video = `[m|www].bilibili.com/video/(\w+)`
 	const live = `live.bilibili.com/(\d+)`
@@ -101,46 +95,6 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		}
 	}
 
-	if essentials.CheckArgumentArray(messageStruct.Command, &b.AiSummarize.Args) {
-		message := messageStruct.Message
-		for _, msg := range message {
-			if msg.Type == "reply" {
-				echo := "BiliAI"
-				if messageStruct.MessageType == "group" {
-					echo += fmt.Sprintf("|%d", messageStruct.MessageId)
-					value := essentials.EchoCache{
-						Value: *messageStruct,
-						Time:  time.Now().Unix(),
-					}
-					essentials.SetCache(strconv.FormatInt(messageStruct.MessageId, 10), value)
-				}
-				return essentials.SendAction("get_msg", structs.GetMsg{Id: msg.Data["id"].(string)}, "BiliAI")
-			}
-		}
-
-		if match := regexp.MustCompile(video).FindAllStringSubmatch(rawMsg, -1); match != nil {
-			videoData := b.getVideoData(match[0][1])
-			e, aiSum := b.AiSummarize.Summarize(videoData, false)
-			if aiSum != nil {
-				if messageStruct.MessageType == "group" && b.AiSummarize.GroupForward && len(*aiSum) > 1 {
-					var data []structs.ForwardNode
-					data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, videoData.ToArrayMessage()))
-					for _, msg := range *aiSum {
-						data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(msg)}))
-					}
-					return essentials.SendGroupForward(messageStruct, &data, "")
-				} else {
-					for _, msg := range *aiSum {
-						return essentials.SendMsg(messageStruct, msg, nil, false, false, "")
-					}
-				}
-			} else {
-				return essentials.SendMsg(messageStruct, e, nil, false, false, "")
-			}
-		}
-		return nil
-	}
-
 	var (
 		videoData *VideoData
 		liveData  *LiveData
@@ -151,7 +105,7 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	} else if match = regexp.MustCompile(live).FindAllStringSubmatch(rawMsg, -1); match != nil {
 		liveData = b.getLiveData(match[0][1])
 	} else {
-		return nil
+		return
 	}
 
 	if videoData != nil {
@@ -161,84 +115,14 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		} else {
 			videoData.Summary = e
 		}
-		return essentials.SendMsg(messageStruct, "", videoData.ToArrayMessage(), false, true, "")
+		send <- essentials.SendMsg(messageStruct, "", videoData.ToArrayMessage(), false, true, "")
 	} else if liveData != nil {
-		return essentials.SendMsg(messageStruct, "", liveData.ToArrayMessage(), false, true, "")
+		send <- essentials.SendMsg(messageStruct, "", liveData.ToArrayMessage(), false, true, "")
 	}
-	return nil
+	return
 }
 
-func (b *Bili) ReceiveEcho(EchoMessageStruct *structs.EchoMessageStruct) *[]byte {
-	split := strings.Split(EchoMessageStruct.Echo, "|")
-
-	if split[0] == "BiliAI" {
-		if !cmp.Equal(EchoMessageStruct.Data, struct{}{}) {
-			ctxData := EchoMessageStruct.Data
-			message := ctxData.Message
-			var text string
-			for _, msg := range message {
-				if msg.Type == "text" {
-					text += msg.Data["text"].(string) + " "
-				}
-			}
-
-			const biliShort = `(b23.tv/\w+)`
-			const video = `www.bilibili.com/video/(\w+)`
-
-			if match := regexp.MustCompile(biliShort).FindAllStringSubmatch(text, -1); match != nil {
-				if orgUrl := essentials.GetOriginUrl("https://" + match[0][1]); orgUrl != nil {
-					text = *orgUrl
-				}
-			}
-
-			if match := regexp.MustCompile(video).FindAllStringSubmatch(text, -1); match != nil {
-				videoData := b.getVideoData(match[0][1])
-				e, aiSum := b.AiSummarize.Summarize(videoData, false)
-				if aiSum != nil {
-					if ctxData.MessageType == "group" && b.AiSummarize.GroupForward && len(*aiSum) > 1 {
-						value, ok := essentials.GetCache(split[1])
-						if !ok {
-							log.Println("BiliAI cache not found")
-							return nil
-						}
-						orgStruct := value.(essentials.EchoCache).Value
-						var data []structs.ForwardNode
-						data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, videoData.ToArrayMessage()))
-						for _, msg := range *aiSum {
-							data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(msg)}))
-						}
-						return essentials.SendGroupForward(&orgStruct, &data, "")
-					} else {
-						for _, msg := range *aiSum {
-							sendStruct := structs.MessageStruct{
-								MessageType: ctxData.MessageType,
-								UserId:      ctxData.UserId,
-							}
-							return essentials.SendMsg(&sendStruct, msg, nil, false, false, "")
-						}
-					}
-				} else {
-					if ctxData.MessageType == "group" {
-						value, ok := essentials.GetCache(split[1])
-						if !ok {
-							log.Println("BiliAI cache not found")
-							return nil
-						}
-						orgStruct := value.(essentials.EchoCache).Value
-						return essentials.SendMsg(&orgStruct, e, nil, false, false, "")
-					} else {
-						sendStruct := structs.MessageStruct{
-							MessageType: ctxData.MessageType,
-							UserId:      ctxData.UserId,
-						}
-						return essentials.SendMsg(&sendStruct, e, nil, false, false, "")
-					}
-				}
-			}
-		}
-	}
-	return nil
-}
+func (b *Bili) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
 
 func (b *Bili) getVideoData(vid string) *VideoData {
 	const api = "https://api.bilibili.com/x/web-interface/view?"

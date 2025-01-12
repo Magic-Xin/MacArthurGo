@@ -19,18 +19,13 @@ func MessageFactory(msg *[]byte, sendPump chan *[]byte) {
 		return
 	}
 
-	ch := make(chan *[]byte)
-	allCh := make(chan *[]byte)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	for _, p := range essentials.PluginArray {
-		go func() {
-			r := p.GoroutineAll(ctx)
-			if r != nil {
-				allCh <- r
-			}
-		}()
+		go func(plugin *essentials.Plugin) {
+			plugin.GoroutineAll(ctx, sendPump)
+		}(p)
 	}
 
 	if messageStruct.Message != nil {
@@ -41,12 +36,9 @@ func MessageFactory(msg *[]byte, sendPump chan *[]byte) {
 		messageStruct.CleanMessage, messageStruct.Command = CleanMessage(&messageStruct.Message)
 
 		for _, p := range essentials.PluginArray {
-			go func() {
-				r := p.GoroutineMessage(ctx, &messageStruct)
-				if r != nil {
-					ch <- r
-				}
-			}()
+			go func(plugin *essentials.Plugin) {
+				plugin.GoroutineMessage(ctx, &messageStruct, sendPump)
+			}(p)
 		}
 	}
 
@@ -66,30 +58,13 @@ func MessageFactory(msg *[]byte, sendPump chan *[]byte) {
 		}
 
 		for _, p := range essentials.PluginArray {
-			go func() {
-				r := p.GoroutineEcho(ctx, &echoMessageStruct)
-				if r != nil {
-					ch <- r
-				}
-			}()
+			go func(plugin *essentials.Plugin) {
+				plugin.GoroutineEcho(ctx, &echoMessageStruct, sendPump)
+			}(p)
 		}
 	}
 
-	for {
-		select {
-		case r := <-allCh:
-			if r != nil {
-				sendPump <- r
-			}
-		case r := <-ch:
-			if r != nil {
-				cancel()
-				sendPump <- r
-			}
-		case <-ctx.Done():
-			return
-		}
-	}
+	<-ctx.Done()
 }
 
 func CleanMessage(message *[]cqcode.ArrayMessage) (*[]cqcode.ArrayMessage, string) {
