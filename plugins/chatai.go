@@ -165,13 +165,13 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		}
 		if c.Gemini.Enabled {
 			if len(c.Gemini.Args) < 2 {
-				text += fmt.Sprintf("Gemini:\ngemini-2.0-flash-exp: %s\n\n", c.Gemini.Args)
+				text += fmt.Sprintf("Gemini:\nGemini-2.0-flash-exp: %s\n\n", c.Gemini.Args)
 			} else {
-				text += fmt.Sprintf("Gemini:\ngemini-2.0-flash-exp: %s\ngemini-2.0-flash-thinking-exp: %s\n\n", c.Gemini.Args[0], c.Gemini.Args[1])
+				text += fmt.Sprintf("Gemini:\nGemini-2.0-flash-exp: %s\nGemini-2.0-flash-thinking-exp: %s\n\n", c.Gemini.Args[0], c.Gemini.Args[1])
 			}
 		}
 		if c.Github.Enabled {
-			text += fmt.Sprintf("Github:\n4o: %s\no1: %s\no1-preview: %s\nllama3.2: %s\nllama3.3: %s\nphi4: %s\n",
+			text += fmt.Sprintf("Github:\nChatGPT 4o: %s\nChatGPT o1: %s\nChatGPT o1-preview: %s\nLlama-3.2-90B: %s\nLlama-3.3-70B: %s\nPhi-4: %s\n",
 				c.Github.ArgsMap["4o"], c.Github.ArgsMap["o1"], c.Github.ArgsMap["o1p"], c.Github.ArgsMap["llama3.2"],
 				c.Github.ArgsMap["llama3.3"], c.Github.ArgsMap["phi4"])
 		}
