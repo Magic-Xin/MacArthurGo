@@ -56,7 +56,7 @@ func init() {
 		Token: base.Config.Plugins.ChatAI.Github.Token,
 	}
 
-	var args []string
+	args := []string{"/aihelp", "/ai帮助"}
 	if chatGPT.Enabled {
 		args = append(args, chatGPT.Args...)
 	}
