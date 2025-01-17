@@ -2,6 +2,7 @@ package chatai
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,7 +20,7 @@ func (c *Github) RequireAnswer(str string, model string) *[]string {
 	var res []string
 
 	payload := fmt.Sprintf(`{
-		"message": [
+		"messages": [
 			{
 				"role": "user",
 				"content": "%s"
@@ -57,6 +58,36 @@ func (c *Github) RequireAnswer(str string, model string) *[]string {
 		return &res
 	}
 
-	res = append(res, string(body))
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		res = append(res, fmt.Sprintf("Unmarshal error: %v", err))
+		return &res
+	}
+
+	choices, ok := result["choices"].([]interface{})
+	if !ok || len(choices) == 0 {
+		res = append(res, "No choices found")
+		return &res
+	}
+
+	firstChoice, ok := choices[0].(map[string]interface{})
+	if !ok {
+		res = append(res, "First choice not found")
+		return &res
+	}
+
+	message, ok := firstChoice["message"].(map[string]interface{})
+	if !ok {
+		res = append(res, "Message field not found")
+		return &res
+	}
+
+	contentField, ok := message["content"].(string)
+	if !ok {
+		res = append(res, "Content field not found")
+		return &res
+	}
+
+	res = append(res, contentField)
 	return &res
 }
