@@ -130,6 +130,19 @@ func CheckArgumentArray(command string, args *[]string) bool {
 	return false
 }
 
+func CheckArgumentMap(command string, argsMap *map[string]string) (string, bool) {
+	if argsMap == nil {
+		return "", false
+	}
+
+	for key, value := range *argsMap {
+		if value == command {
+			return key, true
+		}
+	}
+	return "", false
+}
+
 func SplitArgument(message *[]cqcode.ArrayMessage) (res []string) {
 	for _, msg := range *message {
 		if msg.Type == "text" {
