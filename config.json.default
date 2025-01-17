@@ -99,7 +99,7 @@
             "phi4": ["/phi4", "/p4"],
         },
         "token": ""
-      }
+      },
       "groupForward": true,
       "panGu": true
     },
