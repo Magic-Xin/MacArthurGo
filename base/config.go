@@ -93,6 +93,11 @@ type config struct {
 				Args   []string `json:"args"`
 				APIKey string   `json:"apiKey"`
 			} `json:"gemini"`
+			Github struct {
+				Enable  bool              `json:"enable"`
+				ArgsMap map[string]string `json:"argsMap"`
+				Token   string            `json:"token"`
+			} `json:"github"`
 			GroupForward bool `json:"groupForward"`
 			PanGu        bool `json:"panGu"`
 		} `json:"chatAI"`
