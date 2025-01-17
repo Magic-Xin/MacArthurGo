@@ -90,13 +90,13 @@
       },
       "github": {
         "enable": true,
-        "args": {
-            "4o": ["/4o"],
-            "o1": ["/o1"],
-            "o1p": ["/o1p"],
-            "llama3.2": ["/llama3.2", "/l2"],
-            "llama3.3": ["/llama3.3", "/l3"],
-            "phi4": ["/phi4", "/p4"]
+        "argsMap": {
+            "4o": "/4o",
+            "o1": "/o1",
+            "o1p": "/o1p",
+            "llama3.2": "/l2",
+            "llama3.3": "/l3",
+            "phi4": "/p4"
         },
         "token": ""
       },
