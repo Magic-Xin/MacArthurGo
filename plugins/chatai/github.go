@@ -88,6 +88,7 @@ func (c *Github) RequireAnswer(str string, model string) *[]string {
 		return &res
 	}
 
+	res = append(res, fmt.Sprintf("%s response:", model))
 	res = append(res, contentField)
 	return &res
 }
