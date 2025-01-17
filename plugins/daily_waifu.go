@@ -101,21 +101,31 @@ func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, _
 	pairings := make(map[int64]Waifu, len(waifus))
 	visited := make(map[int64]bool)
 
-	for i, u := range echoMessageStruct.DataArray {
+	for _, u := range echoMessageStruct.DataArray {
 		if visited[u.UserId] {
 			continue
 		}
 
-		targetIdx := (i + 1) % len(waifus)
-		for visited[waifus[targetIdx].UserId] {
-			targetIdx = (targetIdx + 1) % len(waifus)
+		targetIdx := -1
+		for i := 0; i < len(waifus); i++ {
+			idx := (r.Int() + i) % len(waifus)
+			target := waifus[idx]
+			if !visited[target.UserId] && target.UserId != u.UserId {
+				targetIdx = idx
+				break
+			}
 		}
 
-		pairings[u.UserId] = waifus[targetIdx]
-		visited[u.UserId] = true
-		visited[waifus[targetIdx].UserId] = true
+		if targetIdx == -1 {
+			continue
+		}
 
-		pairings[waifus[targetIdx].UserId] = Waifu{
+		target := waifus[targetIdx]
+		pairings[u.UserId] = target
+		visited[u.UserId] = true
+		visited[target.UserId] = true
+
+		pairings[target.UserId] = Waifu{
 			UserId:   u.UserId,
 			NickName: u.Nickname,
 			Card:     u.Card,
