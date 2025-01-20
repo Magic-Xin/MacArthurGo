@@ -15,7 +15,7 @@ type Github struct {
 }
 
 func (c *Github) RequireAnswer(str string, model string) *[]string {
-	const api = "https://models.github.ai/inference/chat/completions"
+	const api = "https://models.inference.ai.azure.com/chat/completions"
 
 	var res []string
 
@@ -57,6 +57,8 @@ func (c *Github) RequireAnswer(str string, model string) *[]string {
 		res = append(res, fmt.Sprintf("Read body error: %v", err))
 		return &res
 	}
+
+	fmt.Println(string(body))
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(body, &result); err != nil {
