@@ -6,6 +6,7 @@ import (
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"fmt"
+	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -40,10 +41,21 @@ func (d *DailyWaifu) ReceiveAll(send chan<- *[]byte) {
 }
 
 func (d *DailyWaifu) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if messageStruct.GroupId == 0 {
+	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.Waifu.Args) {
 		return
 	}
-	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.Waifu.Args) {
+
+	if messageStruct.GroupId == 0 {
+		for _, msg := range *messageStruct.CleanMessage {
+			if msg.Type == "text" && msg.Data["text"].(string) == "update" {
+				if messageStruct.UserId != base.Config.Admin {
+					send <- essentials.SendMsg(messageStruct, "该指令仅限管理员使用", nil, false, true, "")
+				} else {
+					d.RequireUpdate()
+					send <- essentials.SendMsg(messageStruct, "今日老婆信息更新中...", nil, false, true, "")
+				}
+			}
+		}
 		return
 	}
 
@@ -137,6 +149,7 @@ func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, _
 
 func (d *DailyWaifu) RequireUpdate() {
 	for d.send == nil {
+		log.Printf("DailyWaifu: Waiting for send channel...")
 		time.Sleep(10 * time.Second)
 	}
 
@@ -150,6 +163,15 @@ func (d *DailyWaifu) RequireUpdate() {
 }
 
 func ScheduleRequireUpdate(d *DailyWaifu) {
+	if !base.Config.Plugins.Waifu.Enable {
+		return
+	}
+
+	for essentials.Info.UpdateTime[2] == 0 {
+		log.Printf("DailyWaifu: Waiting for group list...")
+		time.Sleep(10 * time.Second)
+	}
+
 	d.RequireUpdate()
 
 	location, _ := time.LoadLocation("Asia/Shanghai")
@@ -158,9 +180,17 @@ func ScheduleRequireUpdate(d *DailyWaifu) {
 	durationUntilMidnight := time.Until(nextMidnight)
 
 	time.AfterFunc(durationUntilMidnight, func() {
+		for time.Now().Unix()-essentials.Info.UpdateTime[2] > 86400 {
+			log.Printf("DailyWaifu: Waiting for new group list...")
+			time.Sleep(10 * time.Second)
+		}
 		d.RequireUpdate()
 		ticker := time.NewTicker(24 * time.Hour)
 		for range ticker.C {
+			for time.Now().Unix()-essentials.Info.UpdateTime[2] > 86400 {
+				log.Printf("DailyWaifu: Waiting for new group list...")
+				time.Sleep(10 * time.Second)
+			}
 			d.RequireUpdate()
 		}
 	})
