@@ -13,11 +13,13 @@ import (
 )
 
 type LoginInfo struct {
+	send       chan<- *[]byte
 	NickName   string
 	UserId     string
 	FriendList []Friend
 	GroupList  []Group
-	status     int64
+	IsOnline   bool
+	UpdateTime []int64
 }
 
 type Friend struct {
@@ -36,7 +38,9 @@ type Group struct {
 var Info LoginInfo
 
 func init() {
-	Info = LoginInfo{}
+	Info = LoginInfo{
+		UpdateTime: []int64{0, 0, 0},
+	}
 	plugin := &Plugin{
 		Name:      "info",
 		Enabled:   true,
@@ -44,21 +48,13 @@ func init() {
 		Interface: &Info,
 	}
 	PluginArray = append(PluginArray, plugin)
+
+	go SchedulerRequireUpdate(&Info)
 }
 
 func (l *LoginInfo) ReceiveAll(send chan<- *[]byte) {
-	switch l.status {
-	case 0:
-		l.status++
-		send <- SendAction("get_login_info", struct{}{}, "info")
-	case 1:
-		l.status++
-		send <- SendAction("get_friend_list", struct{}{}, "friendList")
-	case 2:
-		l.status++
-		send <- SendAction("get_group_list", struct{}{}, "groupList")
-	default:
-		return
+	if l.send == nil && send != nil {
+		l.send = send
 	}
 }
 
@@ -106,6 +102,14 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send ch
 		}
 
 		send <- SendMsg(messageStruct, strings.Join(result, "\n"), nil, false, false, "")
+	} else if messageStruct.Command == "/info_update" {
+		if messageStruct.UserId != base.Config.Admin {
+			send <- SendMsg(messageStruct, "该指令仅限管理员使用", nil, false, true, "")
+			return
+		}
+
+		l.RequireUpdate()
+		send <- SendMsg(messageStruct, "信息更新请求已发送", nil, false, false, "")
 	}
 	return
 }
@@ -125,7 +129,11 @@ func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, se
 		data := echoMessageStruct.Data
 		l.NickName, l.UserId = data.Nickname, strconv.FormatInt(data.UserId, 10)
 		log.Printf("Get account nickname: %s, id: %s", l.NickName, l.UserId)
-		send <- SendMsg(&sendStruct, "MacArthurGo 已上线", nil, false, false, "")
+		if !l.IsOnline {
+			send <- SendMsg(&sendStruct, "MacArthurGo 已上线", nil, false, false, "")
+			l.IsOnline = true
+		}
+		l.UpdateTime[0] = time.Now().Unix()
 	case "friendList":
 		data := echoMessageStruct.DataArray
 		bytesData, err := json.Marshal(data)
@@ -140,7 +148,8 @@ func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, se
 		}
 
 		log.Printf("Get friend list count: %d", len(l.FriendList))
-		send <- SendMsg(&sendStruct, fmt.Sprintf("好友列表加载成功，好友数量: %d", len(l.FriendList)), nil, false, false, "")
+		//send <- SendMsg(&sendStruct, fmt.Sprintf("好友列表加载成功，好友数量: %d", len(l.FriendList)), nil, false, false, "")
+		l.UpdateTime[1] = time.Now().Unix()
 	case "groupList":
 		data := echoMessageStruct.DataArray
 		bytesData, err := json.Marshal(data)
@@ -155,7 +164,8 @@ func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, se
 		}
 
 		log.Printf("Get group list count: %d", len(l.GroupList))
-		send <- SendMsg(&sendStruct, fmt.Sprintf("群组列表加载成功，群组数量: %d", len(l.GroupList)), nil, false, false, "")
+		//send <- SendMsg(&sendStruct, fmt.Sprintf("群组列表加载成功，群组数量: %d", len(l.GroupList)), nil, false, false, "")
+		l.UpdateTime[2] = time.Now().Unix()
 	}
 
 	return
@@ -171,4 +181,31 @@ func (*LoginInfo) timeToString(time int64) string {
 	}
 
 	return fmt.Sprintf("%d天%d小时%d分%d秒", time/86400, time%86400/3600, time%86400%3600/60, time%86400%3600%60)
+}
+
+func (l *LoginInfo) RequireUpdate() {
+	if l.send == nil {
+		log.Printf("LoginInfo: Waiting for send channel...")
+		time.Sleep(10 * time.Second)
+	}
+	l.send <- SendAction("get_login_info", struct{}{}, "info")
+	l.send <- SendAction("get_friend_list", struct{}{}, "friendList")
+	l.send <- SendAction("get_group_list", struct{}{}, "groupList")
+}
+
+func SchedulerRequireUpdate(l *LoginInfo) {
+	l.RequireUpdate()
+
+	location, _ := time.LoadLocation("Asia/Shanghai")
+	now := time.Now().In(location)
+	nextMidnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, location)
+	durationUntilMidnight := time.Until(nextMidnight)
+
+	time.AfterFunc(durationUntilMidnight, func() {
+		l.RequireUpdate()
+		ticker := time.NewTicker(24 * time.Hour)
+		for range ticker.C {
+			l.RequireUpdate()
+		}
+	})
 }
