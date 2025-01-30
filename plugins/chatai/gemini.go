@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -92,38 +93,38 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	}
 	parts = append(parts, textParts...)
 	contents := []*genai.Content{{Parts: parts}}
-
-	resp, err := client.Models.GenerateContent(ctx, modelName, contents, &genai.GenerateContentConfig{
-		Tools: []*genai.Tool{
-			{GoogleSearchRetrieval: &genai.GoogleSearchRetrieval{}},
-		},
+	config := &genai.GenerateContentConfig{
 		SafetySettings: []*genai.SafetySetting{
 			{
-				Category:  genai.HarmCategoryUnspecified,
-				Threshold: genai.HarmBlockThresholdOff,
-			},
-			{
 				Category:  genai.HarmCategoryHateSpeech,
-				Threshold: genai.HarmBlockThresholdOff,
+				Threshold: genai.HarmBlockThresholdBlockNone,
 			},
 			{
 				Category:  genai.HarmCategoryDangerousContent,
-				Threshold: genai.HarmBlockThresholdOff,
+				Threshold: genai.HarmBlockThresholdBlockNone,
 			},
 			{
 				Category:  genai.HarmCategoryHarassment,
-				Threshold: genai.HarmBlockThresholdOff,
+				Threshold: genai.HarmBlockThresholdBlockNone,
 			},
 			{
 				Category:  genai.HarmCategorySexuallyExplicit,
-				Threshold: genai.HarmBlockThresholdOff,
+				Threshold: genai.HarmBlockThresholdBlockNone,
 			},
 			{
 				Category:  genai.HarmCategoryCivicIntegrity,
-				Threshold: genai.HarmBlockThresholdOff,
+				Threshold: genai.HarmBlockThresholdBlockNone,
 			},
 		},
-	})
+	}
+
+	if !strings.Contains(modelName, "thinking") {
+		config.Tools = []*genai.Tool{
+			{GoogleSearchRetrieval: &genai.GoogleSearchRetrieval{}},
+		}
+	}
+
+	resp, err := client.Models.GenerateContent(ctx, modelName, contents, config)
 	if err != nil {
 		log.Printf("Gemini generate error: %v", err)
 		res = append(res, fmt.Sprintf("Gemini generate error: %v", err))

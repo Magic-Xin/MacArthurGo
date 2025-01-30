@@ -127,7 +127,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 			if messageStruct.Command == c.Gemini.Args[0] {
 				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-flash-exp", 0)
 			} else {
-				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-flash-thinking-exp", 0)
+				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-flash-thinking-exp-01-21", 0)
 			}
 		}
 
