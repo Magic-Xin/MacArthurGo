@@ -92,7 +92,7 @@ func init() {
 	}
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 
-	go gemini.DeleteExpiredCache(3600, 1800)
+	//go gemini.DeleteExpiredCache(3600, 1800)
 }
 
 func (*ChatAI) ReceiveAll(chan<- *[]byte) {}

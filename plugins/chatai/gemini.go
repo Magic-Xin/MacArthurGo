@@ -20,11 +20,11 @@ import (
 )
 
 type Gemini struct {
-	Enabled    bool
-	Args       []string
-	ApiKey     string
-	ReplyMap   sync.Map
-	HistoryMap sync.Map
+	Enabled  bool
+	Args     []string
+	ApiKey   string
+	ReplyMap sync.Map
+	//HistoryMap sync.Map
 }
 
 type RMap struct {
@@ -40,12 +40,10 @@ type HMap struct {
 
 func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64, modelName string, echoId int64) (*[]string, *[]byte) {
 	var (
-		images  []*genai.Blob
-		prompts []genai.Part
-		model   *genai.GenerativeModel
-		history []*genai.Content
-		res     []string
-		reply   string
+		parts []*genai.Part
+		//history []*genai.Content
+		res   []string
+		reply string
 	)
 
 	for _, msg := range *message {
@@ -130,6 +128,21 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		return &res, nil
 	}
 
+	res = append(res, modelName+" response: ")
+	//if echoId != 0 {
+	//	value, ok := g.HistoryMap.Load(echoId)
+	//	if ok {
+	//		cs.History = value.(HMap).History
+	//	}
+	//}
+	//
+	//resp, err := cs.SendMessage(ctx, prompts...)
+	//if err != nil {
+	//	log.Printf("Gemini generate error: %v", err)
+	//	res = append(res, fmt.Sprintf("Gemini generate error: %v", err))
+	//	return &res, nil
+	//}
+
 	var cts []*genai.Content
 
 	for _, c := range resp.Candidates {
@@ -142,13 +155,13 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		cts = append(cts, c.Content)
 	}
 
-	history = append(history, &genai.Content{
-		Parts: prompts,
-		Role:  "user",
-	})
-	history = append(history, cts...)
-
-	g.HistoryMap.Store(messageID, HMap{History: history, Time: time.Now().Unix()})
+	//history = append(history, &genai.Content{
+	//	Parts: prompts,
+	//	Role:  "user",
+	//})
+	//history = append(history, cts...)
+	//
+	//g.HistoryMap.Store(messageID, HMap{History: history, Time: time.Now().Unix()})
 
 	return &res, nil
 }
@@ -181,20 +194,20 @@ func (*Gemini) ImageProcessing(imgData *bytes.Buffer) (*[]byte, string, error) {
 	}
 }
 
-func (g *Gemini) DeleteExpiredCache(expiration int64, interval int64) {
-	for {
-		g.ReplyMap.Range(func(key, value any) bool {
-			if time.Now().Unix()-value.(RMap).Time > expiration {
-				g.ReplyMap.Delete(key)
-			}
-			return true
-		})
-		g.HistoryMap.Range(func(key, value any) bool {
-			if time.Now().Unix()-value.(HMap).Time > expiration {
-				g.HistoryMap.Delete(key)
-			}
-			return true
-		})
-		time.Sleep(time.Duration(interval) * time.Second)
-	}
-}
+//func (g *Gemini) DeleteExpiredCache(expiration int64, interval int64) {
+//	for {
+//		g.ReplyMap.Range(func(key, value any) bool {
+//			if time.Now().Unix()-value.(RMap).Time > expiration {
+//				g.ReplyMap.Delete(key)
+//			}
+//			return true
+//		})
+//		g.HistoryMap.Range(func(key, value any) bool {
+//			if time.Now().Unix()-value.(HMap).Time > expiration {
+//				g.HistoryMap.Delete(key)
+//			}
+//			return true
+//		})
+//		time.Sleep(time.Duration(interval) * time.Second)
+//	}
+//}
