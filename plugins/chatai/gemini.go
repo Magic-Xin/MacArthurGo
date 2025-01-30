@@ -7,8 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 	"image/gif"
 	"image/jpeg"
 	"io"
@@ -54,14 +53,19 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 				log.Printf("Image processing error: %v", err)
 				continue
 			}
-			img := genai.ImageData(imgType, *data)
-			images = append(images, &img)
+			image := []*genai.Part{
+				{InlineData: &genai.Blob{Data: *data, MIMEType: "image/" + imgType}},
+			}
+			parts = append(parts, image...)
 		}
 		if msg.Type == "reply" {
 			reply = msg.Data["id"].(string)
 		}
 		if echoId != 0 && msg.Type == "text" {
-			prompts = append(prompts, genai.Text(msg.Data["text"].(string)))
+			part := []*genai.Part{
+				{Text: msg.Data["text"].(string)},
+			}
+			parts = append(parts, part...)
 		}
 	}
 
@@ -73,55 +77,53 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	}
 
 	ctx := context.Background()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(g.ApiKey))
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:  g.ApiKey,
+		Backend: genai.BackendGeminiAPI,
+	})
 	if err != nil {
 		log.Printf("Gemini client error: %v", err)
 		res = append(res, fmt.Sprintf("Gemini client error: %v", err))
 		return &res, nil
 	}
-	defer func(client *genai.Client) {
-		err = client.Close()
-		if err != nil {
-			log.Printf("Gemini client close error: %v", err)
-		}
-	}(client)
 
-	prompts = append(prompts, genai.Text(str))
-	if len(images) > 0 {
-		for _, img := range images {
-			prompts = append(prompts, img)
-		}
+	textParts := []*genai.Part{
+		{Text: str},
 	}
-	res = append(res, modelName+" response: ")
+	parts = append(parts, textParts...)
+	contents := []*genai.Content{{Parts: parts}}
 
-	model = client.GenerativeModel("models/" + modelName)
-	model.SafetySettings = []*genai.SafetySetting{
-		{
-			Category:  genai.HarmCategoryHarassment,
-			Threshold: genai.HarmBlockNone,
+	resp, err := client.Models.GenerateContent(ctx, modelName, contents, &genai.GenerateContentConfig{
+		Tools: []*genai.Tool{
+			{GoogleSearchRetrieval: &genai.GoogleSearchRetrieval{}},
 		},
-		{
-			Category:  genai.HarmCategoryHateSpeech,
-			Threshold: genai.HarmBlockNone,
+		SafetySettings: []*genai.SafetySetting{
+			{
+				Category:  genai.HarmCategoryUnspecified,
+				Threshold: genai.HarmBlockThresholdOff,
+			},
+			{
+				Category:  genai.HarmCategoryHateSpeech,
+				Threshold: genai.HarmBlockThresholdOff,
+			},
+			{
+				Category:  genai.HarmCategoryDangerousContent,
+				Threshold: genai.HarmBlockThresholdOff,
+			},
+			{
+				Category:  genai.HarmCategoryHarassment,
+				Threshold: genai.HarmBlockThresholdOff,
+			},
+			{
+				Category:  genai.HarmCategorySexuallyExplicit,
+				Threshold: genai.HarmBlockThresholdOff,
+			},
+			{
+				Category:  genai.HarmCategoryCivicIntegrity,
+				Threshold: genai.HarmBlockThresholdOff,
+			},
 		},
-		{
-			Category:  genai.HarmCategorySexuallyExplicit,
-			Threshold: genai.HarmBlockNone,
-		},
-		{
-			Category:  genai.HarmCategoryDangerousContent,
-			Threshold: genai.HarmBlockNone,
-		},
-	}
-	cs := model.StartChat()
-	if echoId != 0 {
-		value, ok := g.HistoryMap.Load(echoId)
-		if ok {
-			cs.History = value.(HMap).History
-		}
-	}
-
-	resp, err := cs.SendMessage(ctx, prompts...)
+	})
 	if err != nil {
 		log.Printf("Gemini generate error: %v", err)
 		res = append(res, fmt.Sprintf("Gemini generate error: %v", err))
