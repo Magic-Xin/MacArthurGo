@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -117,11 +118,11 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		},
 	}
 
-	//if !strings.Contains(modelName, "thinking") {
-	//	config.Tools = []*genai.Tool{
-	//		{GoogleSearchRetrieval: &genai.GoogleSearchRetrieval{}},
-	//	}
-	//}
+	if !strings.Contains(modelName, "thinking") {
+		config.Tools = []*genai.Tool{
+			{GoogleSearch: &genai.GoogleSearch{}},
+		}
+	}
 
 	resp, err := client.Models.GenerateContent(ctx, modelName, contents, config)
 	if err != nil {
@@ -152,7 +153,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 			continue
 		}
 		for _, part := range c.Content.Parts {
-			res = append(res, essentials.RemoveMarkdown(fmt.Sprintln(part)))
+			res = append(res, essentials.RemoveMarkdown(part.Text))
 		}
 		cts = append(cts, c.Content)
 	}
