@@ -50,12 +50,12 @@ func init() {
 	github := chatai.Github{
 		Enabled: base.Config.Plugins.ChatAI.Github.Enable,
 		ArgsMap: map[string]string{
-			"4o":       base.Config.Plugins.ChatAI.Github.ArgsMap["4o"],
-			"o1":       base.Config.Plugins.ChatAI.Github.ArgsMap["o1"],
-			"o1p":      base.Config.Plugins.ChatAI.Github.ArgsMap["o1p"],
-			"llama3.2": base.Config.Plugins.ChatAI.Github.ArgsMap["llama3.2"],
-			"llama3.3": base.Config.Plugins.ChatAI.Github.ArgsMap["llama3.3"],
-			"phi4":     base.Config.Plugins.ChatAI.Github.ArgsMap["phi4"],
+			"4o":    base.Config.Plugins.ChatAI.Github.ArgsMap["4o"],
+			"o1p":   base.Config.Plugins.ChatAI.Github.ArgsMap["o1p"],
+			"o3m":   base.Config.Plugins.ChatAI.Github.ArgsMap["o3m"],
+			"llama": base.Config.Plugins.ChatAI.Github.ArgsMap["llama"],
+			"phi4":  base.Config.Plugins.ChatAI.Github.ArgsMap["phi4"],
+			"r1":    base.Config.Plugins.ChatAI.Github.ArgsMap["r1"],
 		},
 		Token: base.Config.Plugins.ChatAI.Github.Token,
 	}
@@ -73,12 +73,9 @@ func init() {
 		}
 	}
 	if github.Enabled {
-		args = append(args, github.ArgsMap["4o"])
-		args = append(args, github.ArgsMap["o1"])
-		args = append(args, github.ArgsMap["o1p"])
-		args = append(args, github.ArgsMap["llama3.2"])
-		args = append(args, github.ArgsMap["llama3.3"])
-		args = append(args, github.ArgsMap["phi4"])
+		for _, v := range github.ArgsMap {
+			args = append(args, v)
+		}
 	}
 
 	chatAI := ChatAI{
@@ -146,16 +143,16 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		switch key {
 		case "4o":
 			res = c.Github.RequireAnswer(str, "gpt-4o")
-		case "o1":
-			res = c.Github.RequireAnswer(str, "o1")
 		case "o1p":
 			res = c.Github.RequireAnswer(str, "o1-preview")
-		case "llama3.2":
-			res = c.Github.RequireAnswer(str, "Llama-3.2-90B-Vision-Instruct")
-		case "llama3.3":
-			res = c.Github.RequireAnswer(str, "Llama-3.3-70B-Instruct")
+		case "o3m":
+			res = c.Github.RequireAnswer(str, "o3-mini")
+		case "llama":
+			res = c.Github.RequireAnswer(str, "Meta-Llama-3.1-405B-Instruct")
 		case "phi4":
 			res = c.Github.RequireAnswer(str, "Phi-4")
+		case "r1":
+			res = c.Github.RequireAnswer(str, "DeepSeek-R1")
 		default:
 			return
 		}
@@ -172,9 +169,9 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 				c.Gemini.ArgsMap["flash"], c.Gemini.ArgsMap["think"], c.Gemini.ArgsMap["pro"])
 		}
 		if c.Github.Enabled {
-			text += fmt.Sprintf("Github:\nChatGPT 4o: %s\nChatGPT o1: %s\nChatGPT o1-preview: %s\nLlama-3.2-90B: %s\nLlama-3.3-70B: %s\nPhi-4: %s\n",
-				c.Github.ArgsMap["4o"], c.Github.ArgsMap["o1"], c.Github.ArgsMap["o1p"], c.Github.ArgsMap["llama3.2"],
-				c.Github.ArgsMap["llama3.3"], c.Github.ArgsMap["phi4"])
+			text += fmt.Sprintf("Github:\nChatGPT 4o: %s\nChatGPT o1-preview: %s\nChatGPT o3-mini: %s\nLlama-3.1-405B: %s\nPhi-4: %s\nDeepSeek-R1: %s\n",
+				c.Github.ArgsMap["4o"], c.Github.ArgsMap["o1p"], c.Github.ArgsMap["o3m"], c.Github.ArgsMap["llama"],
+				c.Github.ArgsMap["phi4"], c.Github.ArgsMap["r1"])
 		}
 		send <- essentials.SendMsg(messageStruct, text, nil, false, false, "")
 		return
