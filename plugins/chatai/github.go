@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strings"
 )
 
 type Github struct {
@@ -144,6 +146,7 @@ func (c *Github) RequireAnswer(str string, model string) *[]string {
 
 	if len(result.Choices) == 0 {
 		res = append(res, "No choices found")
+		res = append(res, "抵达 Rate Limit, 请稍后再试或更换模型")
 		return &res
 	}
 
@@ -156,7 +159,26 @@ func (c *Github) RequireAnswer(str string, model string) *[]string {
 	}
 
 	res = append(res, fmt.Sprintf("%s response:", model))
-	res = append(res, message.Content)
+	thinking, content := splitThinkContent(message.Content)
+	if thinking != "" {
+		res = append(res, thinking)
+	}
+	res = append(res, content)
 
 	return &res
+}
+
+func splitThinkContent(content string) (string, string) {
+	re := regexp.MustCompile(`<think>([\s\S]*?)</think>`)
+	matches := re.FindStringSubmatch(content)
+
+	if len(matches) < 2 {
+		return "", content
+	}
+
+	thinkPart := strings.TrimSpace(matches[1])
+	contentPart := strings.Replace(content, matches[0], "", 1)
+	contentPart = strings.TrimSpace(contentPart)
+
+	return thinkPart, contentPart
 }
