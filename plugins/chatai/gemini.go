@@ -21,7 +21,7 @@ import (
 
 type Gemini struct {
 	Enabled  bool
-	Args     []string
+	ArgsMap  map[string]string
 	ApiKey   string
 	ReplyMap sync.Map
 	//HistoryMap sync.Map

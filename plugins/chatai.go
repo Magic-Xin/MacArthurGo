@@ -40,8 +40,12 @@ func init() {
 	}
 	gemini := chatai.Gemini{
 		Enabled: base.Config.Plugins.ChatAI.Gemini.Enable,
-		Args:    base.Config.Plugins.ChatAI.Gemini.Args,
-		ApiKey:  base.Config.Plugins.ChatAI.Gemini.APIKey,
+		ArgsMap: map[string]string{
+			"flash": base.Config.Plugins.ChatAI.Gemini.ArgsMap["flash"],
+			"think": base.Config.Plugins.ChatAI.Gemini.ArgsMap["think"],
+			"pro":   base.Config.Plugins.ChatAI.Gemini.ArgsMap["pro"],
+		},
+		ApiKey: base.Config.Plugins.ChatAI.Gemini.APIKey,
 	}
 	github := chatai.Github{
 		Enabled: base.Config.Plugins.ChatAI.Github.Enable,
@@ -64,7 +68,9 @@ func init() {
 		args = append(args, qWen.Args...)
 	}
 	if gemini.Enabled {
-		args = append(args, gemini.Args...)
+		for _, v := range gemini.ArgsMap {
+			args = append(args, v)
+		}
 	}
 	if github.Enabled {
 		args = append(args, github.ArgsMap["4o"])
@@ -118,19 +124,17 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		res = c.ChatGPT.RequireAnswer(str)
 	} else if essentials.CheckArgumentArray(messageStruct.Command, &c.QWen.Args) && c.QWen.Enabled {
 		res = c.QWen.RequireAnswer(str)
-	} else if essentials.CheckArgumentArray(messageStruct.Command, &c.Gemini.Args) && c.Gemini.Enabled {
+	} else if key, ok := essentials.CheckArgumentMap(messageStruct.Command, &c.Gemini.ArgsMap); ok && c.Gemini.Enabled {
 		var action *[]byte
 		messageID := messageStruct.MessageId
-		if len(c.Gemini.Args) < 2 {
+		switch key {
+		case "flash":
 			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-flash-exp", 0)
-		} else {
-			if messageStruct.Command == c.Gemini.Args[0] {
-				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-flash-exp", 0)
-			} else {
-				res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-flash-thinking-exp-01-21", 0)
-			}
+		case "think":
+			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-flash-thinking-exp-01-21", 0)
+		case "pro":
+			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-pro-exp-02-05", 0)
 		}
-
 		if action != nil {
 			value := essentials.EchoCache{Value: *messageStruct, Time: time.Now().Unix()}
 			essentials.SetCache(strconv.FormatInt(messageID, 10), value)
@@ -164,11 +168,8 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 			text += fmt.Sprintf("QWen:\n%s: %s\n\n", c.QWen.Model, c.QWen.Args)
 		}
 		if c.Gemini.Enabled {
-			if len(c.Gemini.Args) < 2 {
-				text += fmt.Sprintf("Gemini:\nGemini-2.0-flash-exp: %s\n\n", c.Gemini.Args)
-			} else {
-				text += fmt.Sprintf("Gemini:\nGemini-2.0-flash-exp: %s\nGemini-2.0-flash-thinking-exp: %s\n\n", c.Gemini.Args[0], c.Gemini.Args[1])
-			}
+			text += fmt.Sprintf("Gemini:\nGemini-2.0-flash-exp: %s\nGemini-2.0-flash-thinking-exp: %s\nGemini-2.0-pro-exp: %s\n\n",
+				c.Gemini.ArgsMap["flash"], c.Gemini.ArgsMap["think"], c.Gemini.ArgsMap["pro"])
 		}
 		if c.Github.Enabled {
 			text += fmt.Sprintf("Github:\nChatGPT 4o: %s\nChatGPT o1: %s\nChatGPT o1-preview: %s\nLlama-3.2-90B: %s\nLlama-3.3-70B: %s\nPhi-4: %s\n",

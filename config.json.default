@@ -85,7 +85,11 @@
       },
       "gemini": {
         "enable": true,
-        "args": ["/gemini", "/g"],
+        "argsMap": {
+            "flash": "/g",
+            "think": "/gt",
+            "pro": "/gp"
+        },
         "apiKey": ""
       },
       "github": {

@@ -90,9 +90,9 @@ type config struct {
 				APIKey string   `json:"apiKey"`
 			} `json:"qWen"`
 			Gemini struct {
-				Enable bool     `json:"enable"`
-				Args   []string `json:"args"`
-				APIKey string   `json:"apiKey"`
+				Enable  bool              `json:"enable"`
+				ArgsMap map[string]string `json:"argsMap"`
+				APIKey  string            `json:"apiKey"`
 			} `json:"gemini"`
 			Github struct {
 				Enable  bool              `json:"enable"`
