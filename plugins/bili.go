@@ -26,13 +26,19 @@ type Bili struct {
 	AiSummarize *AISummarize
 }
 
+type BiliLogin struct {
+	Cookies      []*http.Cookie
+	RefreshToken string
+	TimeStamp    int64
+}
+
 type AISummarize struct {
 	Enabled        bool
-	Cookie         string
 	GroupForward   bool
 	mixinKeyEncTab []int
 	cache          sync.Map
 	lastUpdateTime time.Time
+	LoginInfo      *BiliLogin
 }
 
 type VideoData struct {
@@ -60,16 +66,17 @@ type LiveData struct {
 }
 
 func init() {
+	login := BiliLogin{}
 	aiSummarize := AISummarize{
 		Enabled:      base.Config.Plugins.Bili.AiSummarize.Enable,
 		GroupForward: base.Config.Plugins.Bili.AiSummarize.GroupForward,
-		Cookie:       base.Config.Plugins.Bili.AiSummarize.Cookie,
 		mixinKeyEncTab: []int{
 			46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49,
 			33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 40,
 			61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11,
 			36, 20, 34, 44, 52,
 		},
+		LoginInfo: &login,
 	}
 	bili := Bili{
 		AiSummarize: &aiSummarize,
@@ -88,6 +95,11 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- 
 	const biliShort = `((b23.tv|bili2233.cn)\\?/\w+)`
 	const video = `[m|www].bilibili.com/video/(\w+)`
 	const live = `live.bilibili.com/(\d+)`
+
+	if essentials.CheckArgumentArray(messageStruct.Command, &[]string{"/bili_login"}) && messageStruct.UserId == base.Config.Admin {
+		b.AiSummarize.Login(messageStruct, send)
+		return
+	}
 
 	rawMsg := messageStruct.RawMessage
 	if match := regexp.MustCompile(biliShort).FindAllStringSubmatch(rawMsg, -1); match != nil {
@@ -255,6 +267,95 @@ func (b *Bili) getLiveData(roomId string) *LiveData {
 	return data
 }
 
+func (a *AISummarize) Login(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
+	const genQr = "https://passport.bilibili.com/x/passport-login/web/qrcode/generate"
+	const login = "https://passport.bilibili.com/x/passport-login/web/qrcode/poll"
+
+	req, err := http.NewRequest("GET", genQr, nil)
+	if err != nil {
+		log.Printf("Bili Login Error: %s", err)
+		return
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("Bili Login Error: %s", err)
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Bili Login Error: %s", err)
+		return
+	}
+
+	var i any
+	err = json.Unmarshal(body, &i)
+	if err != nil {
+		log.Printf("Bili Login Error: %s", err)
+		return
+	}
+
+	ctx := i.(map[string]any)
+	if ctx["code"].(float64) != 0 {
+		log.Printf("Bili Login Error: %s", ctx["message"].(string))
+		return
+	}
+
+	qrUrl := ctx["data"].(map[string]any)["url"].(string)
+	qrKey := ctx["data"].(map[string]any)["qrcode_key"].(string)
+	send <- essentials.SendMsg(messageStruct, qrUrl, nil, false, false, "")
+
+	for x := 0; x < 18; x++ { // timeout 180s
+		time.Sleep(time.Second * 10)
+		req, err := http.NewRequest("GET", login+"?qrcode_key="+qrKey, nil)
+		if err != nil {
+			log.Printf("Bili Login Error: %s", err)
+			return
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Printf("Bili Login Error: %s", err)
+			return
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Printf("Bili Login Error: %s", err)
+			return
+		}
+
+		var i any
+		err = json.Unmarshal(body, &i)
+		if err != nil {
+			log.Printf("Bili Login Error: %s", err)
+			return
+		}
+
+		ctx := i.(map[string]any)
+		if ctx["code"].(float64) == 0 {
+			if ctx["data"].(map[string]any)["code"].(float64) == 0 {
+				a.LoginInfo.Cookies = resp.Cookies()
+				a.LoginInfo.RefreshToken = ctx["data"].(map[string]any)["refresh_token"].(string)
+				a.LoginInfo.TimeStamp = int64(ctx["data"].(map[string]any)["timestamp"].(float64))
+				send <- essentials.SendMsg(messageStruct, "登录成功", nil, false, false, "")
+				return
+			} else if ctx["code"].(float64) == 86038 {
+				send <- essentials.SendMsg(messageStruct, "二维码已失效, 请重新获取", nil, false, false, "")
+				return
+			}
+		}
+	}
+
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("Bili Login Error: %s", err)
+		}
+	}(resp.Body)
+}
+
 func (a *AISummarize) Summarize(videoData *VideoData, sumOnly bool) (string, *[]string) {
 	if !a.Enabled {
 		return "", nil
@@ -355,7 +456,13 @@ func (a *AISummarize) requireSummarize(url string) (*map[string]any, error) {
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 	req.Header.Set("Referer", "https://www.bilibili.com/")
-	req.AddCookie(&http.Cookie{Name: "SESSDATA", Value: a.Cookie})
+
+	for _, c := range a.LoginInfo.Cookies {
+		if c.Name == "SESSDATA" {
+			req.AddCookie(c)
+		}
+	}
+
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Printf("Request failed: %s", err)
