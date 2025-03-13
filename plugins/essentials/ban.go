@@ -22,13 +22,11 @@ func init() {
 	PluginArray = append(PluginArray, plugin)
 }
 
-func (*Ban) ReceiveAll() *[]byte {
-	return nil
-}
+func (*Ban) ReceiveAll(chan<- *[]byte) {}
 
-func (b *Ban) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+func (b *Ban) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
 	if messageStruct.UserId != base.Config.Admin || !CheckArgumentArray(messageStruct.Command, &[]string{"/ban", "/unban", "/ban-list"}) {
-		return nil
+		return
 	}
 
 	if messageStruct.Command == "/ban-list" {
@@ -38,7 +36,8 @@ func (b *Ban) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 			message += strconv.FormatInt(v, 10) + "\n"
 		}
 		base.Config.Mutex.RUnlock()
-		return SendMsg(messageStruct, message, nil, false, true, "")
+		send <- SendMsg(messageStruct, message, nil, false, true, "")
+		return
 	} else {
 		var (
 			target int64
@@ -54,28 +53,34 @@ func (b *Ban) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 			}
 		}
 		if err != nil {
-			return SendMsg(messageStruct, "参数错误, 无法解析目标 qq 号", nil, false, true, "")
+			send <- SendMsg(messageStruct, "参数错误, 无法解析目标 qq 号", nil, false, true, "")
+			return
 		}
 		if target == 0 {
-			return SendMsg(messageStruct, "参数错误, 请指定目标 qq 号", nil, false, true, "")
+			send <- SendMsg(messageStruct, "参数错误, 请指定目标 qq 号", nil, false, true, "")
+			return
 		}
 		if target == base.Config.Admin {
-			return SendMsg(messageStruct, "无法封禁管理员", nil, false, true, "")
+			send <- SendMsg(messageStruct, "无法封禁管理员", nil, false, true, "")
+			return
 		}
 
 		if messageStruct.Command == "/ban" {
 			if b.IsBanned(target) {
-				return SendMsg(messageStruct, "该用户已被封禁，请勿重复封禁", nil, false, true, "")
+				send <- SendMsg(messageStruct, "该用户已被封禁，请勿重复封禁", nil, false, true, "")
+				return
 			}
 			base.Config.Mutex.Lock()
 			base.Config.BannedList = append(base.Config.BannedList, target)
 			base.Config.Mutex.Unlock()
 			base.Config.UpdateConfig()
-			return SendMsg(messageStruct, fmt.Sprintf("已封禁用户: %v", target), nil, false, true, "")
+			send <- SendMsg(messageStruct, fmt.Sprintf("已封禁用户: %v", target), nil, false, true, "")
+			return
 		}
 		if messageStruct.Command == "/unban" {
 			if !b.IsBanned(target) {
-				return SendMsg(messageStruct, "该用户未被封禁", nil, false, true, "")
+				send <- SendMsg(messageStruct, "该用户未被封禁", nil, false, true, "")
+				return
 			}
 			base.Config.Mutex.Lock()
 			for i, v := range base.Config.BannedList {
@@ -86,15 +91,12 @@ func (b *Ban) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 			}
 			base.Config.Mutex.Unlock()
 			base.Config.UpdateConfig()
-			return SendMsg(messageStruct, fmt.Sprintf("已解封用户: %v", target), nil, false, true, "")
+			send <- SendMsg(messageStruct, fmt.Sprintf("已解封用户: %v", target), nil, false, true, "")
 		}
 	}
-	return nil
 }
 
-func (*Ban) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
-	return nil
-}
+func (*Ban) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
 
 func (*Ban) IsBanned(qq int64) bool {
 	if qq == base.Config.Admin {

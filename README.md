@@ -28,6 +28,7 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
   - ChatGPT
   - Alibaba QianWen
   - Google Gemini Pro (with picture search)
+  - Github Models
 - Music url parser
   - Netease Cloud Music
   - QQ Music
@@ -41,6 +42,7 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - Roll
 - Repeat
 - Corpus reply
+- Daily waifu
 
 ## TODO
 - [ ] Add more plugins

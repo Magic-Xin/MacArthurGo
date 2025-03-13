@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
 	"github.com/tidwall/gjson"
 	"io"
 	"log"
@@ -27,13 +26,19 @@ type Bili struct {
 	AiSummarize *AISummarize
 }
 
+type BiliLogin struct {
+	Cookies      []*http.Cookie
+	RefreshToken string
+	TimeStamp    int64
+}
+
 type AISummarize struct {
 	Enabled        bool
-	Args           []string
 	GroupForward   bool
 	mixinKeyEncTab []int
 	cache          sync.Map
 	lastUpdateTime time.Time
+	LoginInfo      *BiliLogin
 }
 
 type VideoData struct {
@@ -61,9 +66,9 @@ type LiveData struct {
 }
 
 func init() {
+	login := BiliLogin{}
 	aiSummarize := AISummarize{
 		Enabled:      base.Config.Plugins.Bili.AiSummarize.Enable,
-		Args:         base.Config.Plugins.Bili.AiSummarize.Args,
 		GroupForward: base.Config.Plugins.Bili.AiSummarize.GroupForward,
 		mixinKeyEncTab: []int{
 			46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49,
@@ -71,6 +76,7 @@ func init() {
 			61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11,
 			36, 20, 34, 44, 52,
 		},
+		LoginInfo: &login,
 	}
 	bili := Bili{
 		AiSummarize: &aiSummarize,
@@ -78,20 +84,22 @@ func init() {
 	plugin := &essentials.Plugin{
 		Name:      "B 站链接解析",
 		Enabled:   base.Config.Plugins.Bili.Enable,
-		Args:      aiSummarize.Args,
 		Interface: &bili,
 	}
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (*Bili) ReceiveAll() *[]byte {
-	return nil
-}
+func (*Bili) ReceiveAll(chan<- *[]byte) {}
 
-func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
 	const biliShort = `((b23.tv|bili2233.cn)\\?/\w+)`
 	const video = `[m|www].bilibili.com/video/(\w+)`
 	const live = `live.bilibili.com/(\d+)`
+
+	if essentials.CheckArgumentArray(messageStruct.Command, &[]string{"/bili_login"}) && messageStruct.UserId == base.Config.Admin {
+		b.AiSummarize.Login(messageStruct, send)
+		return
+	}
 
 	rawMsg := messageStruct.RawMessage
 	if match := regexp.MustCompile(biliShort).FindAllStringSubmatch(rawMsg, -1); match != nil {
@@ -99,46 +107,6 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		if orgUrl := essentials.GetOriginUrl("https://" + replaceUrl); orgUrl != nil {
 			rawMsg = *orgUrl
 		}
-	}
-
-	if essentials.CheckArgumentArray(messageStruct.Command, &b.AiSummarize.Args) {
-		message := messageStruct.Message
-		for _, msg := range message {
-			if msg.Type == "reply" {
-				echo := "BiliAI"
-				if messageStruct.MessageType == "group" {
-					echo += fmt.Sprintf("|%d", messageStruct.MessageId)
-					value := essentials.EchoCache{
-						Value: *messageStruct,
-						Time:  time.Now().Unix(),
-					}
-					essentials.SetCache(strconv.FormatInt(messageStruct.MessageId, 10), value)
-				}
-				return essentials.SendAction("get_msg", structs.GetMsg{Id: msg.Data["id"].(string)}, "BiliAI")
-			}
-		}
-
-		if match := regexp.MustCompile(video).FindAllStringSubmatch(rawMsg, -1); match != nil {
-			videoData := b.getVideoData(match[0][1])
-			e, aiSum := b.AiSummarize.Summarize(videoData, false)
-			if aiSum != nil {
-				if messageStruct.MessageType == "group" && b.AiSummarize.GroupForward && len(*aiSum) > 1 {
-					var data []structs.ForwardNode
-					data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, videoData.ToArrayMessage()))
-					for _, msg := range *aiSum {
-						data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(msg)}))
-					}
-					return essentials.SendGroupForward(messageStruct, &data, "")
-				} else {
-					for _, msg := range *aiSum {
-						return essentials.SendMsg(messageStruct, msg, nil, false, false, "")
-					}
-				}
-			} else {
-				return essentials.SendMsg(messageStruct, e, nil, false, false, "")
-			}
-		}
-		return nil
 	}
 
 	var (
@@ -151,7 +119,7 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	} else if match = regexp.MustCompile(live).FindAllStringSubmatch(rawMsg, -1); match != nil {
 		liveData = b.getLiveData(match[0][1])
 	} else {
-		return nil
+		return
 	}
 
 	if videoData != nil {
@@ -161,84 +129,14 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		} else {
 			videoData.Summary = e
 		}
-		return essentials.SendMsg(messageStruct, "", videoData.ToArrayMessage(), false, true, "")
+		send <- essentials.SendMsg(messageStruct, "", videoData.ToArrayMessage(), false, true, "")
 	} else if liveData != nil {
-		return essentials.SendMsg(messageStruct, "", liveData.ToArrayMessage(), false, true, "")
+		send <- essentials.SendMsg(messageStruct, "", liveData.ToArrayMessage(), false, true, "")
 	}
-	return nil
+	return
 }
 
-func (b *Bili) ReceiveEcho(EchoMessageStruct *structs.EchoMessageStruct) *[]byte {
-	split := strings.Split(EchoMessageStruct.Echo, "|")
-
-	if split[0] == "BiliAI" {
-		if !cmp.Equal(EchoMessageStruct.Data, struct{}{}) {
-			ctxData := EchoMessageStruct.Data
-			message := ctxData.Message
-			var text string
-			for _, msg := range message {
-				if msg.Type == "text" {
-					text += msg.Data["text"].(string) + " "
-				}
-			}
-
-			const biliShort = `(b23.tv/\w+)`
-			const video = `www.bilibili.com/video/(\w+)`
-
-			if match := regexp.MustCompile(biliShort).FindAllStringSubmatch(text, -1); match != nil {
-				if orgUrl := essentials.GetOriginUrl("https://" + match[0][1]); orgUrl != nil {
-					text = *orgUrl
-				}
-			}
-
-			if match := regexp.MustCompile(video).FindAllStringSubmatch(text, -1); match != nil {
-				videoData := b.getVideoData(match[0][1])
-				e, aiSum := b.AiSummarize.Summarize(videoData, false)
-				if aiSum != nil {
-					if ctxData.MessageType == "group" && b.AiSummarize.GroupForward && len(*aiSum) > 1 {
-						value, ok := essentials.GetCache(split[1])
-						if !ok {
-							log.Println("BiliAI cache not found")
-							return nil
-						}
-						orgStruct := value.(essentials.EchoCache).Value
-						var data []structs.ForwardNode
-						data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, videoData.ToArrayMessage()))
-						for _, msg := range *aiSum {
-							data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(msg)}))
-						}
-						return essentials.SendGroupForward(&orgStruct, &data, "")
-					} else {
-						for _, msg := range *aiSum {
-							sendStruct := structs.MessageStruct{
-								MessageType: ctxData.MessageType,
-								UserId:      ctxData.UserId,
-							}
-							return essentials.SendMsg(&sendStruct, msg, nil, false, false, "")
-						}
-					}
-				} else {
-					if ctxData.MessageType == "group" {
-						value, ok := essentials.GetCache(split[1])
-						if !ok {
-							log.Println("BiliAI cache not found")
-							return nil
-						}
-						orgStruct := value.(essentials.EchoCache).Value
-						return essentials.SendMsg(&orgStruct, e, nil, false, false, "")
-					} else {
-						sendStruct := structs.MessageStruct{
-							MessageType: ctxData.MessageType,
-							UserId:      ctxData.UserId,
-						}
-						return essentials.SendMsg(&sendStruct, e, nil, false, false, "")
-					}
-				}
-			}
-		}
-	}
-	return nil
-}
+func (b *Bili) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
 
 func (b *Bili) getVideoData(vid string) *VideoData {
 	const api = "https://api.bilibili.com/x/web-interface/view?"
@@ -369,6 +267,95 @@ func (b *Bili) getLiveData(roomId string) *LiveData {
 	return data
 }
 
+func (a *AISummarize) Login(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
+	const genQr = "https://passport.bilibili.com/x/passport-login/web/qrcode/generate"
+	const login = "https://passport.bilibili.com/x/passport-login/web/qrcode/poll"
+
+	req, err := http.NewRequest("GET", genQr, nil)
+	if err != nil {
+		log.Printf("Bili Login Error: %s", err)
+		return
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("Bili Login Error: %s", err)
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Bili Login Error: %s", err)
+		return
+	}
+
+	var i any
+	err = json.Unmarshal(body, &i)
+	if err != nil {
+		log.Printf("Bili Login Error: %s", err)
+		return
+	}
+
+	ctx := i.(map[string]any)
+	if ctx["code"].(float64) != 0 {
+		log.Printf("Bili Login Error: %s", ctx["message"].(string))
+		return
+	}
+
+	qrUrl := ctx["data"].(map[string]any)["url"].(string)
+	qrKey := ctx["data"].(map[string]any)["qrcode_key"].(string)
+	send <- essentials.SendMsg(messageStruct, qrUrl, nil, false, false, "")
+
+	for x := 0; x < 18; x++ { // timeout 180s
+		time.Sleep(time.Second * 10)
+		req, err := http.NewRequest("GET", login+"?qrcode_key="+qrKey, nil)
+		if err != nil {
+			log.Printf("Bili Login Error: %s", err)
+			return
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Printf("Bili Login Error: %s", err)
+			return
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Printf("Bili Login Error: %s", err)
+			return
+		}
+
+		var i any
+		err = json.Unmarshal(body, &i)
+		if err != nil {
+			log.Printf("Bili Login Error: %s", err)
+			return
+		}
+
+		ctx := i.(map[string]any)
+		if ctx["code"].(float64) == 0 {
+			if ctx["data"].(map[string]any)["code"].(float64) == 0 {
+				a.LoginInfo.Cookies = resp.Cookies()
+				a.LoginInfo.RefreshToken = ctx["data"].(map[string]any)["refresh_token"].(string)
+				a.LoginInfo.TimeStamp = int64(ctx["data"].(map[string]any)["timestamp"].(float64))
+				send <- essentials.SendMsg(messageStruct, "登录成功", nil, false, false, "")
+				return
+			} else if ctx["code"].(float64) == 86038 {
+				send <- essentials.SendMsg(messageStruct, "二维码已失效, 请重新获取", nil, false, false, "")
+				return
+			}
+		}
+	}
+
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("Bili Login Error: %s", err)
+		}
+	}(resp.Body)
+}
+
 func (a *AISummarize) Summarize(videoData *VideoData, sumOnly bool) (string, *[]string) {
 	if !a.Enabled {
 		return "", nil
@@ -469,6 +456,13 @@ func (a *AISummarize) requireSummarize(url string) (*map[string]any, error) {
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 	req.Header.Set("Referer", "https://www.bilibili.com/")
+
+	for _, c := range a.LoginInfo.Cookies {
+		if c.Name == "SESSDATA" {
+			req.AddCookie(c)
+		}
+	}
+
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Printf("Request failed: %s", err)

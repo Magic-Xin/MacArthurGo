@@ -25,18 +25,16 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (*OriginPic) ReceiveAll() *[]byte {
-	return nil
-}
+func (*OriginPic) ReceiveAll(chan<- *[]byte) {}
 
-func (*OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+func (*OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
 	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.OriginPic.Args) {
-		return nil
+		return
 	}
 
 	message := messageStruct.Message
 	if message == nil {
-		return nil
+		return
 	}
 
 	for _, m := range message {
@@ -44,16 +42,14 @@ func (*OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 			echo := fmt.Sprintf("originPic|%d", messageStruct.MessageId)
 			value := essentials.EchoCache{Value: *messageStruct, Time: time.Now().Unix()}
 			essentials.SetCache(strconv.FormatInt(messageStruct.MessageId, 10), value)
-			return essentials.SendAction("get_msg", structs.GetMsg{Id: m.Data["id"].(string)}, echo)
+			send <- essentials.SendAction("get_msg", structs.GetMsg{Id: m.Data["id"].(string)}, echo)
 		}
 	}
-
-	return nil
 }
 
-func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[]byte {
+func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- *[]byte) {
 	if echoMessageStruct.Status != "ok" {
-		return nil
+		return
 	}
 
 	echo := echoMessageStruct.Echo
@@ -63,22 +59,21 @@ func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct) *[
 		contexts := echoMessageStruct.Data
 		message := contexts.Message
 		if message == nil {
-			return nil
+			return
 		}
 
 		value, ok := essentials.GetCache(split[1])
 		if !ok {
 			log.Println("Origin picture cache not found")
-			return nil
+			return
 		}
 		messageStruct := value.(essentials.EchoCache).Value
 
 		for _, m := range message {
 			if m.Type == "image" {
 				msg := fmt.Sprintf("已获取原图链接，请尽快保存:\n %s", m.Data["url"])
-				return essentials.SendMsg(&messageStruct, msg, nil, false, true, "")
+				send <- essentials.SendMsg(&messageStruct, msg, nil, false, true, "")
 			}
 		}
 	}
-	return nil
 }

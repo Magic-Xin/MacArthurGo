@@ -45,7 +45,6 @@
       "enable": false,
       "aiSummarize": {
         "enable": true,
-        "args": ["/summarize", "/sum"],
         "groupForward": true
       }
     },
@@ -86,11 +85,31 @@
       },
       "gemini": {
         "enable": true,
-        "args": ["/gemini", "/g"],
+        "argsMap": {
+            "flash": "/g",
+            "think": "/gt",
+            "pro": "/gp"
+        },
         "apiKey": ""
+      },
+      "github": {
+        "enable": true,
+        "argsMap": {
+            "4o": "/4o",
+            "o1p": "/o1p",
+            "o3m": "/o3m",
+            "llama": "/ll",
+            "phi4": "/p4",
+            "r1": "/r1"
+        },
+        "token": ""
       },
       "groupForward": true,
       "panGu": true
-    }
+    },
+    "waifu": {
+      "enable": false,
+      "args": ["/waifu", "wife", "/w"]
+    },
   }
 }

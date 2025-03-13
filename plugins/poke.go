@@ -19,13 +19,11 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (*Poke) ReceiveAll() *[]byte {
-	return nil
-}
+func (*Poke) ReceiveAll(chan<- *[]byte) {}
 
-func (*Poke) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+func (*Poke) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
 	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.Poke.Args) {
-		return nil
+		return
 	}
 
 	var uid int64
@@ -39,14 +37,10 @@ func (*Poke) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 		}
 	}
 	if uid != 0 {
-		return essentials.SendPoke(messageStruct, uid)
+		send <- essentials.SendPoke(messageStruct, uid)
 	} else if messageStruct.UserId != 0 {
-		return essentials.SendPoke(messageStruct, messageStruct.UserId)
+		send <- essentials.SendPoke(messageStruct, messageStruct.UserId)
 	}
-
-	return nil
 }
 
-func (*Poke) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
-	return nil
-}
+func (*Poke) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}

@@ -49,9 +49,8 @@ type config struct {
 		Bili struct {
 			Enable      bool `json:"enable"`
 			AiSummarize struct {
-				Enable       bool     `json:"enable"`
-				Args         []string `json:"args"`
-				GroupForward bool     `json:"groupForward"`
+				Enable       bool `json:"enable"`
+				GroupForward bool `json:"groupForward"`
 			} `json:"aiSummarize"`
 		} `json:"bili"`
 		Poke struct {
@@ -90,13 +89,22 @@ type config struct {
 				APIKey string   `json:"apiKey"`
 			} `json:"qWen"`
 			Gemini struct {
-				Enable bool     `json:"enable"`
-				Args   []string `json:"args"`
-				APIKey string   `json:"apiKey"`
+				Enable  bool              `json:"enable"`
+				ArgsMap map[string]string `json:"argsMap"`
+				APIKey  string            `json:"apiKey"`
 			} `json:"gemini"`
+			Github struct {
+				Enable  bool              `json:"enable"`
+				ArgsMap map[string]string `json:"argsMap"`
+				Token   string            `json:"token"`
+			} `json:"github"`
 			GroupForward bool `json:"groupForward"`
 			PanGu        bool `json:"panGu"`
 		} `json:"chatAI"`
+		Waifu struct {
+			Enable bool     `json:"enable"`
+			Args   []string `json:"args"`
+		} `json:"waifu"`
 	} `json:"plugins"`
 }
 

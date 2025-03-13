@@ -32,27 +32,25 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (*Repeat) ReceiveAll() *[]byte {
-	return nil
-}
+func (*Repeat) ReceiveAll(chan<- *[]byte) {}
 
-func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
 	if messageStruct.MessageType != "group" || messageStruct.Message == nil ||
 		messageStruct.GroupId == 0 || len(messageStruct.Message) == 0 ||
 		messageStruct.Command != "" {
-		return nil
+		return
 	}
 
 	message := messageStruct.Message
 
 	if message[0].Type == "text" && message[0].Data["text"].(string) == "[该接龙表情不支持查看，请使用QQ最新版本]" {
-		return nil
+		return
 	}
 
 	msg, err := json.Marshal(message)
 	if err != nil {
 		log.Printf("Repeat json marshal error: %v", err)
-		return nil
+		return
 	}
 
 	groupId := strconv.FormatInt(messageStruct.GroupId, 10)
@@ -60,13 +58,14 @@ func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	cache, ok := r.repeatMap.Load(groupId)
 	if !ok {
 		r.repeatMap.Store(groupId, []any{md5, 1})
-		return nil
+		return
 	}
 
 	if cache.([]any)[0].(string) == md5 {
 		if cache.([]any)[1].(int) >= int(r.Times) && r.getRand(false) {
 			r.repeatMap.Store(groupId, []any{md5, 1})
-			return essentials.SendMsg(messageStruct, "", &message, false, false, "")
+			send <- essentials.SendMsg(messageStruct, "", &message, false, false, "")
+			return
 		} else {
 			r.repeatMap.Store(groupId, []any{md5, cache.([]any)[1].(int) + 1})
 		}
@@ -75,14 +74,11 @@ func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	}
 
 	if r.getRand(true) {
-		return essentials.SendMsg(messageStruct, "", &message, false, false, "")
+		send <- essentials.SendMsg(messageStruct, "", &message, false, false, "")
 	}
-	return nil
 }
 
-func (*Repeat) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
-	return nil
-}
+func (*Repeat) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
 
 func (r *Repeat) getRand(common bool) bool {
 	if common {

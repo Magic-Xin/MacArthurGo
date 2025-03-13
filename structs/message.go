@@ -38,16 +38,19 @@ type EchoMessageStruct struct {
 		Message []cqcode.ArrayMessage `json:"message"`
 	} `json:"data"`
 	DataArray []struct {
-		//friendList only
+		//friendList
 		UserId   int64  `json:"user_id"`
 		Nickname string `json:"nickname"`
 		Remark   string `json:"remark"`
 
-		//groupList only
+		//groupList
 		GroupId        int64  `json:"group_id"`
 		GroupName      string `json:"group_name"`
 		MemberCount    int    `json:"member_count"`
 		MaxMemberCount int    `json:"max_member_count"`
+
+		//groupMemberList
+		Card string `json:"card"`
 	}
 	Echo   string `json:"echo"`
 	Status string `json:"status"`
@@ -65,6 +68,9 @@ type EchoMessageArrayStruct struct {
 		GroupName      string `json:"group_name"`
 		MemberCount    int    `json:"member_count"`
 		MaxMemberCount int    `json:"max_member_count"`
+
+		//groupMemberList
+		Card string `json:"card"`
 	}
 	Echo   string `json:"echo"`
 	Status string `json:"status"`

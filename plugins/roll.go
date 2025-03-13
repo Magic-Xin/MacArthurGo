@@ -22,13 +22,11 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (*Roll) ReceiveAll() *[]byte {
-	return nil
-}
+func (*Roll) ReceiveAll(chan<- *[]byte) {}
 
-func (r *Roll) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
+func (r *Roll) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
 	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.Roll.Args) {
-		return nil
+		return
 	}
 
 	words := essentials.SplitArgument(&messageStruct.Message)
@@ -47,14 +45,11 @@ func (r *Roll) ReceiveMessage(messageStruct *structs.MessageStruct) *[]byte {
 	}
 
 	if result != "" {
-		return essentials.SendMsg(messageStruct, result, nil, false, true, "")
+		send <- essentials.SendMsg(messageStruct, result, nil, false, true, "")
 	}
-	return nil
 }
 
-func (*Roll) ReceiveEcho(*structs.EchoMessageStruct) *[]byte {
-	return nil
-}
+func (*Roll) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
 
 func (*Roll) getRoll(n int) string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
