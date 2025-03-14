@@ -13,18 +13,13 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
-	"sync"
-	"time"
 )
 
 type Gemini struct {
-	Enabled  bool
-	ArgsMap  map[string]string
-	ApiKey   string
-	ReplyMap sync.Map
-	//HistoryMap sync.Map
+	Enabled bool
+	ArgsMap map[string]string
+	ApiKey  string
 }
 
 type RMap struct {
@@ -38,44 +33,82 @@ type HMap struct {
 	Time    int64
 }
 
-func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messageID int64, modelName string, echoId int64) (*[]string, *[]byte) {
-	var (
-		parts []*genai.Part
-		//history []*genai.Content
-		res   []string
-		reply string
-	)
+func (g *Gemini) RequireAnswer(message *[]cqcode.ArrayMessage, messageID int64, modelName string) (*[]string, *[]byte) {
+	var parts []*genai.Part
 
 	for _, msg := range *message {
-		if msg.Type == "image" && msg.Data["url"] != nil {
-			imgData := essentials.GetImageData(msg.Data["url"].(string))
-			data, imgType, err := g.ImageProcessing(imgData)
-			if err != nil {
-				log.Printf("Image processing error: %v", err)
-				continue
+		switch msg.Type {
+		case "image":
+			if url, ok := msg.Data["url"].(string); ok {
+				if data, imgType, err := g.ImageProcessing(essentials.GetImageData(url)); err == nil {
+					parts = append(parts, &genai.Part{InlineData: &genai.Blob{Data: *data, MIMEType: "image/" + imgType}})
+				} else {
+					log.Printf("Image processing error: %v", err)
+				}
 			}
-			image := []*genai.Part{
-				{InlineData: &genai.Blob{Data: *data, MIMEType: "image/" + imgType}},
+		case "reply":
+			echo := fmt.Sprintf("gemini|%d|%s", messageID, modelName)
+			return nil, essentials.SendAction("get_msg", structs.GetMsg{Id: msg.Data["id"].(string)}, echo)
+		case "text":
+			if text, ok := msg.Data["text"].(string); ok && text != "" {
+				parts = append(parts, &genai.Part{Text: text})
 			}
-			parts = append(parts, image...)
-		}
-		if msg.Type == "reply" {
-			reply = msg.Data["id"].(string)
-		}
-		if echoId != 0 && msg.Type == "text" {
-			part := []*genai.Part{
-				{Text: msg.Data["text"].(string)},
-			}
-			parts = append(parts, part...)
 		}
 	}
 
-	if reply != "" && echoId == 0 {
-		g.ReplyMap.Store(strconv.FormatInt(messageID, 10), RMap{Data: *message, OriginStr: str, Time: time.Now().Unix()})
-
-		echo := fmt.Sprintf("gemini|%d|%s", messageID, modelName)
-		return nil, essentials.SendAction("get_msg", structs.GetMsg{Id: reply}, echo)
+	resp, err := g.GetResponse(parts, modelName)
+	if err != nil {
+		log.Printf("Get response error: %v", err)
 	}
+
+	return resp, nil
+}
+
+func (g *Gemini) RequireEchoAnswer(originMessage *[]cqcode.ArrayMessage, echoMessage *[]cqcode.ArrayMessage, modelName string) *[]string {
+	var parts []*genai.Part
+
+	for _, msg := range *originMessage {
+		if msg.Type == "image" {
+			if url, ok := msg.Data["url"].(string); ok {
+				if data, imgType, err := g.ImageProcessing(essentials.GetImageData(url)); err == nil {
+					parts = append(parts, &genai.Part{InlineData: &genai.Blob{Data: *data, MIMEType: "image/" + imgType}})
+				} else {
+					log.Printf("Image processing error: %v", err)
+				}
+			}
+		} else if msg.Type == "text" {
+			if text, ok := msg.Data["text"].(string); ok && text != "" {
+				parts = append(parts, &genai.Part{Text: text})
+			}
+		}
+	}
+
+	for _, msg := range *echoMessage {
+		if msg.Type == "image" {
+			if url, ok := msg.Data["url"].(string); ok {
+				if data, imgType, err := g.ImageProcessing(essentials.GetImageData(url)); err == nil {
+					parts = append(parts, &genai.Part{InlineData: &genai.Blob{Data: *data, MIMEType: "image/" + imgType}})
+				} else {
+					log.Printf("Image processing error: %v", err)
+				}
+			}
+		} else if msg.Type == "text" {
+			if text, ok := msg.Data["text"].(string); ok {
+				parts = append(parts, &genai.Part{Text: text})
+			}
+		}
+	}
+
+	resp, err := g.GetResponse(parts, modelName)
+	if err != nil {
+		log.Printf("Get response error: %v", err)
+	}
+
+	return resp
+}
+
+func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) (*[]string, error) {
+	var res []string
 
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
@@ -85,13 +118,9 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	if err != nil {
 		log.Printf("Gemini client error: %v", err)
 		res = append(res, fmt.Sprintf("Gemini client error: %v", err))
-		return &res, nil
+		return &res, err
 	}
 
-	textParts := []*genai.Part{
-		{Text: str},
-	}
-	parts = append(parts, textParts...)
 	contents := []*genai.Content{{Parts: parts}}
 	config := &genai.GenerateContentConfig{
 		SafetySettings: []*genai.SafetySetting{
@@ -128,25 +157,10 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 	if err != nil {
 		log.Printf("Gemini generate error: %v", err)
 		res = append(res, fmt.Sprintf("Gemini generate error: %v", err))
-		return &res, nil
+		return &res, err
 	}
 
 	res = append(res, modelName+" response: ")
-	//if echoId != 0 {
-	//	value, ok := g.HistoryMap.Load(echoId)
-	//	if ok {
-	//		cs.History = value.(HMap).History
-	//	}
-	//}
-	//
-	//resp, err := cs.SendMessage(ctx, prompts...)
-	//if err != nil {
-	//	log.Printf("Gemini generate error: %v", err)
-	//	res = append(res, fmt.Sprintf("Gemini generate error: %v", err))
-	//	return &res, nil
-	//}
-
-	var cts []*genai.Content
 
 	for _, c := range resp.Candidates {
 		if c.Content == nil {
@@ -155,16 +169,7 @@ func (g *Gemini) RequireAnswer(str string, message *[]cqcode.ArrayMessage, messa
 		for _, part := range c.Content.Parts {
 			res = append(res, essentials.RemoveMarkdown(part.Text))
 		}
-		cts = append(cts, c.Content)
 	}
-
-	//history = append(history, &genai.Content{
-	//	Parts: prompts,
-	//	Role:  "user",
-	//})
-	//history = append(history, cts...)
-	//
-	//g.HistoryMap.Store(messageID, HMap{History: history, Time: time.Now().Unix()})
 
 	return &res, nil
 }
@@ -196,21 +201,3 @@ func (*Gemini) ImageProcessing(imgData *bytes.Buffer) (*[]byte, string, error) {
 		return nil, "", fmt.Errorf("unsupported image type: %s", imgType)
 	}
 }
-
-//func (g *Gemini) DeleteExpiredCache(expiration int64, interval int64) {
-//	for {
-//		g.ReplyMap.Range(func(key, value any) bool {
-//			if time.Now().Unix()-value.(RMap).Time > expiration {
-//				g.ReplyMap.Delete(key)
-//			}
-//			return true
-//		})
-//		g.HistoryMap.Range(func(key, value any) bool {
-//			if time.Now().Unix()-value.(HMap).Time > expiration {
-//				g.HistoryMap.Delete(key)
-//			}
-//			return true
-//		})
-//		time.Sleep(time.Duration(interval) * time.Second)
-//	}
-//}
