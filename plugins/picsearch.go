@@ -188,7 +188,6 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 
 	if result != nil {
 		if !cached {
-			result = append(result, []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))})
 			jsonMsg, err := json.Marshal(result)
 			if err != nil {
 				log.Printf("Search result mashal error: %v", err)
@@ -200,7 +199,6 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 				}
 			}
 		} else if isPurge {
-			result = append(result, []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))})
 			jsonMsg, err := json.Marshal(result)
 			if err != nil {
 				log.Printf("Search result mashal error: %v", err)
@@ -211,6 +209,8 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 				}
 			}
 		}
+
+		result = append(result, []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))})
 
 		if p.groupForward {
 			var data []structs.ForwardNode
