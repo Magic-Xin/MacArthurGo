@@ -119,7 +119,7 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 	var (
 		key    string
 		result [][]cqcode.ArrayMessage
-		cached bool
+		//cached bool
 	)
 
 	if msg == nil {
@@ -132,24 +132,24 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 			send <- essentials.SendMsg(messageStruct, "正在搜索中，请稍等", nil, false, false, "")
 			imgUrl := c.Data["url"].(string)
 			key = essentials.GetImageKey(imgUrl)
-			selectRes := essentials.SelectDB("picSearch", "res", fmt.Sprintf("uid='%s'", key))
-			if selectRes != nil {
-				if len(*selectRes) > 0 {
-					cached = true
-					if !isPurge {
-						res := (*selectRes)[0]["res"].(string)
-						result = append(result, []cqcode.ArrayMessage{*cqcode.Text("本次搜图结果来自数据库缓存")})
-						var cachedMsg [][]cqcode.ArrayMessage
-						err := json.Unmarshal([]byte(res), &cachedMsg)
-						if err != nil {
-							log.Printf("Unmarshal cached message error: %v", err)
-							continue
-						}
-						result = append(result, cachedMsg[:len(cachedMsg)-1]...)
-						continue
-					}
-				}
-			}
+			//selectRes := essentials.SelectDB("picSearch", "res", fmt.Sprintf("uid='%s'", key))
+			//if selectRes != nil {
+			//	if len(*selectRes) > 0 {
+			//		cached = true
+			//		if !isPurge {
+			//			res := (*selectRes)[0]["res"].(string)
+			//			result = append(result, []cqcode.ArrayMessage{*cqcode.Text("本次搜图结果来自数据库缓存")})
+			//			var cachedMsg [][]cqcode.ArrayMessage
+			//			err := json.Unmarshal([]byte(res), &cachedMsg)
+			//			if err != nil {
+			//				log.Printf("Unmarshal cached message error: %v", err)
+			//				continue
+			//			}
+			//			result = append(result, cachedMsg[:len(cachedMsg)-1]...)
+			//			continue
+			//		}
+			//	}
+			//}
 
 			wg := &sync.WaitGroup{}
 			wgResponse := &sync.WaitGroup{}
@@ -187,28 +187,28 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 	end := time.Since(start)
 
 	if result != nil {
-		if !cached {
-			jsonMsg, err := json.Marshal(result)
-			if err != nil {
-				log.Printf("Search result mashal error: %v", err)
-			} else {
-				err = essentials.InsertDB("picSearch", &[]string{"uid", "res", "created"},
-					&[]string{key, string(jsonMsg), strconv.FormatInt(time.Now().Unix(), 10)})
-				if err != nil {
-					log.Printf("Insert picSearch error: %v", err)
-				}
-			}
-		} else if isPurge {
-			jsonMsg, err := json.Marshal(result)
-			if err != nil {
-				log.Printf("Search result mashal error: %v", err)
-			} else {
-				err = essentials.UpdateDB("picSearch", "uid", key, &[]string{"res", "created"}, &[]string{string(jsonMsg), strconv.FormatInt(time.Now().Unix(), 10)})
-				if err != nil {
-					log.Printf("Update picSearch error: %v", err)
-				}
-			}
-		}
+		//if !cached {
+		//	jsonMsg, err := json.Marshal(result)
+		//	if err != nil {
+		//		log.Printf("Search result mashal error: %v", err)
+		//	} else {
+		//		err = essentials.InsertDB("picSearch", &[]string{"uid", "res", "created"},
+		//			&[]string{key, string(jsonMsg), strconv.FormatInt(time.Now().Unix(), 10)})
+		//		if err != nil {
+		//			log.Printf("Insert picSearch error: %v", err)
+		//		}
+		//	}
+		//} else if isPurge {
+		//	jsonMsg, err := json.Marshal(result)
+		//	if err != nil {
+		//		log.Printf("Search result mashal error: %v", err)
+		//	} else {
+		//		err = essentials.UpdateDB("picSearch", "uid", key, &[]string{"res", "created"}, &[]string{string(jsonMsg), strconv.FormatInt(time.Now().Unix(), 10)})
+		//		if err != nil {
+		//			log.Printf("Update picSearch error: %v", err)
+		//		}
+		//	}
+		//}
 
 		result = append(result, []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))})
 
