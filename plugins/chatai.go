@@ -131,7 +131,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		case "think":
 			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.0-flash-thinking-exp-01-21")
 		case "pro":
-			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.0-pro-exp-02-05")
+			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-pro-exp-03-25")
 		case "image":
 			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.0-flash-exp-image-generation")
 		}
@@ -188,6 +188,9 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 
 	if c.panGu {
 		for i, r := range *res {
+			if r[:9] == "base64://" {
+				continue
+			}
 			(*res)[i] = pangu.SpacingText(r)
 		}
 	}
@@ -205,12 +208,23 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 
 		data = append(data, *essentials.ConstructForwardNode(uin, name, messageStruct.CleanMessage))
 		for _, r := range *res {
-			data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(r)}))
+			if r[:9] == "base64://" {
+				data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Image(r)}))
+			} else {
+				data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(r)}))
+			}
 		}
 		send <- essentials.SendGroupForward(messageStruct, &data, echo)
 	} else {
-		text := strings.Join(*res, "\n")
-		send <- essentials.SendMsg(messageStruct, text, nil, false, false, "")
+		var msg []cqcode.ArrayMessage
+		for _, r := range *res {
+			if r[:9] == "base64://" {
+				msg = append(msg, *cqcode.Image(r))
+			} else {
+				msg = append(msg, *cqcode.Text(r))
+			}
+		}
+		send <- essentials.SendMsg(messageStruct, "", &msg, false, false, "")
 	}
 }
 
@@ -238,6 +252,9 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send 
 
 		if c.panGu {
 			for i, r := range *res {
+				if r[:9] == "base64://" {
+					continue
+				}
 				(*res)[i] = pangu.SpacingText(r)
 			}
 		}
@@ -260,13 +277,24 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send 
 			data = append(data, *essentials.ConstructForwardNode(strconv.FormatInt(originMessage.UserId, 10), originMessage.Sender.Nickname, originMessage.CleanMessage))
 
 			for _, r := range *res {
-				data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(r)}))
+				if r[:9] == "base64://" {
+					data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Image(r)}))
+				} else {
+					data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(r)}))
+				}
 			}
 
 			send <- essentials.SendGroupForward(&originMessage, &data, "")
 		} else {
-			text := strings.Join(*res, "\n")
-			send <- essentials.SendMsg(&originMessage, text, nil, false, false, "")
+			var msg []cqcode.ArrayMessage
+			for _, r := range *res {
+				if r[:9] == "base64://" {
+					msg = append(msg, *cqcode.Image(r))
+				} else {
+					msg = append(msg, *cqcode.Text(r))
+				}
+			}
+			send <- essentials.SendMsg(&originMessage, "", &msg, false, false, "")
 		}
 	}
 	return

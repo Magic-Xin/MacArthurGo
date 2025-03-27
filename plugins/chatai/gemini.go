@@ -6,6 +6,7 @@ import (
 	"MacArthurGo/structs/cqcode"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"google.golang.org/genai"
 	"image/gif"
@@ -147,10 +148,14 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) (*[]string, 
 		},
 	}
 
-	if !strings.Contains(modelName, "thinking") {
+	if !strings.Contains(modelName, "thinking") && !strings.Contains(modelName, "image-generation") {
 		config.Tools = []*genai.Tool{
 			{GoogleSearch: &genai.GoogleSearch{}},
 		}
+	}
+
+	if strings.Contains(modelName, "image-generation") {
+		config.ResponseModalities = []string{"TEXT", "IMAGE"}
 	}
 
 	resp, err := client.Models.GenerateContent(ctx, modelName, contents, config)
@@ -167,7 +172,13 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) (*[]string, 
 			continue
 		}
 		for _, part := range c.Content.Parts {
-			res = append(res, essentials.RemoveMarkdown(part.Text))
+			if part.Text != "" {
+				res = append(res, essentials.RemoveMarkdown(part.Text))
+			}
+			if part.InlineData != nil {
+				img := base64.StdEncoding.EncodeToString(part.InlineData.Data)
+				res = append(res, "base64://"+img)
+			}
 		}
 	}
 
