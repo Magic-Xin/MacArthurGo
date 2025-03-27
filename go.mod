@@ -6,18 +6,18 @@ require (
 	github.com/antchfx/htmlquery v1.3.4
 	github.com/google/go-cmp v0.7.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/ncruces/go-sqlite3 v0.24.0
+	github.com/ncruces/go-sqlite3 v0.24.1
 	github.com/refraction-networking/utls v1.6.7
-	github.com/sashabaranov/go-openai v1.38.0
+	github.com/sashabaranov/go-openai v1.38.1
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/pretty v1.2.1
 	github.com/vinta/pangu v3.0.0+incompatible
 	golang.org/x/net v0.37.0
-	google.golang.org/genai v0.5.0
+	google.golang.org/genai v0.6.0
 )
 
 require (
-	cloud.google.com/go v0.119.0 // indirect
+	cloud.google.com/go v0.120.0 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/antchfx/xpath v1.3.3 // indirect
