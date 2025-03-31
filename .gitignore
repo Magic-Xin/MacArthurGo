@@ -36,3 +36,4 @@ log/*
 *.db
 img_cache/*
 TODO.md
+.DS_Store
