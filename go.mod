@@ -6,13 +6,13 @@ require (
 	github.com/antchfx/htmlquery v1.3.4
 	github.com/google/go-cmp v0.7.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/ncruces/go-sqlite3 v0.24.1
+	github.com/ncruces/go-sqlite3 v0.25.0
 	github.com/refraction-networking/utls v1.6.7
 	github.com/sashabaranov/go-openai v1.38.1
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/pretty v1.2.1
 	github.com/vinta/pangu v3.0.0+incompatible
-	golang.org/x/net v0.37.0
+	golang.org/x/net v0.38.0
 	google.golang.org/genai v0.6.0
 )
 

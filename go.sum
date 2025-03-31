@@ -28,6 +28,8 @@ github.com/ncruces/go-sqlite3 v0.24.0 h1:Z4jfmzu2NCd4SmyFwLT2OmF3EnTZbqwATvdiuNH
 github.com/ncruces/go-sqlite3 v0.24.0/go.mod h1:/Vs8ACZHjJ1SA6E9RZUn3EyB1OP3nDQ4z/ar+0fplTQ=
 github.com/ncruces/go-sqlite3 v0.24.1 h1:qHlIz+dlH3Y0wCUErFZXon5hCvw1Kc9eEkZVYYi8p14=
 github.com/ncruces/go-sqlite3 v0.24.1/go.mod h1:n6Z7036yFilJx04yV0mi5JWaF66rUmXn1It9Ux8dx68=
+github.com/ncruces/go-sqlite3 v0.25.0 h1:trugKUs98Zwy9KwRr/EUxZHL92LYt7UqcKqAfpGpK+I=
+github.com/ncruces/go-sqlite3 v0.25.0/go.mod h1:n6Z7036yFilJx04yV0mi5JWaF66rUmXn1It9Ux8dx68=
 github.com/ncruces/julianday v1.0.0 h1:fH0OKwa7NWvniGQtxdJRxAgkBMolni2BjDHaWTxqt7M=
 github.com/ncruces/julianday v1.0.0/go.mod h1:Dusn2KvZrrovOMJuOt0TNXL6tB7U2E8kvza5fFc9G7g=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
@@ -78,6 +80,8 @@ golang.org/x/net v0.25.0/go.mod h1:JkAGAh7GEvH74S6FOH42FLoXpXbE/aqXSrIQjXgsiwM=
 golang.org/x/net v0.33.0/go.mod h1:HXLR5J+9DxmrqMwG9qjGCxZ+zKXxBru04zlTvWlWuN4=
 golang.org/x/net v0.37.0 h1:1zLorHbz+LYj7MQlSf1+2tPIIgibq2eL5xkrGk6f+2c=
 golang.org/x/net v0.37.0/go.mod h1:ivrbrMbzFq5J41QOQh0siUuly180yBYtLp+CKbEaFx8=
+golang.org/x/net v0.38.0 h1:vRMAPTMaeGqVhG5QyLJHqNDwecKTomGeqbnfZyKlBI8=
+golang.org/x/net v0.38.0/go.mod h1:ivrbrMbzFq5J41QOQh0siUuly180yBYtLp+CKbEaFx8=
 golang.org/x/oauth2 v0.28.0 h1:CrgCKl8PPAVtLnU3c+EDw6x11699EWlsDeWNWKdIOkc=
 golang.org/x/oauth2 v0.28.0/go.mod h1:onh5ek6nERTohokkhCD/y2cV4Do3fxFHFuAejCkRWT8=
 golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
