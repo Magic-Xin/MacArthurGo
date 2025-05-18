@@ -42,7 +42,13 @@ func (*OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct, send chan
 			echo := fmt.Sprintf("originPic|%d", messageStruct.MessageId)
 			value := essentials.EchoCache{Value: *messageStruct, Time: time.Now().Unix()}
 			essentials.SetCache(strconv.FormatInt(messageStruct.MessageId, 10), value)
-			send <- essentials.SendAction("get_msg", structs.GetMsg{Id: m.Data["id"].(string)}, echo)
+			idStr := m.Data["id"].(string)
+			id, err := strconv.ParseInt(idStr, 10, 64)
+			if err != nil {
+				log.Printf("Failed to convert id to int64: %v", err)
+				continue
+			}
+			send <- essentials.SendAction("get_msg", structs.GetMsg{Id: id}, echo)
 		}
 	}
 }

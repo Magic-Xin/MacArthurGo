@@ -14,6 +14,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -49,7 +50,13 @@ func (g *Gemini) RequireAnswer(message *[]cqcode.ArrayMessage, messageID int64, 
 			}
 		case "reply":
 			echo := fmt.Sprintf("gemini|%d|%s", messageID, modelName)
-			return nil, essentials.SendAction("get_msg", structs.GetMsg{Id: msg.Data["id"].(string)}, echo)
+			idStr := msg.Data["id"].(string)
+			id, err := strconv.ParseInt(idStr, 10, 64)
+			if err != nil {
+				log.Printf("Failed to convert id to int64: %v", err)
+				continue
+			}
+			return nil, essentials.SendAction("get_msg", structs.GetMsg{Id: id}, echo)
 		case "text":
 			if text, ok := msg.Data["text"].(string); ok && text != "" {
 				parts = append(parts, &genai.Part{Text: text})

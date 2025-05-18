@@ -181,7 +181,13 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 			if isPurge {
 				echo += "|purge"
 			}
-			return essentials.SendAction("get_msg", structs.GetMsg{Id: c.Data["id"].(string)}, echo)
+			idStr := c.Data["id"].(string)
+			id, err := strconv.ParseInt(idStr, 10, 64)
+			if err != nil {
+				log.Printf("Failed to convert id to int64: %v", err)
+				continue
+			}
+			return essentials.SendAction("get_msg", structs.GetMsg{Id: id}, echo)
 		}
 	}
 	end := time.Since(start)
