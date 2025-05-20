@@ -129,7 +129,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		case "flash":
 			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.0-flash")
 		case "think":
-			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-flash-preview-04-17")
+			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-flash-preview-05-20")
 		case "pro":
 			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-pro-exp-03-25")
 		case "image":
