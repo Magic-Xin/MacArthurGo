@@ -62,22 +62,22 @@ func init() {
 	}
 
 	args := []string{"/aihelp", "/ai帮助"}
-	if chatGPT.Enabled {
-		args = append(args, chatGPT.Args...)
-	}
-	if qWen.Enabled {
-		args = append(args, qWen.Args...)
-	}
-	if gemini.Enabled {
-		for _, v := range gemini.ArgsMap {
-			args = append(args, v)
-		}
-	}
-	if github.Enabled {
-		for _, v := range github.ArgsMap {
-			args = append(args, v)
-		}
-	}
+	//if chatGPT.Enabled {
+	//	args = append(args, chatGPT.Args...)
+	//}
+	//if qWen.Enabled {
+	//	args = append(args, qWen.Args...)
+	//}
+	//if gemini.Enabled {
+	//	for _, v := range gemini.ArgsMap {
+	//		args = append(args, v)
+	//	}
+	//}
+	//if github.Enabled {
+	//	for _, v := range github.ArgsMap {
+	//		args = append(args, v)
+	//	}
+	//}
 
 	chatAI := ChatAI{
 		ChatGPT:      &chatGPT,
@@ -129,7 +129,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		case "flash":
 			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-flash")
 		case "think":
-			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-flash-preview-05-20")
+			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-flash")
 		case "pro":
 			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-pro")
 		case "image":
@@ -168,7 +168,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 			text += fmt.Sprintf("QWen:\n%s: %s\n\n", c.QWen.Model, c.QWen.Args)
 		}
 		if c.Gemini.Enabled {
-			text += fmt.Sprintf("Gemini:\nGemini-2.0-flash: %s\nGemini-2.0-flash image-generation: %s\nGemini-2.5-flash: %s\nGemini-2.5-pro: %s\n\n",
+			text += fmt.Sprintf("Gemini:\nGemini-2.5-flash: %s\nGemini-2.0-flash image-generation: %s\nGemini-2.5-flash: %s\nGemini-2.5-pro: %s\n\n",
 				c.Gemini.ArgsMap["flash"], c.Gemini.ArgsMap["image"], c.Gemini.ArgsMap["think"], c.Gemini.ArgsMap["pro"])
 		}
 		if c.Github.Enabled {
