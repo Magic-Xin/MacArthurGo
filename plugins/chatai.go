@@ -21,6 +21,7 @@ type ChatAI struct {
 	Gemini       *chatai.Gemini
 	Github       *chatai.Github
 	Args         []string
+	FullArgs     []string
 	groupForward bool
 	panGu        bool
 }
@@ -62,22 +63,25 @@ func init() {
 	}
 
 	args := []string{"/aihelp", "/ai帮助"}
-	//if chatGPT.Enabled {
-	//	args = append(args, chatGPT.Args...)
-	//}
-	//if qWen.Enabled {
-	//	args = append(args, qWen.Args...)
-	//}
-	//if gemini.Enabled {
-	//	for _, v := range gemini.ArgsMap {
-	//		args = append(args, v)
-	//	}
-	//}
-	//if github.Enabled {
-	//	for _, v := range github.ArgsMap {
-	//		args = append(args, v)
-	//	}
-	//}
+
+	var fullArgs []string
+	fullArgs = append(fullArgs, args...)
+	if chatGPT.Enabled {
+		fullArgs = append(fullArgs, chatGPT.Args...)
+	}
+	if qWen.Enabled {
+		fullArgs = append(fullArgs, qWen.Args...)
+	}
+	if gemini.Enabled {
+		for _, v := range gemini.ArgsMap {
+			fullArgs = append(fullArgs, v)
+		}
+	}
+	if github.Enabled {
+		for _, v := range github.ArgsMap {
+			fullArgs = append(fullArgs, v)
+		}
+	}
 
 	chatAI := ChatAI{
 		ChatGPT:      &chatGPT,
@@ -85,6 +89,7 @@ func init() {
 		Gemini:       &gemini,
 		Github:       &github,
 		Args:         args,
+		FullArgs:     fullArgs,
 		groupForward: base.Config.Plugins.ChatAI.GroupForward,
 		panGu:        base.Config.Plugins.ChatAI.PanGu,
 	}
@@ -102,7 +107,7 @@ func init() {
 func (*ChatAI) ReceiveAll(chan<- *[]byte) {}
 
 func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if !essentials.CheckArgumentArray(messageStruct.Command, &c.Args) {
+	if !essentials.CheckArgumentArray(messageStruct.Command, &c.FullArgs) {
 		return
 	}
 
