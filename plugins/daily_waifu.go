@@ -83,7 +83,7 @@ func (d *DailyWaifu) ReceiveMessage(messageStruct *structs.MessageStruct, send c
 		return
 	}
 
-	send <- essentials.SendMsg(messageStruct, "获取老婆失败", nil, false, true, "")
+	send <- essentials.SendMsg(messageStruct, "获取老婆失败, 你今天没老婆了", nil, false, true, "")
 }
 
 func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, _ chan<- *[]byte) {
@@ -104,43 +104,61 @@ func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, _
 		})
 	}
 
-	src := rand.NewSource(time.Now().UnixNano())
+	today := time.Now().In(time.Local)
+	seedDate := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, time.Local)
+	src := rand.NewSource(seedDate.UnixNano())
 	r := rand.New(src)
-	r.Shuffle(len(waifus), func(i, j int) {
-		waifus[i], waifus[j] = waifus[j], waifus[i]
-	})
 
-	pairings := make(map[int64]Waifu, len(waifus))
-	visited := make(map[int64]bool)
-
-	for _, u := range echoMessageStruct.DataArray {
-		if visited[u.UserId] {
-			continue
-		}
-
-		targetIdx := -1
-		for i := 0; i < len(waifus); i++ {
-			idx := (r.Int() + i) % len(waifus)
-			target := waifus[idx]
-			if !visited[target.UserId] && target.UserId != u.UserId {
-				targetIdx = idx
-				break
-			}
-		}
-
-		if targetIdx == -1 {
-			continue
-		}
-
-		target := waifus[targetIdx]
-		pairings[u.UserId] = target
-		visited[u.UserId] = true
-		visited[target.UserId] = true
-
-		pairings[target.UserId] = Waifu{
+	userIDs := make([]int64, len(echoMessageStruct.DataArray))
+	userMap := make(map[int64]Waifu)
+	for i, u := range echoMessageStruct.DataArray {
+		userIDs[i] = u.UserId
+		userMap[u.UserId] = Waifu{
 			UserId:   u.UserId,
 			NickName: u.Nickname,
 			Card:     u.Card,
+		}
+	}
+
+	r.Shuffle(len(userIDs), func(i, j int) {
+		userIDs[i], userIDs[j] = userIDs[j], userIDs[i]
+	})
+
+	pairings := make(map[int64]Waifu, len(waifus))
+
+	for i := 0; i < len(userIDs); i += 2 {
+
+		if i+1 >= len(userIDs) {
+			if len(userIDs) > 1 {
+				randomPairIdx := r.Intn(i)
+				userA := userIDs[i]
+				userB := userIDs[randomPairIdx]
+
+				userBInfo := userMap[userB]
+				pairings[userA] = Waifu{
+					UserId:   userB,
+					NickName: userBInfo.NickName,
+					Card:     userBInfo.Card,
+				}
+			}
+			break
+		}
+
+		userA := userIDs[i]
+		userB := userIDs[i+1]
+
+		userBInfo := userMap[userB]
+		pairings[userA] = Waifu{
+			UserId:   userB,
+			NickName: userBInfo.NickName,
+			Card:     userBInfo.Card,
+		}
+
+		userAInfo := userMap[userA]
+		pairings[userB] = Waifu{
+			UserId:   userA,
+			NickName: userAInfo.NickName,
+			Card:     userAInfo.Card,
 		}
 	}
 

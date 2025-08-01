@@ -21,6 +21,7 @@ type ChatAI struct {
 	Gemini       *chatai.Gemini
 	Github       *chatai.Github
 	Args         []string
+	FullArgs     []string
 	groupForward bool
 	panGu        bool
 }
@@ -44,6 +45,7 @@ func init() {
 			"flash": base.Config.Plugins.ChatAI.Gemini.ArgsMap["flash"],
 			"think": base.Config.Plugins.ChatAI.Gemini.ArgsMap["think"],
 			"pro":   base.Config.Plugins.ChatAI.Gemini.ArgsMap["pro"],
+			"image": base.Config.Plugins.ChatAI.Gemini.ArgsMap["image"],
 		},
 		ApiKey: base.Config.Plugins.ChatAI.Gemini.APIKey,
 	}
@@ -61,20 +63,23 @@ func init() {
 	}
 
 	args := []string{"/aihelp", "/ai帮助"}
+
+	var fullArgs []string
+	fullArgs = append(fullArgs, args...)
 	if chatGPT.Enabled {
-		args = append(args, chatGPT.Args...)
+		fullArgs = append(fullArgs, chatGPT.Args...)
 	}
 	if qWen.Enabled {
-		args = append(args, qWen.Args...)
+		fullArgs = append(fullArgs, qWen.Args...)
 	}
 	if gemini.Enabled {
 		for _, v := range gemini.ArgsMap {
-			args = append(args, v)
+			fullArgs = append(fullArgs, v)
 		}
 	}
 	if github.Enabled {
 		for _, v := range github.ArgsMap {
-			args = append(args, v)
+			fullArgs = append(fullArgs, v)
 		}
 	}
 
@@ -84,6 +89,7 @@ func init() {
 		Gemini:       &gemini,
 		Github:       &github,
 		Args:         args,
+		FullArgs:     fullArgs,
 		groupForward: base.Config.Plugins.ChatAI.GroupForward,
 		panGu:        base.Config.Plugins.ChatAI.PanGu,
 	}
@@ -101,7 +107,7 @@ func init() {
 func (*ChatAI) ReceiveAll(chan<- *[]byte) {}
 
 func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if !essentials.CheckArgumentArray(messageStruct.Command, &c.Args) {
+	if !essentials.CheckArgumentArray(messageStruct.Command, &c.FullArgs) {
 		return
 	}
 
@@ -126,11 +132,13 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		messageID := messageStruct.MessageId
 		switch key {
 		case "flash":
-			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-flash-exp", 0)
+			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-flash")
 		case "think":
-			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-flash-thinking-exp-01-21", 0)
+			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-flash")
 		case "pro":
-			res, action = c.Gemini.RequireAnswer(str, &message, messageID, "gemini-2.0-pro-exp-02-05", 0)
+			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-pro")
+		case "image":
+			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.0-flash-exp-image-generation")
 		}
 		if action != nil {
 			value := essentials.EchoCache{Value: *messageStruct, Time: time.Now().Unix()}
@@ -165,8 +173,8 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 			text += fmt.Sprintf("QWen:\n%s: %s\n\n", c.QWen.Model, c.QWen.Args)
 		}
 		if c.Gemini.Enabled {
-			text += fmt.Sprintf("Gemini:\nGemini-2.0-flash-exp: %s\nGemini-2.0-flash-thinking-exp: %s\nGemini-2.0-pro-exp: %s\n\n",
-				c.Gemini.ArgsMap["flash"], c.Gemini.ArgsMap["think"], c.Gemini.ArgsMap["pro"])
+			text += fmt.Sprintf("Gemini:\nGemini-2.5-flash: %s\nGemini-2.0-flash image-generation: %s\nGemini-2.5-flash: %s\nGemini-2.5-pro: %s\n\n",
+				c.Gemini.ArgsMap["flash"], c.Gemini.ArgsMap["image"], c.Gemini.ArgsMap["think"], c.Gemini.ArgsMap["pro"])
 		}
 		if c.Github.Enabled {
 			text += fmt.Sprintf("Github:\nChatGPT 4o: %s\nChatGPT o1-preview: %s\nChatGPT o3-mini: %s\nLlama-3.1-405B: %s\nPhi-4: %s\nDeepSeek-R1: %s\n",
@@ -185,6 +193,9 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 
 	if c.panGu {
 		for i, r := range *res {
+			if r[:9] == "base64://" {
+				continue
+			}
 			(*res)[i] = pangu.SpacingText(r)
 		}
 	}
@@ -193,14 +204,32 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		var data []structs.ForwardNode
 		uin := strconv.FormatInt(messageStruct.UserId, 10)
 		name := messageStruct.Sender.Nickname
+
+		for _, m := range *messageStruct.CleanMessage {
+			if m.Type == "image" {
+				m.Data["file"] = essentials.ImageToBase64(m.Data["file"].(string))
+			}
+		}
+
 		data = append(data, *essentials.ConstructForwardNode(uin, name, messageStruct.CleanMessage))
 		for _, r := range *res {
-			data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(r)}))
+			if r[:9] == "base64://" {
+				data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Image(r)}))
+			} else {
+				data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(r)}))
+			}
 		}
 		send <- essentials.SendGroupForward(messageStruct, &data, echo)
 	} else {
-		text := strings.Join(*res, "\n")
-		send <- essentials.SendMsg(messageStruct, text, nil, false, false, "")
+		var msg []cqcode.ArrayMessage
+		for _, r := range *res {
+			if r[:9] == "base64://" {
+				msg = append(msg, *cqcode.Image(r))
+			} else {
+				msg = append(msg, *cqcode.Text(r))
+			}
+		}
+		send <- essentials.SendMsg(messageStruct, "", &msg, false, false, "")
 	}
 }
 
@@ -212,69 +241,66 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send 
 		if !ok {
 			log.Println("Gemini get cache error")
 		}
-		originCtx := value.(essentials.EchoCache).Value
+		originMessage := value.(essentials.EchoCache).Value
 		if echoMessageStruct.Status != "ok" {
-			send <- essentials.SendMsg(&originCtx, "Gemini reply args error", nil, false, false, "")
+			send <- essentials.SendMsg(&originMessage, "Gemini reply args error", nil, false, false, "")
 			return
 		}
-
-		data, ok := c.Gemini.ReplyMap.Load(split[1])
-		if !ok {
-			log.Println("Gemini reply map load error")
-			return
-		}
-
-		originStr := data.(chatai.RMap).OriginStr
-		originMessage := data.(chatai.RMap).Data
 
 		var res *[]string
 		message := echoMessageStruct.Data.Message
-		messageId, err := strconv.ParseInt(split[1], 10, 64)
-		if err != nil {
-			log.Printf("Echo id parse error: %v", err)
-			return
-		}
-		res, _ = c.Gemini.RequireAnswer(originStr, &message, messageId, split[2], echoMessageStruct.Data.MessageId)
+		res = c.Gemini.RequireEchoAnswer(originMessage.CleanMessage, &message, split[2])
 
 		if res == nil {
 			return
 		}
 
-		echo := "geminisend|" + split[1]
-
 		if c.panGu {
 			for i, r := range *res {
+				if r[:9] == "base64://" {
+					continue
+				}
 				(*res)[i] = pangu.SpacingText(r)
 			}
 		}
 
-		if originCtx.MessageType == "group" && c.groupForward {
+		if originMessage.MessageType == "group" && c.groupForward {
 			var data []structs.ForwardNode
-			uin := strconv.FormatInt(originCtx.UserId, 10)
-			name := originCtx.Sender.Nickname
-			originMessage = append(originMessage, message...)
-			data = append(data, *essentials.ConstructForwardNode(uin, name, &originMessage))
-			for _, r := range *res {
-				data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(r)}))
+
+			for _, m := range echoMessageStruct.Data.Message {
+				if m.Type == "image" {
+					m.Data["file"] = essentials.ImageToBase64(m.Data["file"].(string))
+				}
 			}
-			send <- essentials.SendGroupForward(&originCtx, &data, echo)
+			data = append(data, *essentials.ConstructForwardNode(strconv.FormatInt(echoMessageStruct.Data.Sender.UserId, 10), echoMessageStruct.Data.Nickname, &echoMessageStruct.Data.Message))
+
+			for _, m := range *originMessage.CleanMessage {
+				if m.Type == "image" {
+					m.Data["file"] = essentials.ImageToBase64(m.Data["file"].(string))
+				}
+			}
+			data = append(data, *essentials.ConstructForwardNode(strconv.FormatInt(originMessage.UserId, 10), originMessage.Sender.Nickname, originMessage.CleanMessage))
+
+			for _, r := range *res {
+				if r[:9] == "base64://" {
+					data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Image(r)}))
+				} else {
+					data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(r)}))
+				}
+			}
+
+			send <- essentials.SendGroupForward(&originMessage, &data, "")
 		} else {
-			text := strings.Join(*res, "\n")
-			send <- essentials.SendMsg(&originCtx, text, nil, false, false, echo)
+			var msg []cqcode.ArrayMessage
+			for _, r := range *res {
+				if r[:9] == "base64://" {
+					msg = append(msg, *cqcode.Image(r))
+				} else {
+					msg = append(msg, *cqcode.Text(r))
+				}
+			}
+			send <- essentials.SendMsg(&originMessage, "", &msg, false, false, "")
 		}
-	} else if split[0] == "geminisend" {
-		// TODO: Fix this
-		//key, err := strconv.ParseInt(split[1], 10, 64)
-		//if err != nil {
-		//	log.Printf("Gemini send id parse error: %v", err)
-		//	return nil
-		//}
-		//value, ok := c.Gemini.HistoryMap.Load(key)
-		//if !ok {
-		//	log.Println("Gemini history map load error")
-		//	return nil
-		//}
-		//c.Gemini.HistoryMap.Store(echoMessageStruct.Data.MessageId, value)
 	}
 	return
 }

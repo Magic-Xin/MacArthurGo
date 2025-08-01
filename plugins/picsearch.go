@@ -181,14 +181,19 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 			if isPurge {
 				echo += "|purge"
 			}
-			return essentials.SendAction("get_msg", structs.GetMsg{Id: c.Data["id"].(string)}, echo)
+			idStr := c.Data["id"].(string)
+			id, err := strconv.ParseInt(idStr, 10, 64)
+			if err != nil {
+				log.Printf("Failed to convert id to int64: %v", err)
+				continue
+			}
+			return essentials.SendAction("get_msg", structs.GetMsg{Id: id}, echo)
 		}
 	}
 	end := time.Since(start)
 
 	if result != nil {
 		if !cached {
-			result = append(result, []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))})
 			jsonMsg, err := json.Marshal(result)
 			if err != nil {
 				log.Printf("Search result mashal error: %v", err)
@@ -200,7 +205,6 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 				}
 			}
 		} else if isPurge {
-			result = append(result, []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))})
 			jsonMsg, err := json.Marshal(result)
 			if err != nil {
 				log.Printf("Search result mashal error: %v", err)
@@ -211,6 +215,8 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 				}
 			}
 		}
+
+		result = append(result, []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))})
 
 		if p.groupForward {
 			var data []structs.ForwardNode

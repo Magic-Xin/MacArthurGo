@@ -28,6 +28,7 @@ func SendAction(action string, params any, echo string) *[]byte {
 	return &jsonMsg
 }
 
+// SendFile Deprecated
 func SendFile(messageStruct *structs.MessageStruct, file string, name string) *[]byte {
 	if file == "" || messageStruct == nil {
 		return nil
@@ -160,17 +161,6 @@ func GetImageKey(url string) string {
 	return ""
 }
 
-func GetImageBase64(url string) *string {
-	imageData, err := io.ReadAll(GetImageData(url))
-	if err != nil {
-		log.Printf("Image fetch error: %v", err)
-		return nil
-	}
-	imageBase64 := "base64://" + base64.StdEncoding.EncodeToString(imageData)
-
-	return &imageBase64
-}
-
 func GetImageData(url string) *bytes.Buffer {
 	tlsConfig := &tls.Config{
 		ServerName: "multimedia.nt.qq.com.cn",
@@ -211,6 +201,13 @@ func GetImageData(url string) *bytes.Buffer {
 	}
 
 	return &imageData
+}
+
+func ImageToBase64(url string) *string {
+	imageData := GetImageData(url)
+	imageBase64 := "base64://" + base64.StdEncoding.EncodeToString(imageData.Bytes())
+
+	return &imageBase64
 }
 
 func GetOriginUrl(url string) *string {
