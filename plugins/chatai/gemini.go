@@ -148,10 +148,6 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) (*[]string, 
 				Category:  genai.HarmCategorySexuallyExplicit,
 				Threshold: genai.HarmBlockThresholdBlockNone,
 			},
-			{
-				Category:  genai.HarmCategoryCivicIntegrity,
-				Threshold: genai.HarmBlockThresholdBlockNone,
-			},
 		},
 	}
 
