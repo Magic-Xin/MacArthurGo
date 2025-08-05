@@ -5,14 +5,14 @@ import (
 	"MacArthurGo/plugins/chatai"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
-	"MacArthurGo/structs/cqcode"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/vinta/pangu"
 	"log"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/vinta/pangu"
 )
 
 type ChatAI struct {
@@ -214,19 +214,19 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		data = append(data, *essentials.ConstructForwardNode(uin, name, messageStruct.CleanMessage))
 		for _, r := range *res {
 			if r[:9] == "base64://" {
-				data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Image(r)}))
+				data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]structs.ArrayMessage{*structs.Image(r)}))
 			} else {
-				data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(r)}))
+				data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]structs.ArrayMessage{*structs.Text(r)}))
 			}
 		}
 		send <- essentials.SendGroupForward(messageStruct, &data, echo)
 	} else {
-		var msg []cqcode.ArrayMessage
+		var msg []structs.ArrayMessage
 		for _, r := range *res {
 			if r[:9] == "base64://" {
-				msg = append(msg, *cqcode.Image(r))
+				msg = append(msg, *structs.Image(r))
 			} else {
-				msg = append(msg, *cqcode.Text(r))
+				msg = append(msg, *structs.Text(r))
 			}
 		}
 		send <- essentials.SendMsg(messageStruct, "", &msg, false, false, "")
@@ -283,20 +283,20 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send 
 
 			for _, r := range *res {
 				if r[:9] == "base64://" {
-					data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Image(r)}))
+					data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]structs.ArrayMessage{*structs.Image(r)}))
 				} else {
-					data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]cqcode.ArrayMessage{*cqcode.Text(r)}))
+					data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &[]structs.ArrayMessage{*structs.Text(r)}))
 				}
 			}
 
 			send <- essentials.SendGroupForward(&originMessage, &data, "")
 		} else {
-			var msg []cqcode.ArrayMessage
+			var msg []structs.ArrayMessage
 			for _, r := range *res {
 				if r[:9] == "base64://" {
-					msg = append(msg, *cqcode.Image(r))
+					msg = append(msg, *structs.Image(r))
 				} else {
-					msg = append(msg, *cqcode.Text(r))
+					msg = append(msg, *structs.Text(r))
 				}
 			}
 			send <- essentials.SendMsg(&originMessage, "", &msg, false, false, "")

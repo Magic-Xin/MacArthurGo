@@ -3,7 +3,6 @@ package client
 import (
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
-	"MacArthurGo/structs/cqcode"
 	"context"
 	"encoding/json"
 	"log"
@@ -67,9 +66,9 @@ func MessageFactory(msg *[]byte, sendPump chan *[]byte) {
 	<-ctx.Done()
 }
 
-func CleanMessage(message *[]cqcode.ArrayMessage) (*[]cqcode.ArrayMessage, string) {
+func CleanMessage(message *[]structs.ArrayMessage) (*[]structs.ArrayMessage, string) {
 	var (
-		res     []cqcode.ArrayMessage
+		res     []structs.ArrayMessage
 		command string
 	)
 	for _, m := range *message {
@@ -80,7 +79,7 @@ func CleanMessage(message *[]cqcode.ArrayMessage) (*[]cqcode.ArrayMessage, strin
 			}
 			if strings.HasPrefix(words[0], "/") {
 				command = words[0]
-				res = append(res, []cqcode.ArrayMessage{{Type: "text", Data: map[string]any{
+				res = append(res, []structs.ArrayMessage{{Type: "text", Data: map[string]any{
 					"text": strings.Join(words[1:], " "),
 				}}}...)
 			}

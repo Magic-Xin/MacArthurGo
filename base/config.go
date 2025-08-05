@@ -2,11 +2,12 @@ package base
 
 import (
 	"encoding/json"
-	"github.com/tidwall/pretty"
 	"log"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/tidwall/pretty"
 )
 
 var Config config

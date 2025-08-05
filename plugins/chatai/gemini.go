@@ -3,12 +3,10 @@ package chatai
 import (
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
-	"MacArthurGo/structs/cqcode"
 	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
-	"google.golang.org/genai"
 	"image/gif"
 	"image/jpeg"
 	"io"
@@ -16,6 +14,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"google.golang.org/genai"
 )
 
 type Gemini struct {
@@ -25,7 +25,7 @@ type Gemini struct {
 }
 
 type RMap struct {
-	Data      []cqcode.ArrayMessage
+	Data      []structs.ArrayMessage
 	OriginStr string
 	Time      int64
 }
@@ -35,7 +35,7 @@ type HMap struct {
 	Time    int64
 }
 
-func (g *Gemini) RequireAnswer(message *[]cqcode.ArrayMessage, messageID int64, modelName string) (*[]string, *[]byte) {
+func (g *Gemini) RequireAnswer(message *[]structs.ArrayMessage, messageID int64, modelName string) (*[]string, *[]byte) {
 	var parts []*genai.Part
 
 	for _, msg := range *message {
@@ -72,7 +72,7 @@ func (g *Gemini) RequireAnswer(message *[]cqcode.ArrayMessage, messageID int64, 
 	return resp, nil
 }
 
-func (g *Gemini) RequireEchoAnswer(originMessage *[]cqcode.ArrayMessage, echoMessage *[]cqcode.ArrayMessage, modelName string) *[]string {
+func (g *Gemini) RequireEchoAnswer(originMessage *[]structs.ArrayMessage, echoMessage *[]structs.ArrayMessage, modelName string) *[]string {
 	var parts []*genai.Part
 
 	for _, msg := range *originMessage {

@@ -1,4 +1,4 @@
-package cqcode
+package structs
 
 import (
 	"encoding/json"

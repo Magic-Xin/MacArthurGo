@@ -4,14 +4,11 @@ import (
 	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
-	"MacArthurGo/structs/cqcode"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	xpath "github.com/antchfx/htmlquery"
-	"github.com/google/go-cmp/cmp"
 	"io"
 	"log"
 	"mime/multipart"
@@ -22,6 +19,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	xpath "github.com/antchfx/htmlquery"
+	"github.com/google/go-cmp/cmp"
 )
 
 type PicSearch struct {
@@ -110,7 +110,7 @@ func (p *PicSearch) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, se
 	}
 }
 
-func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcode.ArrayMessage, send chan<- *[]byte,
+func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]structs.ArrayMessage, send chan<- *[]byte,
 	isEcho bool, isGroup bool, isPurge bool) *[]byte {
 	if !isGroup && !p.allowPrivate {
 		return nil
@@ -118,7 +118,7 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 
 	var (
 		key    string
-		result [][]cqcode.ArrayMessage
+		result [][]structs.ArrayMessage
 		cached bool
 	)
 
@@ -138,8 +138,8 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 					cached = true
 					if !isPurge {
 						res := (*selectRes)[0]["res"].(string)
-						result = append(result, []cqcode.ArrayMessage{*cqcode.Text("本次搜图结果来自数据库缓存")})
-						var cachedMsg [][]cqcode.ArrayMessage
+						result = append(result, []structs.ArrayMessage{*structs.Text("本次搜图结果来自数据库缓存")})
+						var cachedMsg [][]structs.ArrayMessage
 						err := json.Unmarshal([]byte(res), &cachedMsg)
 						if err != nil {
 							log.Printf("Unmarshal cached message error: %v", err)
@@ -154,7 +154,7 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 			wg := &sync.WaitGroup{}
 			wgResponse := &sync.WaitGroup{}
 			limiter := make(chan bool, 10)
-			response := make(chan []cqcode.ArrayMessage, 200)
+			response := make(chan []structs.ArrayMessage, 200)
 
 			go func() {
 				wgResponse.Add(1)
@@ -216,7 +216,7 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 			}
 		}
 
-		result = append(result, []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))})
+		result = append(result, []structs.ArrayMessage{*structs.Text(fmt.Sprintf("本次搜图总用时: %0.3fs", end.Seconds()))})
 
 		if p.groupForward {
 			var data []structs.ForwardNode
@@ -237,7 +237,7 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 	return nil
 }
 
-func (p *PicSearch) sauceNAO(imgData *bytes.Buffer, response chan []cqcode.ArrayMessage, limiter chan bool, wg *sync.WaitGroup) {
+func (p *PicSearch) sauceNAO(imgData *bytes.Buffer, response chan []structs.ArrayMessage, limiter chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	const api = "https://saucenao.com/search.php"
 
@@ -247,13 +247,13 @@ func (p *PicSearch) sauceNAO(imgData *bytes.Buffer, response chan []cqcode.Array
 	part, err := writer.CreateFormFile("file", "image.jpg")
 	if err != nil {
 		log.Println("Create file field error:", err)
-		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		response <- []structs.ArrayMessage{*structs.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 	_, err = io.Copy(part, imgData)
 	if err != nil {
 		log.Println("Write image data error:", err)
-		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		response <- []structs.ArrayMessage{*structs.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 
@@ -281,7 +281,7 @@ func (p *PicSearch) sauceNAO(imgData *bytes.Buffer, response chan []cqcode.Array
 	err = writer.Close()
 	if err != nil {
 		log.Println("Writer close error:", err)
-		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		response <- []structs.ArrayMessage{*structs.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 
@@ -289,7 +289,7 @@ func (p *PicSearch) sauceNAO(imgData *bytes.Buffer, response chan []cqcode.Array
 	req, err := http.NewRequest("POST", api, body)
 	if err != nil {
 		log.Println("Request error:", err)
-		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		response <- []structs.ArrayMessage{*structs.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 
@@ -298,7 +298,7 @@ func (p *PicSearch) sauceNAO(imgData *bytes.Buffer, response chan []cqcode.Array
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Println("Response error:", err)
-		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		response <- []structs.ArrayMessage{*structs.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 
@@ -311,14 +311,14 @@ func (p *PicSearch) sauceNAO(imgData *bytes.Buffer, response chan []cqcode.Array
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		response <- []structs.ArrayMessage{*structs.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 
 	var i any
 	err = json.Unmarshal(respBody, &i)
 	if err != nil {
-		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		response <- []structs.ArrayMessage{*structs.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 
@@ -337,7 +337,7 @@ func (p *PicSearch) sauceNAO(imgData *bytes.Buffer, response chan []cqcode.Array
 		data := results.(map[string]any)["data"].(map[string]any)
 		similarity, err = strconv.ParseFloat(header["similarity"].(string), 64)
 		if err != nil {
-			response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+			response <- []structs.ArrayMessage{*structs.Text(fmt.Sprintf("%v", err))}
 			return
 		}
 		thumbNail = header["thumbnail"].(string)
@@ -356,10 +356,10 @@ func (p *PicSearch) sauceNAO(imgData *bytes.Buffer, response chan []cqcode.Array
 			extUrl = data["ext_urls"].([]any)[0].(string)
 		}
 	}
-	r := []cqcode.ArrayMessage{*cqcode.Text("SauceNAO\n")}
+	r := []structs.ArrayMessage{*structs.Text("SauceNAO\n")}
 
 	if imageBase64 := p.ThumbnailToBase64(thumbNail); imageBase64 != nil {
-		r = append(r, *cqcode.Image(*imageBase64))
+		r = append(r, *structs.Image(*imageBase64))
 	}
 
 	msg := fmt.Sprintf("\n相似度: %.2f%%\n", similarity)
@@ -382,12 +382,12 @@ func (p *PicSearch) sauceNAO(imgData *bytes.Buffer, response chan []cqcode.Array
 		}
 		msg += extUrl
 	}
-	r = append(r, *cqcode.Text(msg))
+	r = append(r, *structs.Text(msg))
 	response <- r
 	<-limiter
 }
 
-func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, limiter chan bool, wg *sync.WaitGroup) {
+func (p *PicSearch) ascii2d(img string, response chan []structs.ArrayMessage, limiter chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	const api = "https://ascii2d.net/search/uri"
 
@@ -398,27 +398,27 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 
 	reqC, err := http.NewRequest("POST", api, fromData)
 	if err != nil {
-		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		response <- []structs.ArrayMessage{*structs.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 	reqC.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	reqC.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:6.0) Gecko/20100101 Firefox/6.0")
 	respC, err := client.Do(reqC)
 	if err != nil {
-		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		response <- []structs.ArrayMessage{*structs.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 
 	urlB := strings.ReplaceAll(respC.Request.URL.String(), "color", "bovw")
 	reqB, err := http.NewRequest("GET", urlB, nil)
 	if err != nil {
-		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		response <- []structs.ArrayMessage{*structs.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 	reqB.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:6.0) Gecko/20100101 Firefox/6.0")
 	respB, err := client.Do(reqB)
 	if err != nil {
-		response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+		response <- []structs.ArrayMessage{*structs.Text(fmt.Sprintf("%v", err))}
 		return
 	}
 
@@ -445,7 +445,7 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 		list := xpath.Find(doc, `//div[@class="row item-box"]`)
 		if len(list) == 0 {
 			err := errors.New("ascii2d not found")
-			response <- []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("%v", err))}
+			response <- []structs.ArrayMessage{*structs.Text(fmt.Sprintf("%v", err))}
 			return
 		}
 		for _, n := range list {
@@ -467,14 +467,14 @@ func (p *PicSearch) ascii2d(img string, response chan []cqcode.ArrayMessage, lim
 					p.HandleBannedHostsArray(&Link)
 				}
 
-				r := []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("ascii2d %s\n", checkType[i]))}
+				r := []structs.ArrayMessage{*structs.Text(fmt.Sprintf("ascii2d %s\n", checkType[i]))}
 
 				if imageBase64 := p.ThumbnailToBase64(Thumb); imageBase64 != nil {
-					r = append(r, *cqcode.Image(*imageBase64))
+					r = append(r, *structs.Image(*imageBase64))
 				}
 
 				msg := fmt.Sprintf("\n%s %s\n「%s」/「%s」\n%s\nArthor:%s", Info, Type, Name, AuthNm, Link, Author)
-				r = append(r, *cqcode.Text(msg))
+				r = append(r, *structs.Text(msg))
 
 				response <- r
 				break

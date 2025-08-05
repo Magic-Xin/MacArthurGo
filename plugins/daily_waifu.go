@@ -4,7 +4,6 @@ import (
 	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
-	"MacArthurGo/structs/cqcode"
 	"fmt"
 	"log"
 	"math/rand"
@@ -71,14 +70,14 @@ func (d *DailyWaifu) ReceiveMessage(messageStruct *structs.MessageStruct, send c
 	userId := messageStruct.UserId
 	if _, ok := groupCacheMap[userId]; ok {
 		wife := groupCacheMap[userId]
-		var msg []cqcode.ArrayMessage
+		var msg []structs.ArrayMessage
 
 		if wife.Card != "" {
-			msg = append(msg, *cqcode.Text(fmt.Sprintf("你今天的老婆是: %s(%s)\n%d", wife.Card, wife.NickName, wife.UserId)))
+			msg = append(msg, *structs.Text(fmt.Sprintf("你今天的老婆是: %s(%s)\n%d", wife.Card, wife.NickName, wife.UserId)))
 		} else {
-			msg = append(msg, *cqcode.Text(fmt.Sprintf("你今天的老婆是: %s\n%d", wife.NickName, wife.UserId)))
+			msg = append(msg, *structs.Text(fmt.Sprintf("你今天的老婆是: %s\n%d", wife.NickName, wife.UserId)))
 		}
-		msg = append(msg, *cqcode.Image(fmt.Sprintf("%s%d", avatarApi, wife.UserId)))
+		msg = append(msg, *structs.Image(fmt.Sprintf("%s%d", avatarApi, wife.UserId)))
 		send <- essentials.SendMsg(messageStruct, "", &msg, false, true, "")
 		return
 	}

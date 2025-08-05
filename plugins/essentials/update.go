@@ -3,7 +3,6 @@ package essentials
 import (
 	"MacArthurGo/base"
 	"MacArthurGo/structs"
-	"MacArthurGo/structs/cqcode"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -61,12 +60,12 @@ func (u *Update) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		return
 	}
 
-	message := []cqcode.ArrayMessage{*cqcode.Text("本地版本:\n分支: " + base.Branch + "\n" + "版本: " + base.Version + "\n" + "编译时间: " + base.BuildTime),
-		*cqcode.Text("\n\n最新版本 (dev):\n版本: " + u.version + "\n" + "上传时间: " + u.uploadTime.Format("2006-01-02 15:04:05"))}
+	message := []structs.ArrayMessage{*structs.Text("本地版本:\n分支: " + base.Branch + "\n" + "版本: " + base.Version + "\n" + "编译时间: " + base.BuildTime),
+		*structs.Text("\n\n最新版本 (dev):\n版本: " + u.version + "\n" + "上传时间: " + u.uploadTime.Format("2006-01-02 15:04:05"))}
 	if base.Version != u.version {
-		message = append(message, *cqcode.Text(fmt.Sprintf("\n\n有更新！\n请 admin 使用 /update %s 更新到最新版本\n注意：自动更新有风险，请确保可以手动处理未知问题", u.version)))
+		message = append(message, *structs.Text(fmt.Sprintf("\n\n有更新！\n请 admin 使用 /update %s 更新到最新版本\n注意：自动更新有风险，请确保可以手动处理未知问题", u.version)))
 	} else {
-		message = append(message, *cqcode.Text("\n\n版本一致，无需更新"))
+		message = append(message, *structs.Text("\n\n版本一致，无需更新"))
 	}
 	send <- SendMsg(messageStruct, "", &message, false, false, "")
 	return
@@ -87,8 +86,8 @@ func (u *Update) UpdateWatcher() {
 				UserId:      base.Config.Admin,
 			}
 
-			message := []cqcode.ArrayMessage{*cqcode.Text("检测到版本更新！\n\n本地版本:\n分支: " + base.Branch + "\n" + "版本: " + base.Version + "\n" + "编译时间: " + base.BuildTime),
-				*cqcode.Text("\n\n最新版本 (dev):\n版本: " + u.version + "\n" + "上传时间: " + u.uploadTime.Format("2006-01-02 15:04:05"))}
+			message := []structs.ArrayMessage{*structs.Text("检测到版本更新！\n\n本地版本:\n分支: " + base.Branch + "\n" + "版本: " + base.Version + "\n" + "编译时间: " + base.BuildTime),
+				*structs.Text("\n\n最新版本 (dev):\n版本: " + u.version + "\n" + "上传时间: " + u.uploadTime.Format("2006-01-02 15:04:05"))}
 			u.sendCache = SendMsg(&sendStruct, "", &message, false, false, "")
 		}
 		time.Sleep(time.Duration(base.Config.UpdateInterval) * time.Second)

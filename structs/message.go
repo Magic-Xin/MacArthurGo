@@ -1,6 +1,9 @@
 package structs
 
-import "MacArthurGo/structs/cqcode"
+type ArrayMessage struct {
+	Type string         `json:"type"`
+	Data map[string]any `json:"data"`
+}
 
 type MessageStruct struct {
 	Time        int64  `json:"time"`
@@ -12,12 +15,12 @@ type MessageStruct struct {
 		UserId   int64  `json:"user_id"`
 		Nickname string `json:"nickname"`
 	} `json:"sender"`
-	Message    []cqcode.ArrayMessage `json:"message"`
-	RawMessage string                `json:"raw_message"`
-	Echo       string                `json:"echo"`
+	Message    []ArrayMessage `json:"message"`
+	RawMessage string         `json:"raw_message"`
+	Echo       string         `json:"echo"`
 
 	Command      string
-	CleanMessage *[]cqcode.ArrayMessage
+	CleanMessage *[]ArrayMessage
 }
 
 type EchoMessageStruct struct {
@@ -35,7 +38,7 @@ type EchoMessageStruct struct {
 		Sender      struct {
 			UserId int64 `json:"user_id"`
 		}
-		Message []cqcode.ArrayMessage `json:"message"`
+		Message []ArrayMessage `json:"message"`
 	} `json:"data"`
 	DataArray []struct {
 		//friendList
@@ -89,20 +92,20 @@ type GroupFile struct {
 }
 
 type Message struct {
-	MessageType string                `json:"message_type"`
-	UserId      int64                 `json:"user_id"`
-	GroupId     int64                 `json:"group_id"`
-	Message     []cqcode.ArrayMessage `json:"message"`
+	MessageType string         `json:"message_type"`
+	UserId      int64          `json:"user_id"`
+	GroupId     int64          `json:"group_id"`
+	Message     []ArrayMessage `json:"message"`
 }
 
 type PrivateMessage struct {
-	UserId  int64                 `json:"user_id"`
-	Message []cqcode.ArrayMessage `json:"message"`
+	UserId  int64          `json:"user_id"`
+	Message []ArrayMessage `json:"message"`
 }
 
 type GroupMessage struct {
-	GroupId int64                 `json:"group_id"`
-	Message []cqcode.ArrayMessage `json:"message"`
+	GroupId int64          `json:"group_id"`
+	Message []ArrayMessage `json:"message"`
 }
 
 type GroupForward struct {
@@ -118,9 +121,9 @@ type PrivateForward struct {
 type ForwardNode struct {
 	Type string `json:"type"`
 	Data struct {
-		Uin     string                `json:"uin"`
-		Name    string                `json:"name"`
-		Content []cqcode.ArrayMessage `json:"content"`
+		Uin     string         `json:"uin"`
+		Name    string         `json:"name"`
+		Content []ArrayMessage `json:"content"`
 	} `json:"data"`
 }
 

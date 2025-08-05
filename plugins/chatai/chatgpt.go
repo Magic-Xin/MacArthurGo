@@ -3,8 +3,9 @@ package chatai
 import (
 	"context"
 	"fmt"
-	"github.com/sashabaranov/go-openai"
 	"log"
+
+	"github.com/sashabaranov/go-openai"
 )
 
 type ChatGPT struct {

@@ -2,7 +2,6 @@ package essentials
 
 import (
 	"MacArthurGo/structs"
-	"MacArthurGo/structs/cqcode"
 	"bytes"
 	"crypto/md5"
 	"crypto/tls"
@@ -49,23 +48,23 @@ func SendFile(messageStruct *structs.MessageStruct, file string, name string) *[
 	return &jsonMsg
 }
 
-func SendMsg(messageStruct *structs.MessageStruct, message string, messageArray *[]cqcode.ArrayMessage, at bool, reply bool, echo string) *[]byte {
+func SendMsg(messageStruct *structs.MessageStruct, message string, messageArray *[]structs.ArrayMessage, at bool, reply bool, echo string) *[]byte {
 	if (message == "" && messageArray == nil) || messageStruct == nil {
 		return nil
 	}
 
-	arrayMessage := []cqcode.ArrayMessage{{Type: "text", Data: map[string]any{"text": message}}}
+	arrayMessage := []structs.ArrayMessage{{Type: "text", Data: map[string]any{"text": message}}}
 	if messageArray != nil {
 		arrayMessage = append(arrayMessage, *messageArray...)
 	}
 
 	if at && messageStruct.MessageType == "group" {
 		uid := strconv.FormatInt(messageStruct.UserId, 10)
-		arrayMessage = append([]cqcode.ArrayMessage{*cqcode.At(uid)}, arrayMessage...)
+		arrayMessage = append([]structs.ArrayMessage{*structs.At(uid)}, arrayMessage...)
 	}
 	if reply {
 		msgId := strconv.FormatInt(messageStruct.MessageId, 10)
-		arrayMessage = append([]cqcode.ArrayMessage{*cqcode.Reply(msgId)}, arrayMessage...)
+		arrayMessage = append([]structs.ArrayMessage{*structs.Reply(msgId)}, arrayMessage...)
 	}
 
 	return constructMessage(messageStruct, &arrayMessage, echo)
@@ -88,7 +87,7 @@ func SendPoke(messageStruct *structs.MessageStruct, uid int64) *[]byte {
 }
 
 func SendMusic(messageStruct *structs.MessageStruct, urlType string, id string) *[]byte {
-	return constructMessage(messageStruct, &[]cqcode.ArrayMessage{*cqcode.Music(urlType, id)}, "")
+	return constructMessage(messageStruct, &[]structs.ArrayMessage{*structs.Music(urlType, id)}, "")
 }
 
 func SendPrivateForward(messageStruct *structs.MessageStruct, data *[]structs.ForwardNode, echo string) *[]byte {
@@ -109,7 +108,7 @@ func SendGroupForward(messageStruct *structs.MessageStruct, data *[]structs.Forw
 	return SendAction("send_group_forward_msg", params, echo)
 }
 
-func ConstructForwardNode(uin string, name string, data *[]cqcode.ArrayMessage) *structs.ForwardNode {
+func ConstructForwardNode(uin string, name string, data *[]structs.ArrayMessage) *structs.ForwardNode {
 	node := structs.NewForwardNode()
 	node.Data.Uin = uin
 	node.Data.Name = name
@@ -144,7 +143,7 @@ func CheckArgumentMap(command string, argsMap *map[string]string) (string, bool)
 	return "", false
 }
 
-func SplitArgument(message *[]cqcode.ArrayMessage) (res []string) {
+func SplitArgument(message *[]structs.ArrayMessage) (res []string) {
 	for _, msg := range *message {
 		if msg.Type == "text" {
 			res = append(res, strings.Fields(msg.Data["text"].(string))...)
@@ -230,7 +229,7 @@ func Md5(origin *[]byte) string {
 	return fmt.Sprintf("%x", md5.Sum(*origin))
 }
 
-func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.ArrayMessage, echo string) *[]byte {
+func constructMessage(messageStruct *structs.MessageStruct, message *[]structs.ArrayMessage, echo string) *[]byte {
 	if messageStruct.MessageType == "" {
 		return nil
 	}

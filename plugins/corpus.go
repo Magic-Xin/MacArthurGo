@@ -4,7 +4,6 @@ import (
 	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
-	"MacArthurGo/structs/cqcode"
 	"regexp"
 	"strings"
 )
@@ -21,7 +20,7 @@ type Rules struct {
 	Scene   string
 	Users   []int64
 	Groups  []int64
-	Message *[]cqcode.ArrayMessage
+	Message *[]structs.ArrayMessage
 }
 
 func init() {
@@ -37,7 +36,7 @@ func init() {
 			Groups:  v.Groups,
 		}
 
-		cq := cqcode.FromStr(v.Reply)
+		cq := structs.FromStr(v.Reply)
 		if cq != nil {
 			rule.Message = cq
 		}

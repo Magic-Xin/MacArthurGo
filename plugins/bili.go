@@ -4,12 +4,10 @@ import (
 	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
-	"MacArthurGo/structs/cqcode"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/tidwall/gjson"
 	"io"
 	"log"
 	"net/http"
@@ -20,6 +18,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/tidwall/gjson"
 )
 
 type Bili struct {
@@ -619,28 +619,28 @@ func (*AISummarize) timestampToString(timestamp int64) string {
 	return fmt.Sprintf("%02d:%02d:%02d", hour, minute, second)
 }
 
-func (v *VideoData) ToArrayMessage() *[]cqcode.ArrayMessage {
-	var messageArray []cqcode.ArrayMessage
-	messageArray = append(messageArray, *cqcode.Image(v.ThumbnailUrl + "\n"))
-	messageArray = append(messageArray, *cqcode.Text("av" + v.Aid + "\n"))
-	messageArray = append(messageArray, *cqcode.Text(v.Title + "\n"))
-	messageArray = append(messageArray, *cqcode.Text("UP: " + v.Author + "\n"))
-	messageArray = append(messageArray, *cqcode.Text("播放: " + v.Playtime + "	弹幕: " + v.Danmaku + "\n"))
-	messageArray = append(messageArray, *cqcode.Text(v.Url + "\n\n"))
+func (v *VideoData) ToArrayMessage() *[]structs.ArrayMessage {
+	var messageArray []structs.ArrayMessage
+	messageArray = append(messageArray, *structs.Image(v.ThumbnailUrl + "\n"))
+	messageArray = append(messageArray, *structs.Text("av" + v.Aid + "\n"))
+	messageArray = append(messageArray, *structs.Text(v.Title + "\n"))
+	messageArray = append(messageArray, *structs.Text("UP: " + v.Author + "\n"))
+	messageArray = append(messageArray, *structs.Text("播放: " + v.Playtime + "	弹幕: " + v.Danmaku + "\n"))
+	messageArray = append(messageArray, *structs.Text(v.Url + "\n\n"))
 	if v.Summary != "" {
-		messageArray = append(messageArray, *cqcode.Text(v.Summary))
+		messageArray = append(messageArray, *structs.Text(v.Summary))
 	}
 	return &messageArray
 }
 
-func (l *LiveData) ToArrayMessage() *[]cqcode.ArrayMessage {
-	var messageArray []cqcode.ArrayMessage
-	messageArray = append(messageArray, *cqcode.Image(l.ThumbnailUrl + "\n"))
-	messageArray = append(messageArray, *cqcode.Text(l.Title + "\n"))
-	messageArray = append(messageArray, *cqcode.Text("主播: " + l.User + "\n"))
-	messageArray = append(messageArray, *cqcode.Text(l.RoomId + "\n"))
-	messageArray = append(messageArray, *cqcode.Text("分区: " + l.AreaName + "\n"))
-	messageArray = append(messageArray, *cqcode.Text(l.Status + "\n"))
-	messageArray = append(messageArray, *cqcode.Text(l.Url))
+func (l *LiveData) ToArrayMessage() *[]structs.ArrayMessage {
+	var messageArray []structs.ArrayMessage
+	messageArray = append(messageArray, *structs.Image(l.ThumbnailUrl + "\n"))
+	messageArray = append(messageArray, *structs.Text(l.Title + "\n"))
+	messageArray = append(messageArray, *structs.Text("主播: " + l.User + "\n"))
+	messageArray = append(messageArray, *structs.Text(l.RoomId + "\n"))
+	messageArray = append(messageArray, *structs.Text("分区: " + l.AreaName + "\n"))
+	messageArray = append(messageArray, *structs.Text(l.Status + "\n"))
+	messageArray = append(messageArray, *structs.Text(l.Url))
 	return &messageArray
 }

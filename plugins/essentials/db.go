@@ -3,12 +3,13 @@ package essentials
 import (
 	"database/sql"
 	"errors"
-	_ "github.com/ncruces/go-sqlite3/driver"
-	_ "github.com/ncruces/go-sqlite3/embed"
 	"log"
 	"strconv"
 	"strings"
 	"time"
+
+	_ "github.com/ncruces/go-sqlite3/driver"
+	_ "github.com/ncruces/go-sqlite3/embed"
 )
 
 var db *sql.DB

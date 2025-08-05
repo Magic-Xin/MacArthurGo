@@ -3,11 +3,12 @@ package essentials
 import (
 	"bufio"
 	"fmt"
-	"github.com/refraction-networking/utls"
-	"golang.org/x/net/http2"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/refraction-networking/utls"
+	"golang.org/x/net/http2"
 )
 
 type uTransport struct {
