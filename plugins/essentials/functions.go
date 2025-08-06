@@ -6,116 +6,100 @@ import (
 	"crypto/md5"
 	"crypto/tls"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
-func SendAction(action string, params any, echo string) *[]byte {
-	if action == "" {
-		return nil
-	}
+func GetMessage(incomingMessage *structs.IncomingMessageStruct, messageID int64, send SendFunc) {
+	messageScene := incomingMessage.MessageScene
+	peerId := incomingMessage.PeerID
+	messageSeq := messageID
 
-	act := structs.Action{Action: action, Params: params, Echo: echo}
-	jsonMsg, _ := json.Marshal(act)
-
-	return &jsonMsg
+	SendAction("get_message", map[string]any{"message_scene": messageScene, "peer_id": peerId, "message_seq": messageSeq}, send)
 }
 
-// SendFile Deprecated
-func SendFile(messageStruct *structs.MessageStruct, file string, name string) *[]byte {
-	if file == "" || messageStruct == nil {
-		return nil
+func SendAction(api string, params map[string]any, send SendFunc) {
+	if api == "" {
+		return
 	}
 
-	var act structs.Action
-	if messageStruct.MessageType == "group" {
-		groupId := messageStruct.GroupId
-		params := structs.GroupFile{GroupId: groupId, File: file, Name: name}
-		act = structs.Action{Action: "upload_group_file", Params: params}
-	} else {
-		userId := messageStruct.UserId
-		params := structs.PrivateFile{UserId: userId, File: file, Name: name}
-		act = structs.Action{Action: "upload_private_file", Params: params}
-	}
-
-	jsonMsg, _ := json.Marshal(act)
-	return &jsonMsg
+	send(api, params)
 }
 
-func SendMsg(messageStruct *structs.MessageStruct, message string, messageArray *[]structs.ArrayMessage, at bool, reply bool, echo string) *[]byte {
-	if (message == "" && messageArray == nil) || messageStruct == nil {
-		return nil
+func SendMsg(incomingMessage *structs.IncomingMessageStruct, message string, outgoingMessage *[]structs.MessageSegment, at bool, reply bool, send SendFunc) {
+	if (message == "" && outgoingMessage == nil) || incomingMessage == nil {
+		return
 	}
 
-	arrayMessage := []structs.ArrayMessage{{Type: "text", Data: map[string]any{"text": message}}}
-	if messageArray != nil {
-		arrayMessage = append(arrayMessage, *messageArray...)
+	outMessage := []structs.MessageSegment{{Type: "text", Data: map[string]any{"text": message}}}
+	if outgoingMessage != nil {
+		outMessage = append(outMessage, *outgoingMessage...)
 	}
 
-	if at && messageStruct.MessageType == "group" {
-		uid := strconv.FormatInt(messageStruct.UserId, 10)
-		arrayMessage = append([]structs.ArrayMessage{*structs.At(uid)}, arrayMessage...)
+	if at && incomingMessage.MessageScene == "group" {
+		outMessage = append([]structs.MessageSegment{*structs.Mention(incomingMessage.GroupMember.UserID)}, outMessage...)
 	}
+
 	if reply {
-		msgId := strconv.FormatInt(messageStruct.MessageId, 10)
-		arrayMessage = append([]structs.ArrayMessage{*structs.Reply(msgId)}, arrayMessage...)
+		outMessage = append([]structs.MessageSegment{*structs.Reply(incomingMessage.MessageSeq)}, outMessage...)
 	}
 
-	return constructMessage(messageStruct, &arrayMessage, echo)
+	constructMessage(incomingMessage, &outMessage, send)
 }
 
-func SendPoke(messageStruct *structs.MessageStruct, uid int64) *[]byte {
-	if messageStruct.MessageType == "group" {
-		return SendAction("group_poke",
-			struct {
-				GroupId int64 `json:"group_id"`
-				UserId  int64 `json:"user_id"`
-			}{GroupId: messageStruct.GroupId, UserId: uid}, "")
-	} else if messageStruct.MessageType == "private" {
-		return SendAction("friend_poke",
-			struct {
-				UserId int64 `json:"user_id"`
-			}{UserId: uid}, "")
+func SendGroupNudge(incomingMessage *structs.IncomingMessageStruct, uid int64, send SendFunc) {
+	if incomingMessage.MessageScene == "group" {
+		params := structs.GroupNudge{
+			GroupId: incomingMessage.Group.GroupID,
+			UserId:  uid,
+		}
+		send("send_group_nudge", params)
+	} else if incomingMessage.MessageScene == "private" {
+		outgoingMessage := []structs.MessageSegment{*structs.Text("戳一戳只支持在群聊中使用")}
+		constructMessage(incomingMessage, &outgoingMessage, send)
 	}
-	return nil
 }
 
-func SendMusic(messageStruct *structs.MessageStruct, urlType string, id string) *[]byte {
-	return constructMessage(messageStruct, &[]structs.ArrayMessage{*structs.Music(urlType, id)}, "")
-}
-
-func SendPrivateForward(messageStruct *structs.MessageStruct, data *[]structs.ForwardNode, echo string) *[]byte {
-	params := structs.PrivateForward{
-		UserId:   messageStruct.UserId,
-		Messages: *data,
+func ConstructForwardedMessage(userID int64, name string, outgoingMessage *[]structs.MessageSegment) *structs.OutgoingForwardedMessage {
+	node := structs.OutgoingForwardedMessage{
+		UserID:   userID,
+		Name:     name,
+		Segments: *outgoingMessage,
 	}
 
-	return SendAction("send_private_forward_msg", params, echo)
+	return &node
 }
 
-func SendGroupForward(messageStruct *structs.MessageStruct, data *[]structs.ForwardNode, echo string) *[]byte {
-	params := structs.GroupForward{
-		GroupId:  messageStruct.GroupId,
-		Messages: *data,
-	}
-
-	return SendAction("send_group_forward_msg", params, echo)
-}
-
-func ConstructForwardNode(uin string, name string, data *[]structs.ArrayMessage) *structs.ForwardNode {
-	node := structs.NewForwardNode()
-	node.Data.Uin = uin
-	node.Data.Name = name
-	node.Data.Content = *data
-
-	return node
-}
+//func SendPrivateForward(messageStruct *structs.MessageStruct, data *[]structs.ForwardNode, echo string) *[]byte {
+//	params := structs.PrivateForward{
+//		UserId:   messageStruct.UserId,
+//		Messages: *data,
+//	}
+//
+//	return SendAction("send_private_forward_msg", params, echo)
+//}
+//
+//func SendGroupForward(messageStruct *structs.MessageStruct, data *[]structs.ForwardNode, echo string) *[]byte {
+//	params := structs.GroupForward{
+//		GroupId:  messageStruct.GroupId,
+//		Messages: *data,
+//	}
+//
+//	return SendAction("send_group_forward_msg", params, echo)
+//}
+//
+//func ConstructForwardNode(uin string, name string, data *[]structs.OutgoingForwardedMessage) *structs.ForwardNode {
+//	node := structs.NewForwardNode()
+//	node.Data.Uin = uin
+//	node.Data.Name = name
+//	node.Data.Content = *data
+//
+//	return node
+//}
 
 func CheckArgumentArray(command string, args *[]string) bool {
 	if args == nil {
@@ -143,7 +127,7 @@ func CheckArgumentMap(command string, argsMap *map[string]string) (string, bool)
 	return "", false
 }
 
-func SplitArgument(message *[]structs.ArrayMessage) (res []string) {
+func SplitArgument(message *[]structs.MessageSegment) (res []string) {
 	for _, msg := range *message {
 		if msg.Type == "text" {
 			res = append(res, strings.Fields(msg.Data["text"].(string))...)
@@ -229,22 +213,18 @@ func Md5(origin *[]byte) string {
 	return fmt.Sprintf("%x", md5.Sum(*origin))
 }
 
-func constructMessage(messageStruct *structs.MessageStruct, message *[]structs.ArrayMessage, echo string) *[]byte {
-	if messageStruct.MessageType == "" {
-		return nil
+func constructMessage(incomingMessage *structs.IncomingMessageStruct, outgoingMessage *[]structs.MessageSegment, send SendFunc) {
+	msg := structs.OutgoingMessage{
+		UserId:  incomingMessage.SenderID,
+		GroupId: incomingMessage.Group.GroupID,
+		Message: *outgoingMessage,
 	}
 
-	var act structs.Action
-	msg := structs.Message{
-		MessageType: messageStruct.MessageType,
-		UserId:      messageStruct.UserId,
-		GroupId:     messageStruct.GroupId,
-		Message:     *message,
+	if incomingMessage.MessageScene == "group" {
+		send("send_group_message", msg)
+	} else {
+		send("send_private_message", msg)
 	}
-	act = structs.Action{Action: "send_msg", Params: msg, Echo: echo}
-
-	jsonMsg, _ := json.Marshal(act)
-	return &jsonMsg
 }
 
 func RemoveMarkdown(input string) string {

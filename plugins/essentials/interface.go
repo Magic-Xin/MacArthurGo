@@ -5,10 +5,12 @@ import (
 	"context"
 )
 
+type SendFunc func(api string, body interface{})
+
 type IPlugin interface {
-	ReceiveAll(chan<- *[]byte)
-	ReceiveMessage(*structs.MessageStruct, chan<- *[]byte)
-	ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte)
+	ReceiveAll(SendFunc)
+	ReceiveMessage(*structs.IncomingMessageStruct, SendFunc)
+	ReceiveEcho(*structs.FeedbackStruct, SendFunc)
 }
 
 var PluginArray []*Plugin
@@ -20,7 +22,7 @@ type Plugin struct {
 	Interface IPlugin
 }
 
-func (p *Plugin) GoroutineAll(ctx context.Context, send chan<- *[]byte) {
+func (p *Plugin) GoroutineAll(ctx context.Context, send SendFunc) {
 	if !p.Enabled {
 		return
 	}
@@ -32,7 +34,7 @@ func (p *Plugin) GoroutineAll(ctx context.Context, send chan<- *[]byte) {
 	}
 }
 
-func (p *Plugin) GoroutineMessage(ctx context.Context, messageStruct *structs.MessageStruct, send chan<- *[]byte) {
+func (p *Plugin) GoroutineMessage(ctx context.Context, messageStruct *structs.IncomingMessageStruct, send SendFunc) {
 	if !p.Enabled {
 		return
 	}
@@ -44,7 +46,7 @@ func (p *Plugin) GoroutineMessage(ctx context.Context, messageStruct *structs.Me
 	}
 }
 
-func (p *Plugin) GoroutineEcho(ctx context.Context, echoMessageStruct *structs.EchoMessageStruct, send chan<- *[]byte) {
+func (p *Plugin) GoroutineEcho(ctx context.Context, feedbackStruct *structs.FeedbackStruct, send SendFunc) {
 	if !p.Enabled {
 		return
 	}
@@ -52,6 +54,6 @@ func (p *Plugin) GoroutineEcho(ctx context.Context, echoMessageStruct *structs.E
 	case <-ctx.Done():
 		return
 	default:
-		p.Interface.ReceiveEcho(echoMessageStruct, send)
+		p.Interface.ReceiveEcho(feedbackStruct, send)
 	}
 }

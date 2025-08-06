@@ -20,7 +20,7 @@ type Rules struct {
 	Scene   string
 	Users   []int64
 	Groups  []int64
-	Message *[]structs.ArrayMessage
+	Message *[]structs.MessageSegment
 }
 
 func init() {
@@ -55,11 +55,11 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (*Corpus) ReceiveAll(chan<- *[]byte) {}
+func (*Corpus) ReceiveAll(essentials.SendFunc) {}
 
-func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	message := messageStruct.Message
-	if message == nil || messageStruct.MessageType == "" {
+func (c *Corpus) ReceiveMessage(incomingMessage *structs.IncomingMessageStruct, send essentials.SendFunc) {
+	message := incomingMessage.Segments
+	if message == nil || incomingMessage.MessageScene == "" {
 		return
 	}
 	var text string
@@ -72,25 +72,25 @@ func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 	for _, v := range *c.rules {
 		if match := regexp.MustCompile(v.Regexp).MatchString(text); match {
 			if v.Scene != "a" && v.Scene != "all" {
-				if !strings.HasPrefix(messageStruct.MessageType, v.Scene) {
+				if !strings.HasPrefix(incomingMessage.MessageScene, v.Scene) {
 					continue
 				}
 			}
 			if v.Users != nil {
-				userId := messageStruct.UserId
+				userId := incomingMessage.SenderID
 				if !c.Contain(v.Users, userId) {
 					continue
 				}
 			}
-			if v.Groups != nil && messageStruct.MessageType == "group" {
-				groupId := messageStruct.GroupId
+			if v.Groups != nil && incomingMessage.MessageScene == "group" {
+				groupId := incomingMessage.Group.GroupID
 				if !c.Contain(v.Groups, groupId) {
 					continue
 				}
 			}
 
 			if v.Message != nil {
-				send <- essentials.SendMsg(messageStruct, "", v.Message, v.IsAt, v.IsReply, "")
+				essentials.SendMsg(incomingMessage, "", v.Message, v.IsAt, v.IsReply, send)
 			}
 			break
 		}
@@ -98,7 +98,7 @@ func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 	return
 }
 
-func (*Corpus) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
+func (*Corpus) ReceiveEcho(*structs.FeedbackStruct, essentials.SendFunc) {}
 
 func (*Corpus) Contain(arr []int64, item int64) bool {
 	for _, v := range arr {

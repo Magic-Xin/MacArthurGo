@@ -41,21 +41,21 @@ func main() {
 		base.BuildTime = buildTime.In(tz).Format("2006-01-02 15:04:05")
 	}
 
-	conn, err := client.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
+	c := &client.Client{}
+
+	err = c.Init(base.Config.Address, base.Config.Port, base.Config.AuthToken)
 	for err != nil {
 		time.Sleep(30 * time.Second)
 		log.Println("Can not connect to server, retrying...")
-		conn, err = client.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
+		err = c.Init(base.Config.Address, base.Config.Port, base.Config.AuthToken)
 	}
-	wsClient := &client.Client{Conn: conn, SendPump: make(chan *[]byte)}
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
-	go wsClient.ReadPump()
-	go wsClient.WritePump()
+	go c.EventPipe()
 
 	<-interrupt
 	log.Println("Shutting down...")
-	wsClient.Close()
+	c.Close()
 }

@@ -7,7 +7,7 @@ import (
 )
 
 type EchoCache struct {
-	Value structs.MessageStruct
+	Value structs.IncomingMessageStruct
 	Time  int64
 }
 

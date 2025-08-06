@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"log"
 	"math/rand"
-	"strconv"
 	"sync"
 )
 
@@ -32,16 +31,14 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (*Repeat) ReceiveAll(chan<- *[]byte) {}
+func (*Repeat) ReceiveAll(essentials.SendFunc) {}
 
-func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if messageStruct.MessageType != "group" || messageStruct.Message == nil ||
-		messageStruct.GroupId == 0 || len(messageStruct.Message) == 0 ||
-		messageStruct.Command != "" {
+func (r *Repeat) ReceiveMessage(incomingMessageStruct *structs.IncomingMessageStruct, send essentials.SendFunc) {
+	if incomingMessageStruct.MessageScene != "group" || incomingMessageStruct.Segments == nil || incomingMessageStruct.Command != "" {
 		return
 	}
 
-	message := messageStruct.Message
+	message := incomingMessageStruct.Segments
 
 	if message[0].Type == "text" && message[0].Data["text"].(string) == "[该接龙表情不支持查看，请使用QQ最新版本]" {
 		return
@@ -53,7 +50,7 @@ func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		return
 	}
 
-	groupId := strconv.FormatInt(messageStruct.GroupId, 10)
+	groupId := incomingMessageStruct.Group.GroupID
 	md5 := essentials.Md5(&msg)
 	cache, ok := r.repeatMap.Load(groupId)
 	if !ok {
@@ -64,7 +61,7 @@ func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 	if cache.([]any)[0].(string) == md5 {
 		if cache.([]any)[1].(int) >= int(r.Times) && r.getRand(false) {
 			r.repeatMap.Store(groupId, []any{md5, 1})
-			send <- essentials.SendMsg(messageStruct, "", &message, false, false, "")
+			essentials.SendMsg(incomingMessageStruct, "", &message, false, false, send)
 			return
 		} else {
 			r.repeatMap.Store(groupId, []any{md5, cache.([]any)[1].(int) + 1})
@@ -74,11 +71,11 @@ func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 	}
 
 	if r.getRand(true) {
-		send <- essentials.SendMsg(messageStruct, "", &message, false, false, "")
+		essentials.SendMsg(incomingMessageStruct, "", &message, false, false, send)
 	}
 }
 
-func (*Repeat) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
+func (*Repeat) ReceiveEcho(*structs.FeedbackStruct, essentials.SendFunc) {}
 
 func (r *Repeat) getRand(common bool) bool {
 	if common {

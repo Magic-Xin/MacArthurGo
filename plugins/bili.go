@@ -89,24 +89,36 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (*Bili) ReceiveAll(chan<- *[]byte) {}
+func (*Bili) ReceiveAll(essentials.SendFunc) {}
 
-func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
+func (b *Bili) ReceiveMessage(incomingMessage *structs.IncomingMessageStruct, send essentials.SendFunc) {
 	const biliShort = `((b23.tv|bili2233.cn)\\?/\w+)`
 	const video = `[m|www].bilibili.com/video/(\w+)`
 	const live = `live.bilibili.com/(\d+)`
 
-	if essentials.CheckArgumentArray(messageStruct.Command, &[]string{"/bili_login"}) && messageStruct.UserId == base.Config.Admin {
-		b.AiSummarize.Login(messageStruct, send)
+	if essentials.CheckArgumentArray(incomingMessage.Command, &[]string{"/bili_login"}) && incomingMessage.SenderID == base.Config.Admin {
+		b.AiSummarize.Login(incomingMessage, send)
 		return
 	}
 
-	rawMsg := messageStruct.RawMessage
-	if match := regexp.MustCompile(biliShort).FindAllStringSubmatch(rawMsg, -1); match != nil {
-		replaceUrl := strings.Replace(match[0][1], "\\", "", -1)
-		if orgUrl := essentials.GetOriginUrl("https://" + replaceUrl); orgUrl != nil {
-			rawMsg = *orgUrl
+	var u string
+	for _, msg := range *incomingMessage.CleanMessage {
+		if msg.Type == "text" {
+			if match := regexp.MustCompile(biliShort).FindAllStringSubmatch(msg.Data["text"].(string), -1); match != nil {
+				u = strings.Replace(match[0][1], "\\", "", -1)
+			}
+		} else if msg.Type == "light_app" {
+			if match := regexp.MustCompile(biliShort).FindAllStringSubmatch(msg.Data["json_payload"].(string), -1); match != nil {
+				u = strings.Replace(match[0][1], "\\", "", -1)
+			}
 		}
+	}
+	if u == "" {
+		return
+	}
+
+	if orgUrl := essentials.GetOriginUrl("https://" + u); orgUrl != nil {
+		u = *orgUrl
 	}
 
 	var (
@@ -114,9 +126,9 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- 
 		liveData  *LiveData
 	)
 
-	if match := regexp.MustCompile(video).FindAllStringSubmatch(rawMsg, -1); match != nil {
+	if match := regexp.MustCompile(video).FindAllStringSubmatch(u, -1); match != nil {
 		videoData = b.getVideoData(match[0][1])
-	} else if match = regexp.MustCompile(live).FindAllStringSubmatch(rawMsg, -1); match != nil {
+	} else if match = regexp.MustCompile(live).FindAllStringSubmatch(u, -1); match != nil {
 		liveData = b.getLiveData(match[0][1])
 	} else {
 		return
@@ -129,14 +141,14 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- 
 		} else {
 			videoData.Summary = e
 		}
-		send <- essentials.SendMsg(messageStruct, "", videoData.ToArrayMessage(), false, true, "")
+		essentials.SendMsg(incomingMessage, "", videoData.ToArrayMessage(), false, true, send)
 	} else if liveData != nil {
-		send <- essentials.SendMsg(messageStruct, "", liveData.ToArrayMessage(), false, true, "")
+		essentials.SendMsg(incomingMessage, "", liveData.ToArrayMessage(), false, true, send)
 	}
 	return
 }
 
-func (b *Bili) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
+func (b *Bili) ReceiveEcho(*structs.FeedbackStruct, essentials.SendFunc) {}
 
 func (b *Bili) getVideoData(vid string) *VideoData {
 	const api = "https://api.bilibili.com/x/web-interface/view?"
@@ -267,7 +279,7 @@ func (b *Bili) getLiveData(roomId string) *LiveData {
 	return data
 }
 
-func (a *AISummarize) Login(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
+func (a *AISummarize) Login(incomingMessage *structs.IncomingMessageStruct, send essentials.SendFunc) {
 	const genQr = "https://passport.bilibili.com/x/passport-login/web/qrcode/generate"
 	const login = "https://passport.bilibili.com/x/passport-login/web/qrcode/poll"
 
@@ -304,7 +316,7 @@ func (a *AISummarize) Login(messageStruct *structs.MessageStruct, send chan<- *[
 
 	qrUrl := ctx["data"].(map[string]any)["url"].(string)
 	qrKey := ctx["data"].(map[string]any)["qrcode_key"].(string)
-	send <- essentials.SendMsg(messageStruct, qrUrl, nil, false, false, "")
+	essentials.SendMsg(incomingMessage, qrUrl, nil, false, false, send)
 
 	for x := 0; x < 18; x++ { // timeout 180s
 		time.Sleep(time.Second * 10)
@@ -339,10 +351,10 @@ func (a *AISummarize) Login(messageStruct *structs.MessageStruct, send chan<- *[
 				a.LoginInfo.Cookies = resp.Cookies()
 				a.LoginInfo.RefreshToken = ctx["data"].(map[string]any)["refresh_token"].(string)
 				a.LoginInfo.TimeStamp = int64(ctx["data"].(map[string]any)["timestamp"].(float64))
-				send <- essentials.SendMsg(messageStruct, "登录成功", nil, false, false, "")
+				essentials.SendMsg(incomingMessage, "登录成功", nil, false, false, send)
 				return
 			} else if ctx["code"].(float64) == 86038 {
-				send <- essentials.SendMsg(messageStruct, "二维码已失效, 请重新获取", nil, false, false, "")
+				essentials.SendMsg(incomingMessage, "二维码已失效, 请重新获取", nil, false, false, send)
 				return
 			}
 		}
@@ -619,10 +631,10 @@ func (*AISummarize) timestampToString(timestamp int64) string {
 	return fmt.Sprintf("%02d:%02d:%02d", hour, minute, second)
 }
 
-func (v *VideoData) ToArrayMessage() *[]structs.ArrayMessage {
-	var messageArray []structs.ArrayMessage
-	messageArray = append(messageArray, *structs.Image(v.ThumbnailUrl + "\n"))
-	messageArray = append(messageArray, *structs.Text("av" + v.Aid + "\n"))
+func (v *VideoData) ToArrayMessage() *[]structs.MessageSegment {
+	var messageArray []structs.MessageSegment
+	messageArray = append(messageArray, *structs.Image(v.ThumbnailUrl))
+	messageArray = append(messageArray, *structs.Text("\n" + "av" + v.Aid + "\n"))
 	messageArray = append(messageArray, *structs.Text(v.Title + "\n"))
 	messageArray = append(messageArray, *structs.Text("UP: " + v.Author + "\n"))
 	messageArray = append(messageArray, *structs.Text("播放: " + v.Playtime + "	弹幕: " + v.Danmaku + "\n"))
@@ -633,10 +645,10 @@ func (v *VideoData) ToArrayMessage() *[]structs.ArrayMessage {
 	return &messageArray
 }
 
-func (l *LiveData) ToArrayMessage() *[]structs.ArrayMessage {
-	var messageArray []structs.ArrayMessage
-	messageArray = append(messageArray, *structs.Image(l.ThumbnailUrl + "\n"))
-	messageArray = append(messageArray, *structs.Text(l.Title + "\n"))
+func (l *LiveData) ToArrayMessage() *[]structs.MessageSegment {
+	var messageArray []structs.MessageSegment
+	messageArray = append(messageArray, *structs.Image(l.ThumbnailUrl))
+	messageArray = append(messageArray, *structs.Text("\n" + l.Title + "\n"))
 	messageArray = append(messageArray, *structs.Text("主播: " + l.User + "\n"))
 	messageArray = append(messageArray, *structs.Text(l.RoomId + "\n"))
 	messageArray = append(messageArray, *structs.Text("分区: " + l.AreaName + "\n"))

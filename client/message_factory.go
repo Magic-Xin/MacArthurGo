@@ -10,12 +10,39 @@ import (
 	"time"
 )
 
-func MessageFactory(msg *[]byte, sendPump chan *[]byte) {
-	var messageStruct structs.MessageStruct
-	err := json.Unmarshal(*msg, &messageStruct)
-	if err != nil {
-		log.Printf("Unmarshal error: %v", err)
+func MessageFactory(msg *[]byte, send essentials.SendFunc, event bool) {
+	if msg == nil || send == nil {
 		return
+	}
+
+	var message structs.IncomingMessageStruct
+	var feedback structs.FeedbackStruct
+
+	if event {
+		var eventStruct structs.EventStruct
+		err := json.Unmarshal(*msg, &eventStruct)
+		if err != nil {
+			log.Printf("Unmarshal error: %v", err)
+			return
+		}
+		if eventStruct.EventType == "message_receive" {
+			bytesData, err := json.Marshal(eventStruct.Data)
+			if err != nil {
+				log.Printf("Marshal error: %v", err)
+				return
+			}
+			err = json.Unmarshal(bytesData, &message)
+			if err != nil {
+				log.Printf("Unmarshal error: %v", err)
+				return
+			}
+		}
+	} else {
+		err := json.Unmarshal(*msg, &feedback)
+		if err != nil {
+			log.Printf("Unmarshal error: %v", err)
+			return
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -23,42 +50,26 @@ func MessageFactory(msg *[]byte, sendPump chan *[]byte) {
 
 	for _, p := range essentials.PluginArray {
 		go func(plugin *essentials.Plugin) {
-			plugin.GoroutineAll(ctx, sendPump)
+			plugin.GoroutineAll(ctx, send)
 		}(p)
 	}
 
-	if messageStruct.Message != nil {
-		if essentials.BanList.IsBanned(messageStruct.UserId) {
+	if event {
+		if essentials.BanList.IsBanned(message.SenderID) {
 			return
 		}
 
-		messageStruct.CleanMessage, messageStruct.Command = CleanMessage(&messageStruct.Message)
+		message.CleanMessage, message.Command = CleanMessage(&message.Segments)
 
 		for _, p := range essentials.PluginArray {
 			go func(plugin *essentials.Plugin) {
-				plugin.GoroutineMessage(ctx, &messageStruct, sendPump)
+				plugin.GoroutineMessage(ctx, &message, send)
 			}(p)
 		}
-	}
-
-	if messageStruct.Echo != "" {
-		var echoMessageStruct structs.EchoMessageStruct
-		err := json.Unmarshal(*msg, &echoMessageStruct)
-		if err != nil {
-			var echoMessageArrayStruct structs.EchoMessageArrayStruct
-			err := json.Unmarshal(*msg, &echoMessageArrayStruct)
-			if err != nil {
-				log.Printf("Unmarshal error: %v", err)
-				return
-			}
-			echoMessageStruct.DataArray = echoMessageArrayStruct.Data
-			echoMessageStruct.Echo = echoMessageArrayStruct.Echo
-			echoMessageStruct.Status = echoMessageArrayStruct.Status
-		}
-
+	} else {
 		for _, p := range essentials.PluginArray {
 			go func(plugin *essentials.Plugin) {
-				plugin.GoroutineEcho(ctx, &echoMessageStruct, sendPump)
+				plugin.GoroutineEcho(ctx, &feedback, send)
 			}(p)
 		}
 	}
@@ -66,9 +77,9 @@ func MessageFactory(msg *[]byte, sendPump chan *[]byte) {
 	<-ctx.Done()
 }
 
-func CleanMessage(message *[]structs.ArrayMessage) (*[]structs.ArrayMessage, string) {
+func CleanMessage(message *[]structs.MessageSegment) (*[]structs.MessageSegment, string) {
 	var (
-		res     []structs.ArrayMessage
+		res     []structs.MessageSegment
 		command string
 	)
 	for _, m := range *message {
@@ -79,7 +90,7 @@ func CleanMessage(message *[]structs.ArrayMessage) (*[]structs.ArrayMessage, str
 			}
 			if strings.HasPrefix(words[0], "/") {
 				command = words[0]
-				res = append(res, []structs.ArrayMessage{{Type: "text", Data: map[string]any{
+				res = append(res, []structs.MessageSegment{{Type: "text", Data: map[string]any{
 					"text": strings.Join(words[1:], " "),
 				}}}...)
 			}

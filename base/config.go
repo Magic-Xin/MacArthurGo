@@ -19,6 +19,7 @@ type config struct {
 
 	Debug          bool    `json:"debug"`
 	Address        string  `json:"address"`
+	Port           int64   `json:"port"`
 	AuthToken      string  `json:"authToken"`
 	Admin          int64   `json:"admin"`
 	UpdateUrl      string  `json:"updateUrl"`

@@ -19,16 +19,16 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (*Poke) ReceiveAll(chan<- *[]byte) {}
+func (*Poke) ReceiveAll(essentials.SendFunc) {}
 
-func (*Poke) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.Poke.Args) {
+func (*Poke) ReceiveMessage(incomingMessageStruct *structs.IncomingMessageStruct, send essentials.SendFunc) {
+	if !essentials.CheckArgumentArray(incomingMessageStruct.Command, &base.Config.Plugins.Poke.Args) || incomingMessageStruct.MessageScene != "group" {
 		return
 	}
 
 	var uid int64
 
-	for _, m := range *messageStruct.CleanMessage {
+	for _, m := range *incomingMessageStruct.CleanMessage {
 		if m.Type == "at" {
 			uid, _ = strconv.ParseInt(m.Data["qq"].(string), 10, 64)
 		}
@@ -37,10 +37,10 @@ func (*Poke) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[
 		}
 	}
 	if uid != 0 {
-		send <- essentials.SendPoke(messageStruct, uid)
-	} else if messageStruct.UserId != 0 {
-		send <- essentials.SendPoke(messageStruct, messageStruct.UserId)
+		essentials.SendGroupNudge(incomingMessageStruct, uid, send)
+	} else if incomingMessageStruct.SenderID != 0 {
+		essentials.SendGroupNudge(incomingMessageStruct, incomingMessageStruct.SenderID, send)
 	}
 }
 
-func (*Poke) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
+func (*Poke) ReceiveEcho(*structs.FeedbackStruct, essentials.SendFunc) {}

@@ -5,9 +5,6 @@ import (
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
 	"fmt"
-	"log"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -25,61 +22,51 @@ func init() {
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
 }
 
-func (*OriginPic) ReceiveAll(chan<- *[]byte) {}
+func (*OriginPic) ReceiveAll(essentials.SendFunc) {}
 
-func (*OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.OriginPic.Args) {
+func (*OriginPic) ReceiveMessage(incomingMessageStruct *structs.IncomingMessageStruct, send essentials.SendFunc) {
+	if !essentials.CheckArgumentArray(incomingMessageStruct.Command, &base.Config.Plugins.OriginPic.Args) {
 		return
 	}
 
-	message := messageStruct.Message
+	message := incomingMessageStruct.Segments
 	if message == nil {
 		return
 	}
 
 	for _, m := range message {
 		if m.Type == "reply" {
-			echo := fmt.Sprintf("originPic|%d", messageStruct.MessageId)
-			value := essentials.EchoCache{Value: *messageStruct, Time: time.Now().Unix()}
-			essentials.SetCache(strconv.FormatInt(messageStruct.MessageId, 10), value)
-			idStr := m.Data["id"].(string)
-			id, err := strconv.ParseInt(idStr, 10, 64)
-			if err != nil {
-				log.Printf("Failed to convert id to int64: %v", err)
-				continue
-			}
-			send <- essentials.SendAction("get_msg", structs.GetMsg{Id: id}, echo)
+			id := int64(m.Data["message_seq"].(float64))
+			value := essentials.EchoCache{Value: *incomingMessageStruct, Time: time.Now().Unix()}
+			essentials.SetCache(fmt.Sprintf("%d|%s", id, "originPic"), value)
+			essentials.GetMessage(incomingMessageStruct, id, send)
 		}
 	}
 }
 
-func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- *[]byte) {
-	if echoMessageStruct.Status != "ok" {
+func (o *OriginPic) ReceiveEcho(feedbackStruct *structs.FeedbackStruct, send essentials.SendFunc) {
+	if feedbackStruct.Status != "ok" {
 		return
 	}
 
-	echo := echoMessageStruct.Echo
-	split := strings.Split(echo, "|")
+	message := feedbackStruct.Data.Message
+	messageSeq := message.MessageSeq
 
-	if split[0] == "originPic" {
-		contexts := echoMessageStruct.Data
-		message := contexts.Message
-		if message == nil {
-			return
-		}
+	if messageSeq == 0 {
+		return
+	}
 
-		value, ok := essentials.GetCache(split[1])
-		if !ok {
-			log.Println("Origin picture cache not found")
-			return
-		}
-		messageStruct := value.(essentials.EchoCache).Value
+	value, ok := essentials.GetCache(fmt.Sprintf("%d|%s", messageSeq, "originPic"))
+	if !ok {
+		return
+	}
 
-		for _, m := range message {
-			if m.Type == "image" {
-				msg := fmt.Sprintf("已获取原图链接，请尽快保存:\n %s", m.Data["url"])
-				send <- essentials.SendMsg(&messageStruct, msg, nil, false, true, "")
-			}
+	messageStruct := value.(essentials.EchoCache).Value
+
+	for _, m := range message.Segments {
+		if m.Type == "image" {
+			msg := fmt.Sprintf("已获取原图链接，请尽快保存:\n %s", m.Data["temp_url"])
+			essentials.SendMsg(&messageStruct, msg, nil, false, true, send)
 		}
 	}
 }

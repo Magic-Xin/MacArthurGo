@@ -12,7 +12,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"google.golang.org/genai"
@@ -24,24 +23,26 @@ type Gemini struct {
 	ApiKey  string
 }
 
-type RMap struct {
-	Data      []structs.ArrayMessage
-	OriginStr string
-	Time      int64
-}
+//type RMap struct {
+//	Data      []structs.ArrayMessage
+//	OriginStr string
+//	Time      int64
+//}
 
-type HMap struct {
-	History []*genai.Content
-	Time    int64
-}
+//type HMap struct {
+//	History []*genai.Content
+//	Time    int64
+//}
 
-func (g *Gemini) RequireAnswer(message *[]structs.ArrayMessage, messageID int64, modelName string) (*[]string, *[]byte) {
+func (g *Gemini) RequireAnswer(incomingMessage *structs.IncomingMessageStruct, modelName string, send essentials.SendFunc) (*[]string, int64) {
 	var parts []*genai.Part
+
+	message := incomingMessage.CleanMessage
 
 	for _, msg := range *message {
 		switch msg.Type {
 		case "image":
-			if url, ok := msg.Data["url"].(string); ok {
+			if url, ok := msg.Data["temp_url"].(string); ok {
 				if data, imgType, err := g.ImageProcessing(essentials.GetImageData(url)); err == nil {
 					parts = append(parts, &genai.Part{InlineData: &genai.Blob{Data: *data, MIMEType: "image/" + imgType}})
 				} else {
@@ -49,14 +50,9 @@ func (g *Gemini) RequireAnswer(message *[]structs.ArrayMessage, messageID int64,
 				}
 			}
 		case "reply":
-			echo := fmt.Sprintf("gemini|%d|%s", messageID, modelName)
-			idStr := msg.Data["id"].(string)
-			id, err := strconv.ParseInt(idStr, 10, 64)
-			if err != nil {
-				log.Printf("Failed to convert id to int64: %v", err)
-				continue
-			}
-			return nil, essentials.SendAction("get_msg", structs.GetMsg{Id: id}, echo)
+			id := int64(msg.Data["message_seq"].(float64))
+			essentials.GetMessage(incomingMessage, id, send)
+			return nil, id
 		case "text":
 			if text, ok := msg.Data["text"].(string); ok && text != "" {
 				parts = append(parts, &genai.Part{Text: text})
@@ -69,10 +65,10 @@ func (g *Gemini) RequireAnswer(message *[]structs.ArrayMessage, messageID int64,
 		log.Printf("Get response error: %v", err)
 	}
 
-	return resp, nil
+	return resp, 0
 }
 
-func (g *Gemini) RequireEchoAnswer(originMessage *[]structs.ArrayMessage, echoMessage *[]structs.ArrayMessage, modelName string) *[]string {
+func (g *Gemini) RequireEchoAnswer(originMessage *[]structs.MessageSegment, echoMessage *[]structs.MessageSegment, modelName string) *[]string {
 	var parts []*genai.Part
 
 	for _, msg := range *originMessage {

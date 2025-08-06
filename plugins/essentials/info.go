@@ -3,7 +3,6 @@ package essentials
 import (
 	"MacArthurGo/base"
 	"MacArthurGo/structs"
-	"encoding/json"
 	"fmt"
 	"log"
 	"runtime"
@@ -13,9 +12,9 @@ import (
 )
 
 type LoginInfo struct {
-	send       chan<- *[]byte
+	Send       SendFunc
 	NickName   string
-	UserId     string
+	UserId     int64
 	FriendList []Friend
 	GroupList  []Group
 	IsOnline   bool
@@ -30,7 +29,7 @@ type Friend struct {
 
 type Group struct {
 	GroupId        int64  `json:"group_id"`
-	GroupName      string `json:"group_name"`
+	Name           string `json:"name"`
 	MemberCount    int    `json:"member_count"`
 	MaxMemberCount int    `json:"max_member_count"`
 }
@@ -52,14 +51,10 @@ func init() {
 	go SchedulerRequireUpdate(&Info)
 }
 
-func (l *LoginInfo) ReceiveAll(send chan<- *[]byte) {
-	if l.send == nil && send != nil {
-		l.send = send
-	}
-}
+func (l *LoginInfo) ReceiveAll(SendFunc) {}
 
-func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if messageStruct.Command == "/info" {
+func (l *LoginInfo) ReceiveMessage(incomingMessage *structs.IncomingMessageStruct, send SendFunc) {
+	if incomingMessage.Command == "/info" {
 		var mem runtime.MemStats
 		runtime.ReadMemStats(&mem)
 
@@ -79,8 +74,8 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send ch
 		message += "Sys = " + strconv.FormatUint(mem.Sys/1024/1024, 10) + " MB\n"
 		message += "HeapAlloc = " + strconv.FormatUint(mem.HeapAlloc/1024/1024, 10) + " MB\n"
 
-		send <- SendMsg(messageStruct, message, nil, false, false, "")
-	} else if messageStruct.Command == "/help" {
+		SendMsg(incomingMessage, message, nil, false, false, send)
+	} else if incomingMessage.Command == "/help" {
 		result := []string{"插件\t\t\t\t触发指令"}
 		for _, p := range PluginArray {
 			var res string
@@ -101,74 +96,63 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send ch
 			result = append(result, res)
 		}
 
-		send <- SendMsg(messageStruct, strings.Join(result, "\n"), nil, false, false, "")
-	} else if messageStruct.Command == "/info_update" {
-		if messageStruct.UserId != base.Config.Admin {
-			send <- SendMsg(messageStruct, "该指令仅限管理员使用", nil, false, true, "")
+		SendMsg(incomingMessage, strings.Join(result, "\n"), nil, false, false, send)
+	} else if incomingMessage.Command == "/info_update" {
+		if incomingMessage.SenderID != base.Config.Admin {
+			SendMsg(incomingMessage, "该指令仅限管理员使用", nil, false, true, send)
 			return
 		}
 
 		l.RequireUpdate()
-		send <- SendMsg(messageStruct, "信息更新请求已发送", nil, false, false, "")
+		SendMsg(incomingMessage, "信息更新请求已发送", nil, false, false, send)
 	}
-	return
 }
 
-func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- *[]byte) {
-	if echoMessageStruct.Status != "ok" {
+func (l *LoginInfo) ReceiveEcho(feedbackStruct *structs.FeedbackStruct, send SendFunc) {
+	if feedbackStruct.Status != "ok" {
 		return
 	}
 
-	sendStruct := structs.MessageStruct{
-		MessageType: "private",
-		UserId:      base.Config.Admin,
+	sendStruct := structs.IncomingMessageStruct{
+		MessageScene: "private",
+		SenderID:     base.Config.Admin,
 	}
 
-	switch echoMessageStruct.Echo {
-	case "info":
-		data := echoMessageStruct.Data
-		l.NickName, l.UserId = data.Nickname, strconv.FormatInt(data.UserId, 10)
-		log.Printf("Get account nickname: %s, id: %s", l.NickName, l.UserId)
+	data := feedbackStruct.Data
+
+	if data.Nickname != "" && data.Uin != 0 {
+		l.NickName, l.UserId = data.Nickname, data.Uin
+		log.Printf("Get account nickname: %s, id: %d", l.NickName, l.UserId)
 		if !l.IsOnline {
-			send <- SendMsg(&sendStruct, "MacArthurGo 已上线", nil, false, false, "")
+			SendMsg(&sendStruct, "MacArthurGo 已上线", nil, false, false, send)
 			l.IsOnline = true
 		}
-		l.UpdateTime[0] = time.Now().Unix()
-	case "friendList":
-		data := echoMessageStruct.DataArray
-		bytesData, err := json.Marshal(data)
-		if err != nil {
-			log.Printf("FriendList Marshal error: %v", err)
-			return
+	} else if len(data.Friends) > 0 {
+		l.FriendList = make([]Friend, len(data.Friends))
+		for i, friend := range data.Friends {
+			l.FriendList[i] = Friend{
+				UserId:   friend.UserId,
+				Nickname: friend.Nickname,
+				Remark:   friend.Remark,
+			}
 		}
-		err = json.Unmarshal(bytesData, &l.FriendList)
-		if err != nil {
-			log.Printf("FriendList Unmarshal error: %v", err)
-			return
-		}
-
 		log.Printf("Get friend list count: %d", len(l.FriendList))
-		//send <- SendMsg(&sendStruct, fmt.Sprintf("好友列表加载成功，好友数量: %d", len(l.FriendList)), nil, false, false, "")
+		SendMsg(&sendStruct, fmt.Sprintf("好友列表加载成功，好友数量: %d", len(l.FriendList)), nil, false, false, send)
 		l.UpdateTime[1] = time.Now().Unix()
-	case "groupList":
-		data := echoMessageStruct.DataArray
-		bytesData, err := json.Marshal(data)
-		if err != nil {
-			log.Printf("GroupList Marshal error: %v", err)
-			return
+	} else if len(data.Groups) > 0 {
+		l.GroupList = make([]Group, len(data.Groups))
+		for i, group := range data.Groups {
+			l.GroupList[i] = Group{
+				GroupId:        group.GroupId,
+				Name:           group.Name,
+				MemberCount:    group.MemberCount,
+				MaxMemberCount: group.MaxMemberCount,
+			}
 		}
-		err = json.Unmarshal(bytesData, &l.GroupList)
-		if err != nil {
-			log.Printf("GroupList Unmarshal error: %v", err)
-			return
-		}
-
 		log.Printf("Get group list count: %d", len(l.GroupList))
-		//send <- SendMsg(&sendStruct, fmt.Sprintf("群组列表加载成功，群组数量: %d", len(l.GroupList)), nil, false, false, "")
+		SendMsg(&sendStruct, fmt.Sprintf("群组列表加载成功，群组数量: %d", len(l.GroupList)), nil, false, false, send)
 		l.UpdateTime[2] = time.Now().Unix()
 	}
-
-	return
 }
 
 func (*LoginInfo) timeToString(time int64) string {
@@ -184,13 +168,14 @@ func (*LoginInfo) timeToString(time int64) string {
 }
 
 func (l *LoginInfo) RequireUpdate() {
-	if l.send == nil {
-		log.Printf("LoginInfo: Waiting for send channel...")
+	for l.Send == nil {
+		log.Printf("LoginInfo: Waiting for Send channel...")
 		time.Sleep(10 * time.Second)
 	}
-	l.send <- SendAction("get_login_info", struct{}{}, "info")
-	l.send <- SendAction("get_friend_list", struct{}{}, "friendList")
-	l.send <- SendAction("get_group_list", struct{}{}, "groupList")
+
+	SendAction("get_login_info", map[string]any{}, l.Send)
+	SendAction("get_friend_list", map[string]any{"no_cache": true}, l.Send)
+	SendAction("get_group_list", map[string]any{"no_cache": true}, l.Send)
 }
 
 func SchedulerRequireUpdate(l *LoginInfo) {

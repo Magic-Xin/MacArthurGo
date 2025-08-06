@@ -1,48 +1,51 @@
 package structs
 
 import (
-	"encoding/json"
 	"regexp"
 	"strings"
 )
 
-func Text(text string) *ArrayMessage {
-	return &ArrayMessage{Type: "text", Data: map[string]any{"text": text}}
+func Text(text string) *MessageSegment {
+	return &MessageSegment{Type: "text", Data: map[string]any{"text": text}}
 }
 
-func At(qq string) *ArrayMessage {
-	return &ArrayMessage{Type: "at", Data: map[string]any{"qq": qq}}
+func Mention(userID int64) *MessageSegment {
+	return &MessageSegment{Type: "mention", Data: map[string]any{"user_id": userID}}
 }
 
-func Reply(id string) *ArrayMessage {
-	return &ArrayMessage{Type: "reply", Data: map[string]any{"id": id}}
+func MentionAll() *MessageSegment {
+	return &MessageSegment{Type: "mention_all", Data: map[string]any{}}
 }
 
-func Poke(id int64) *ArrayMessage {
-	return &ArrayMessage{Type: "touch", Data: map[string]any{"id": id}}
+func Reply(messageSeq int64) *MessageSegment {
+	return &MessageSegment{Type: "reply", Data: map[string]any{"message_seq": messageSeq}}
 }
 
-func Music(urlType string, id string) *ArrayMessage {
-	return &ArrayMessage{Type: "music", Data: map[string]any{"type": urlType, "id": id}}
+//func Poke(id int64) *MessageSegment {
+//	return &MessageSegment{Type: "touch", Data: map[string]any{"id": id}}
+//}
+
+//func Music(urlType string, id string) *MessageSegment {
+//	return &MessageSegment{Type: "music", Data: map[string]any{"type": urlType, "id": id}}
+//}
+
+func Image(uri string) *MessageSegment {
+	return &MessageSegment{Type: "image", Data: map[string]any{"uri": uri, "sub_type": "normal"}}
 }
 
-func Image(file string) *ArrayMessage {
-	return &ArrayMessage{Type: "image", Data: map[string]any{"file": file}}
-}
+//func Unmarshal(message []byte) *[]MessageSegment {
+//	var am []MessageSegment
+//	err := json.Unmarshal(message, &am)
+//
+//	if err != nil {
+//		return nil
+//	}
+//
+//	return &am
+//}
 
-func Unmarshal(message []byte) *[]ArrayMessage {
-	var am []ArrayMessage
-	err := json.Unmarshal(message, &am)
-
-	if err != nil {
-		return nil
-	}
-
-	return &am
-}
-
-func FromStr(str string) *[]ArrayMessage {
-	var result []ArrayMessage
+func FromStr(str string) *[]MessageSegment {
+	var result []MessageSegment
 	cqCodeRegex := regexp.MustCompile(`\[CQ:([^,[\]]+)((?:,[^,=[\]]+=[^,[\]]*)*)]`)
 	splitFn := func(c rune) bool {
 		return c == ','
@@ -57,7 +60,7 @@ func FromStr(str string) *[]ArrayMessage {
 			parts := strings.SplitN(kv, "=", 2)
 			data[parts[0]] = parts[1]
 		}
-		result = append(result, ArrayMessage{Type: str[match[2]:match[3]], Data: data})
+		result = append(result, MessageSegment{Type: str[match[2]:match[3]], Data: data})
 		begin = match[1]
 	}
 	result = append(result, *Text(str[begin:]))

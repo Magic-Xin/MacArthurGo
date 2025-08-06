@@ -18,7 +18,7 @@ type Waifu struct {
 }
 
 type DailyWaifu struct {
-	send  chan<- *[]byte
+	send  essentials.SendFunc
 	Cache sync.Map
 }
 
@@ -33,44 +33,47 @@ func init() {
 	go ScheduleRequireUpdate(plugin.Interface.(*DailyWaifu))
 }
 
-func (d *DailyWaifu) ReceiveAll(send chan<- *[]byte) {
+func (d *DailyWaifu) ReceiveAll(send essentials.SendFunc) {
 	if d.send == nil && send != nil {
 		d.send = send
 	}
 }
 
-func (d *DailyWaifu) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.Waifu.Args) {
+func (d *DailyWaifu) ReceiveMessage(incomingMessageStruct *structs.IncomingMessageStruct, send essentials.SendFunc) {
+	if !essentials.CheckArgumentArray(incomingMessageStruct.Command, &base.Config.Plugins.Waifu.Args) {
 		return
 	}
 
-	if messageStruct.GroupId == 0 {
-		for _, msg := range *messageStruct.CleanMessage {
-			if msg.Type == "text" && msg.Data["text"].(string) == "update" {
-				if messageStruct.UserId != base.Config.Admin {
-					send <- essentials.SendMsg(messageStruct, "该指令仅限管理员使用", nil, false, true, "")
-				} else {
-					d.RequireUpdate()
-					send <- essentials.SendMsg(messageStruct, "今日老婆信息更新中...", nil, false, true, "")
-				}
+	for _, msg := range *incomingMessageStruct.CleanMessage {
+		if msg.Type == "text" && msg.Data["text"].(string) == "update" {
+			if incomingMessageStruct.SenderID != base.Config.Admin {
+				essentials.SendMsg(incomingMessageStruct, "该指令仅限管理员使用", nil, false, true, send)
+			} else {
+				d.RequireUpdate()
+				essentials.SendMsg(incomingMessageStruct, "今日老婆信息更新中...", nil, false, true, send)
 			}
+			return
 		}
+	}
+
+	if incomingMessageStruct.MessageScene != "group" {
+		essentials.SendMsg(incomingMessageStruct, "该指令仅限群聊使用", nil, false, true, send)
 		return
 	}
 
 	const avatarApi = "https://q1.qlogo.cn/g?b=qq&s=100&nk="
 
-	groupCache, ok := d.Cache.Load(messageStruct.GroupId)
+	groupCache, ok := d.Cache.Load(incomingMessageStruct.Group.GroupID)
 	if !ok {
-		send <- essentials.SendMsg(messageStruct, "获取群组缓存失败", nil, false, true, "")
+		essentials.SendMsg(incomingMessageStruct, "获取群组缓存失败", nil, false, true, send)
 		return
 	}
 
 	groupCacheMap := groupCache.(map[int64]Waifu)
-	userId := messageStruct.UserId
+	userId := incomingMessageStruct.SenderID
 	if _, ok := groupCacheMap[userId]; ok {
 		wife := groupCacheMap[userId]
-		var msg []structs.ArrayMessage
+		var msg []structs.MessageSegment
 
 		if wife.Card != "" {
 			msg = append(msg, *structs.Text(fmt.Sprintf("你今天的老婆是: %s(%s)\n%d", wife.Card, wife.NickName, wife.UserId)))
@@ -78,24 +81,26 @@ func (d *DailyWaifu) ReceiveMessage(messageStruct *structs.MessageStruct, send c
 			msg = append(msg, *structs.Text(fmt.Sprintf("你今天的老婆是: %s\n%d", wife.NickName, wife.UserId)))
 		}
 		msg = append(msg, *structs.Image(fmt.Sprintf("%s%d", avatarApi, wife.UserId)))
-		send <- essentials.SendMsg(messageStruct, "", &msg, false, true, "")
+		essentials.SendMsg(incomingMessageStruct, "", &msg, false, true, send)
 		return
 	}
 
-	send <- essentials.SendMsg(messageStruct, "获取老婆失败, 你今天没老婆了", nil, false, true, "")
+	essentials.SendMsg(incomingMessageStruct, "获取老婆失败, 你今天没老婆了", nil, false, true, send)
 }
 
-func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, _ chan<- *[]byte) {
-	if echoMessageStruct.Status != "ok" || echoMessageStruct.Echo != "groupMemberList" {
+func (d *DailyWaifu) ReceiveEcho(feedbackStruct *structs.FeedbackStruct, _ essentials.SendFunc) {
+	if feedbackStruct.Status != "ok" {
 		return
 	}
-	if len(echoMessageStruct.DataArray) == 0 {
+
+	members := feedbackStruct.Data.Members
+	if len(members) == 0 {
 		return
 	}
 
 	var waifus []Waifu
-	groupId := echoMessageStruct.DataArray[0].GroupId
-	for _, data := range echoMessageStruct.DataArray {
+	groupId := members[0].GroupId
+	for _, data := range members {
 		waifus = append(waifus, Waifu{
 			UserId:   data.UserId,
 			NickName: data.Nickname,
@@ -108,9 +113,9 @@ func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, _
 	src := rand.NewSource(seedDate.UnixNano())
 	r := rand.New(src)
 
-	userIDs := make([]int64, len(echoMessageStruct.DataArray))
+	userIDs := make([]int64, len(members))
 	userMap := make(map[int64]Waifu)
-	for i, u := range echoMessageStruct.DataArray {
+	for i, u := range members {
 		userIDs[i] = u.UserId
 		userMap[u.UserId] = Waifu{
 			UserId:   u.UserId,
@@ -172,10 +177,8 @@ func (d *DailyWaifu) RequireUpdate() {
 
 	for _, group := range essentials.Info.GroupList {
 		d.Cache.Clear()
-		d.send <- essentials.SendAction("get_group_member_list",
-			struct {
-				GroupId int64 `json:"group_id"`
-			}{GroupId: group.GroupId}, "groupMemberList")
+		essentials.SendAction("get_group_member_list", map[string]any{"group_id": group.GroupId}, d.send)
+		log.Printf("DailyWaifu: Updating group %d member list", group.GroupId)
 	}
 }
 
