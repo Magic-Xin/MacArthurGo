@@ -5,20 +5,19 @@ import (
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
+	"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/tidwall/gjson"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -33,12 +32,10 @@ type BiliLogin struct {
 }
 
 type AISummarize struct {
-	Enabled        bool
-	GroupForward   bool
-	mixinKeyEncTab []int
-	cache          sync.Map
-	lastUpdateTime time.Time
-	LoginInfo      *BiliLogin
+	Enabled      bool
+	GroupForward bool
+	LoginInfo    *BiliLogin
+	loginMsg     string
 }
 
 type VideoData struct {
@@ -70,13 +67,7 @@ func init() {
 	aiSummarize := AISummarize{
 		Enabled:      base.Config.Plugins.Bili.AiSummarize.Enable,
 		GroupForward: base.Config.Plugins.Bili.AiSummarize.GroupForward,
-		mixinKeyEncTab: []int{
-			46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49,
-			33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 40,
-			61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11,
-			36, 20, 34, 44, 52,
-		},
-		LoginInfo: &login,
+		LoginInfo:    &login,
 	}
 	bili := Bili{
 		AiSummarize: &aiSummarize,
@@ -87,9 +78,20 @@ func init() {
 		Interface: &bili,
 	}
 	essentials.PluginArray = append(essentials.PluginArray, plugin)
+
+	bili.AiSummarize.LoadLoginInfo()
 }
 
-func (*Bili) ReceiveAll(chan<- *[]byte) {}
+func (b *Bili) ReceiveAll(send chan<- *[]byte) {
+	if send != nil {
+		return
+	}
+
+	if b.AiSummarize.loginMsg != "" {
+		send <- essentials.SendMsg(nil, b.AiSummarize.loginMsg, nil, false, false, "")
+		b.AiSummarize.loginMsg = ""
+	}
+}
 
 func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
 	const biliShort = `((b23.tv|bili2233.cn)\\?/\w+)`
@@ -339,6 +341,7 @@ func (a *AISummarize) Login(messageStruct *structs.MessageStruct, send chan<- *[
 				a.LoginInfo.Cookies = resp.Cookies()
 				a.LoginInfo.RefreshToken = ctx["data"].(map[string]any)["refresh_token"].(string)
 				a.LoginInfo.TimeStamp = int64(ctx["data"].(map[string]any)["timestamp"].(float64))
+				a.SaveLoginInfo()
 				send <- essentials.SendMsg(messageStruct, "登录成功", nil, false, false, "")
 				return
 			} else if ctx["code"].(float64) == 86038 {
@@ -354,6 +357,40 @@ func (a *AISummarize) Login(messageStruct *structs.MessageStruct, send chan<- *[
 			log.Printf("Bili Login Error: %s", err)
 		}
 	}(resp.Body)
+}
+
+func (a *AISummarize) SaveLoginInfo() {
+	if a.LoginInfo == nil {
+		log.Println("Bili Login Info is nil, cannot save cookies")
+		return
+	}
+
+	data, err := json.Marshal(a.LoginInfo)
+	if err != nil {
+		log.Printf("Bili Save Login Info Error: %s", err)
+		return
+	}
+
+	err = os.WriteFile("bili_info.dat", data, 0644)
+}
+
+func (a *AISummarize) LoadLoginInfo() {
+	data, err := os.ReadFile("bili_info.dat")
+	if err != nil {
+		a.loginMsg = "未找到 B 站登录信息，请先登录"
+		return
+	}
+
+	err = json.Unmarshal(data, a.LoginInfo)
+	if err != nil {
+		a.loginMsg = "Bili Login Info Unmarshal Error: " + err.Error()
+		return
+	}
+
+	if a.LoginInfo.Cookies == nil || len(a.LoginInfo.Cookies) == 0 {
+		a.loginMsg = "Bili Login Info Cookies is nil or empty, please login manually"
+		return
+	}
 }
 
 func (a *AISummarize) Summarize(videoData *VideoData, sumOnly bool) (string, *[]string) {
