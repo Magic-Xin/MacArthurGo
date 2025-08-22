@@ -444,7 +444,7 @@ func (a *AISummarize) Summarize(videoData *VideoData, sumOnly bool) (string, *[]
 }
 
 func (a *AISummarize) requireSummarize(url string) (*map[string]any, error) {
-	newUrlStr, err := a.signAndGenerateURL(url)
+	newUrlStr, err := signAndGenerateURL(url)
 	if err != nil {
 		log.Printf("Error: %s", err)
 		return nil, err
@@ -490,125 +490,6 @@ func (a *AISummarize) requireSummarize(url string) (*map[string]any, error) {
 	return &ctx, nil
 }
 
-func (a *AISummarize) signAndGenerateURL(urlStr string) (string, error) {
-	urlObj, err := url.Parse(urlStr)
-	if err != nil {
-		return "", err
-	}
-	imgKey, subKey := a.getWbiKeysCached()
-	query := urlObj.Query()
-	params := map[string]string{}
-	for k, v := range query {
-		params[k] = v[0]
-	}
-	newParams := a.encWbi(params, imgKey, subKey)
-	for k, v := range newParams {
-		query.Set(k, v)
-	}
-	urlObj.RawQuery = query.Encode()
-	newUrlStr := urlObj.String()
-	return newUrlStr, nil
-}
-
-func (a *AISummarize) encWbi(params map[string]string, imgKey, subKey string) map[string]string {
-	mixinKey := a.getMixinKey(imgKey + subKey)
-	currTime := strconv.FormatInt(time.Now().Unix(), 10)
-	params["wts"] = currTime
-
-	// Sort keys
-	keys := make([]string, 0, len(params))
-	for k := range params {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	// Remove unwanted characters
-	for k, v := range params {
-		v = a.sanitizeString(v)
-		params[k] = v
-	}
-
-	// Build URL parameters
-	query := url.Values{}
-	for _, k := range keys {
-		query.Set(k, params[k])
-	}
-	queryStr := query.Encode()
-
-	// Calculate w_rid
-	hash := md5.Sum([]byte(queryStr + mixinKey))
-	params["w_rid"] = hex.EncodeToString(hash[:])
-	return params
-}
-
-func (a *AISummarize) getMixinKey(orig string) string {
-	var str strings.Builder
-	for _, v := range a.mixinKeyEncTab {
-		if v < len(orig) {
-			str.WriteByte(orig[v])
-		}
-	}
-	return str.String()[:32]
-}
-
-func (*AISummarize) sanitizeString(s string) string {
-	unwantedChars := []string{"!", "'", "(", ")", "*"}
-	for _, char := range unwantedChars {
-		s = strings.ReplaceAll(s, char, "")
-	}
-	return s
-}
-
-func (a *AISummarize) updateCache() {
-	if time.Since(a.lastUpdateTime).Minutes() < 10 {
-		return
-	}
-	imgKey, subKey := a.getWbiKeys()
-	a.cache.Store("imgKey", imgKey)
-	a.cache.Store("subKey", subKey)
-	a.lastUpdateTime = time.Now()
-}
-
-func (a *AISummarize) getWbiKeysCached() (string, string) {
-	a.updateCache()
-	imgKeyI, _ := a.cache.Load("imgKey")
-	subKeyI, _ := a.cache.Load("subKey")
-	return imgKeyI.(string), subKeyI.(string)
-}
-
-func (*AISummarize) getWbiKeys() (string, string) {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", "https://api.bilibili.com/x/web-interface/nav", nil)
-	if err != nil {
-		fmt.Printf("Error creating request: %s", err)
-		return "", ""
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-	req.Header.Set("Referer", "https://www.bilibili.com/")
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Printf("Error sending request: %s", err)
-		return "", ""
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			fmt.Printf("Error closing response: %s", err)
-		}
-	}(resp.Body)
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Printf("Error reading response: %s", err)
-		return "", ""
-	}
-	jsonBody := string(body)
-	imgURL := gjson.Get(jsonBody, "data.wbi_img.img_url").String()
-	subURL := gjson.Get(jsonBody, "data.wbi_img.sub_url").String()
-	imgKey := strings.Split(strings.Split(imgURL, "/")[len(strings.Split(imgURL, "/"))-1], ".")[0]
-	subKey := strings.Split(strings.Split(subURL, "/")[len(strings.Split(subURL, "/"))-1], ".")[0]
-	return imgKey, subKey
-}
-
 func (*AISummarize) timestampToString(timestamp int64) string {
 	hour := timestamp / 3600
 	minute := timestamp % 3600 / 60
@@ -643,4 +524,168 @@ func (l *LiveData) ToArrayMessage() *[]cqcode.ArrayMessage {
 	messageArray = append(messageArray, *cqcode.Text(l.Status + "\n"))
 	messageArray = append(messageArray, *cqcode.Text(l.Url))
 	return &messageArray
+}
+
+// Wbi
+func signAndGenerateURL(urlStr string) (string, error) {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return "", err
+	}
+	err = Sign(u)
+	if err != nil {
+		return "", fmt.Errorf("sign error: %w", err)
+	}
+	return u.String(), nil
+}
+
+// Sign 为链接签名
+func Sign(u *url.URL) error {
+	return wbiKeys.Sign(u)
+}
+
+// Update 无视过期时间更新
+func Update() error {
+	return wbiKeys.Update()
+}
+
+func Get() (wk WbiKeys, err error) {
+	if err = wk.update(false); err != nil {
+		return WbiKeys{}, err
+	}
+	return wbiKeys, nil
+}
+
+var wbiKeys WbiKeys
+
+type WbiKeys struct {
+	Img            string
+	Sub            string
+	Mixin          string
+	lastUpdateTime time.Time
+}
+
+// Sign 为链接签名
+func (wk *WbiKeys) Sign(u *url.URL) (err error) {
+	if err = wk.update(false); err != nil {
+		return err
+	}
+
+	values := u.Query()
+
+	values = removeUnwantedChars(values, '!', '\'', '(', ')', '*') // 必要性存疑?
+
+	values.Set("wts", strconv.FormatInt(time.Now().Unix(), 10))
+
+	// [url.Values.Encode] 内会对参数排序,
+	// 且遍历 map 时本身就是无序的
+	hash := md5.Sum([]byte(values.Encode() + wk.Mixin)) // Calculate w_rid
+	values.Set("w_rid", hex.EncodeToString(hash[:]))
+	u.RawQuery = values.Encode()
+	return nil
+}
+
+// Update 无视过期时间更新
+func (wk *WbiKeys) Update() (err error) {
+	return wk.update(true)
+}
+
+// update 按需更新
+func (wk *WbiKeys) update(purge bool) error {
+	if !purge && time.Since(wk.lastUpdateTime) < time.Hour {
+		return nil
+	}
+
+	// 测试下来不用修改 header 也能过
+	resp, err := http.Get("https://api.bilibili.com/x/web-interface/nav")
+	if err != nil {
+		return err
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("failed to close response body: %s", err)
+		}
+	}(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	nav := Nav{}
+	err = json.Unmarshal(body, &nav)
+	if err != nil {
+		return err
+	}
+
+	if nav.Code != 0 && nav.Code != -101 { // -101 未登录时也会返回两个 key
+		return fmt.Errorf("unexpected code: %d, message: %s", nav.Code, nav.Message)
+	}
+	img := nav.Data.WbiImg.ImgUrl
+	sub := nav.Data.WbiImg.SubUrl
+	if img == "" || sub == "" {
+		return fmt.Errorf("empty image or sub url: %s", body)
+	}
+
+	// https://i0.hdslb.com/bfs/wbi/7cd084941338484aae1ad9425b84077c.png
+	imgParts := strings.Split(img, "/")
+	subParts := strings.Split(sub, "/")
+
+	// 7cd084941338484aae1ad9425b84077c.png
+	imgPng := imgParts[len(imgParts)-1]
+	subPng := subParts[len(subParts)-1]
+
+	// 7cd084941338484aae1ad9425b84077c
+	wbiKeys.Img = strings.TrimSuffix(imgPng, ".png")
+	wbiKeys.Sub = strings.TrimSuffix(subPng, ".png")
+
+	wbiKeys.mixin()
+	wbiKeys.lastUpdateTime = time.Now()
+	return nil
+}
+
+func (wk *WbiKeys) mixin() {
+	var mixin [32]byte
+	wbi := wk.Img + wk.Sub
+	for i := range mixin { // for i := 0; i < len(mixin); i++ {
+		mixin[i] = wbi[mixinKeyEncTab[i]]
+	}
+	wk.Mixin = string(mixin[:])
+}
+
+var mixinKeyEncTab = [...]int{
+	46, 47, 18, 2, 53, 8, 23, 32,
+	15, 50, 10, 31, 58, 3, 45, 35,
+	27, 43, 5, 49, 33, 9, 42, 19,
+	29, 28, 14, 39, 12, 38, 41, 13,
+	37, 48, 7, 16, 24, 55, 40, 61,
+	26, 17, 0, 1, 60, 51, 30, 4,
+	22, 25, 54, 21, 56, 59, 6, 63,
+	57, 62, 11, 36, 20, 34, 44, 52,
+}
+
+func removeUnwantedChars(v url.Values, chars ...byte) url.Values {
+	b := []byte(v.Encode())
+	for _, c := range chars {
+		b = bytes.ReplaceAll(b, []byte{c}, nil)
+	}
+	s, err := url.ParseQuery(string(b))
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
+type Nav struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Ttl     int    `json:"ttl"`
+	Data    struct {
+		WbiImg struct {
+			ImgUrl string `json:"img_url"`
+			SubUrl string `json:"sub_url"`
+		} `json:"wbi_img"`
+
+		// ......
+	} `json:"data"`
 }
