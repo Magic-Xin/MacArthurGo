@@ -491,13 +491,14 @@ func (a *AISummarize) requireSummarize(url string) (*map[string]any, error) {
 		log.Printf("Error: %s", err)
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36")
 	req.Header.Set("Referer", "https://www.bilibili.com/")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
+	req.Header.Set("Connection", "keep-alive")
 
 	for _, c := range a.LoginInfo.Cookies {
-		if c.Name == "SESSDATA" {
-			req.AddCookie(c)
-		}
+		req.AddCookie(c)
 	}
 
 	response, err := http.DefaultClient.Do(req)
