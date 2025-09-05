@@ -7,12 +7,13 @@ import (
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
-	"github.com/vinta/pangu"
 	"log"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/vinta/pangu"
 )
 
 type ChatAI struct {

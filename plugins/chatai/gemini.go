@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"google.golang.org/genai"
 	"image/gif"
 	"image/jpeg"
 	"io"
@@ -16,6 +15,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"google.golang.org/genai"
 )
 
 type Gemini struct {
