@@ -1,6 +1,11 @@
 package structs
 
-import "MacArthurGo/structs/cqcode"
+import (
+	"MacArthurGo/structs/cqcode"
+	"bytes"
+	"encoding/json"
+	"fmt"
+)
 
 type MessageStruct struct {
 	Time        int64  `json:"time"`
@@ -18,6 +23,44 @@ type MessageStruct struct {
 
 	Command      string
 	CleanMessage *[]cqcode.ArrayMessage
+}
+
+func (m *MessageStruct) UnmarshalJSON(data []byte) error {
+	type Alias MessageStruct
+	aux := &struct {
+		Message json.RawMessage `json:"message"`
+		*Alias
+	}{
+		Alias: (*Alias)(m),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if len(aux.Message) == 0 || bytes.Equal(aux.Message, []byte("null")) {
+		m.Message = nil
+		return nil
+	}
+
+	var s string
+	if err := json.Unmarshal(aux.Message, &s); err == nil {
+		m.Message = []cqcode.ArrayMessage{
+			{
+				Type: "text",
+				Data: map[string]interface{}{"text": s},
+			},
+		}
+		return nil
+	}
+
+	var arr []cqcode.ArrayMessage
+	if err := json.Unmarshal(aux.Message, &arr); err == nil {
+		m.Message = arr
+		return nil
+	}
+
+	return fmt.Errorf("unsupported message format: %s", string(aux.Message))
 }
 
 type EchoMessageStruct struct {
