@@ -51,7 +51,7 @@ jobs:
           echo "upx=../upx-4.2.2-amd64_linux/upx" >> $GITHUB_ENV
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
 
       - name: Build
         env:
