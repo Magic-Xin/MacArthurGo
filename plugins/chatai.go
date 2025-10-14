@@ -208,7 +208,11 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 
 		for _, m := range *messageStruct.CleanMessage {
 			if m.Type == "image" {
-				m.Data["file"] = essentials.ImageToBase64(m.Data["file"].(string))
+				if url, ok := m.Data["url"].(string); ok {
+					m.Data["file"] = essentials.ImageToBase64(url)
+				} else {
+					log.Println("Image get url error")
+				}
 			}
 		}
 
@@ -270,14 +274,22 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send 
 
 			for _, m := range echoMessageStruct.Data.Message {
 				if m.Type == "image" {
-					m.Data["file"] = essentials.ImageToBase64(m.Data["file"].(string))
+					if url, ok := m.Data["url"].(string); ok {
+						m.Data["file"] = essentials.ImageToBase64(url)
+					} else {
+						log.Println("Image get url error")
+					}
 				}
 			}
 			data = append(data, *essentials.ConstructForwardNode(strconv.FormatInt(echoMessageStruct.Data.Sender.UserId, 10), echoMessageStruct.Data.Nickname, &echoMessageStruct.Data.Message))
 
 			for _, m := range *originMessage.CleanMessage {
 				if m.Type == "image" {
-					m.Data["file"] = essentials.ImageToBase64(m.Data["file"].(string))
+					if url, ok := m.Data["url"].(string); ok {
+						m.Data["file"] = essentials.ImageToBase64(url)
+					} else {
+						log.Println("Image get url error")
+					}
 				}
 			}
 			data = append(data, *essentials.ConstructForwardNode(strconv.FormatInt(originMessage.UserId, 10), originMessage.Sender.Nickname, originMessage.CleanMessage))
