@@ -9,7 +9,7 @@
 
 If you have any comments or suggestions, you are welcome to discuss and provide feedback in the [issues](https://github.com/Magic-Xin/MacArthurGo/issues) section
 
-**Highly recommend using [Lagrange.OneBot](https://github.com/KonataDev/Lagrange.Core) as the OneBot server**
+**Highly recommend using [NapCatQQ](https://github.com/NapNeko/NapCatQQ) as the OneBot server**
 
 ## How to use
 
@@ -27,7 +27,7 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - Chat AI
   - ChatGPT
   - Alibaba QianWen
-  - Google Gemini Pro (with picture search)
+  - Google Gemini
   - Github Models
 - Music url parser
   - Netease Cloud Music
@@ -56,6 +56,7 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - [onebot-11](https://github.com/botuniverse/onebot-11)
 - [OpenShamrock](https://github.com/whitechi73/OpenShamrock)
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
+- [NapCatQQ](https://github.com/NapNeko/NapCatQQ)
 
 ## Special thanks
 ![JetBrains](https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.svg)
