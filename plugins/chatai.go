@@ -137,9 +137,9 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		case "think":
 			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-flash")
 		case "pro":
-			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-pro")
+			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-3-pro-preview")
 		case "image":
-			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-flash-image-preview")
+			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-3-pro-image-preview")
 		}
 		if action != nil {
 			value := essentials.EchoCache{Value: *messageStruct, Time: time.Now().Unix()}
