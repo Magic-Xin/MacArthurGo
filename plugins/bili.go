@@ -426,11 +426,12 @@ func (a *AISummarize) Summarize(videoData *VideoData, sumOnly bool) (string, *[]
 		return "该视频可能内含敏感内容或其他异常，不支持 AI 总结", nil
 	}
 	if dataCode == 1 {
-		if (*ctx)["data"].(map[string]any)["stid"].(string) == "" {
+		switch (*ctx)["data"].(map[string]any)["stid"].(string) {
+		case "":
 			return "该视频未识别到语音，暂不支持 AI 总结", nil
-		} else if (*ctx)["data"].(map[string]any)["stid"].(string) == "0" {
+		case "0":
 			return "该视频正在 AI 总结等待队列，请稍后再试", nil
-		} else {
+		default:
 			return "由于未知问题，无法获得该视频的 AI 总结", nil
 		}
 	}
