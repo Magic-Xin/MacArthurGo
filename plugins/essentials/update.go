@@ -39,7 +39,6 @@ func (u *Update) ReceiveAll(send chan<- *[]byte) {
 		send <- u.sendCache
 		u.sendCache = nil
 	}
-	return
 }
 
 func (u *Update) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
@@ -69,7 +68,6 @@ func (u *Update) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		message = append(message, *cqcode.Text("\n\n版本一致，无需更新"))
 	}
 	send <- SendMsg(messageStruct, "", &message, false, false, "")
-	return
 }
 
 func (*Update) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}

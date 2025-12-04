@@ -112,7 +112,6 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send ch
 		l.RequireUpdate()
 		send <- SendMsg(messageStruct, "信息更新请求已发送", nil, false, false, "")
 	}
-	return
 }
 
 func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- *[]byte) {
@@ -168,8 +167,6 @@ func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, se
 		//send <- SendMsg(&sendStruct, fmt.Sprintf("群组列表加载成功，群组数量: %d", len(l.GroupList)), nil, false, false, "")
 		l.UpdateTime[2] = time.Now().Unix()
 	}
-
-	return
 }
 
 func (*LoginInfo) timeToString(time int64) string {
