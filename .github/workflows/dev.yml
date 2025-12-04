@@ -20,12 +20,27 @@ jobs:
     name: Build binary CI
     strategy:
       matrix:
-        goos: [ linux, windows, darwin ]
-        goarch: [ "386", amd64, arm64 ]
-        exclude:
+        include:
+          - goos: linux
+            goarch: amd64
+            runner: ubuntu-latest
+          - goos: linux
+            goarch: arm64
+            runner: ubuntu-24.04-arm
+          - goos: windows
+            goarch: amd64
+            runner: windows-latest
+          - goos: windows
+            goarch: arm64
+            runner: windows-11-arm
           - goos: darwin
-            goarch: "386"
-    runs-on: ${{ matrix.goos == 'linux' && 'ubuntu-latest' || matrix.goos == 'windows' && 'windows-latest' || 'macos-latest' }}
+            goarch: amd64
+            runner: macos-15-intel
+          - goos: darwin
+            goarch: arm64
+            runner: macos-latest
+
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
 
