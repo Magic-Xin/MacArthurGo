@@ -29,6 +29,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Install dependencies (Linux only)
+        if: ${{ matrix.os == 'linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc-multilib g++-multilib
+
       - name: Set Environment
         run: |
           mkdir -p bin
