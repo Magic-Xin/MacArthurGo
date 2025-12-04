@@ -18,7 +18,6 @@ env:
 jobs:
   Build:
     name: Build binary CI
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         goos: [ linux, windows, darwin ]
@@ -26,6 +25,7 @@ jobs:
         exclude:
           - goos: darwin
             goarch: "386"
+    runs-on: ${{ matrix.goos == 'linux' && 'ubuntu-latest' || matrix.goos == 'windows' && 'windows-latest' || 'macos-latest' }}
     steps:
       - uses: actions/checkout@v5
 

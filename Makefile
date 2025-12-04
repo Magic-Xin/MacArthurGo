@@ -31,9 +31,6 @@ linux-amd64:
 linux-arm64:
 	CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-linux-arm64 ./
 
-android-arm64:
-	CGO_ENABLED=1 GOOS=android GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-android-arm64 ./
-
 windows-386:
 	CGO_ENABLED=1 GOOS=windows GOARCH=386 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-windows-386 ./
 
