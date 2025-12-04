@@ -96,7 +96,6 @@ func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 			break
 		}
 	}
-	return
 }
 
 func (*Corpus) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}

@@ -135,7 +135,6 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- 
 	} else if liveData != nil {
 		send <- essentials.SendMsg(messageStruct, "", liveData.ToArrayMessage(), false, true, "")
 	}
-	return
 }
 
 func (b *Bili) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}

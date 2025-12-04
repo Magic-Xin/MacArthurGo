@@ -81,7 +81,6 @@ func (p *PicSearch) ReceiveMessage(messageStruct *structs.MessageStruct, send ch
 		}
 
 	}
-	return
 }
 
 func (p *PicSearch) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- *[]byte) {
@@ -518,7 +517,6 @@ func (p *PicSearch) HandleBannedHostsArray(str *string) {
 	for _, host := range bannedHosts {
 		*str = strings.Replace(*str, host, strings.Replace(host, ".", ".\u200B", -1), -1)
 	}
-	return
 }
 
 func (p *PicSearch) ThumbnailToBase64(url string) *string {

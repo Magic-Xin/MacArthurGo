@@ -68,7 +68,6 @@ func (m *Music) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<-
 			send <- essentials.SendMusic(messageStruct, urlType, match[0][1])
 		}
 	}
-	return
 }
 
 func (*Music) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}

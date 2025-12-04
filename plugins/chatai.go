@@ -315,5 +315,4 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send 
 			send <- essentials.SendMsg(&originMessage, "", &msg, false, false, "")
 		}
 	}
-	return
 }
