@@ -83,7 +83,7 @@ func init() {
 }
 
 func (b *Bili) ReceiveAll(send chan<- *[]byte) {
-	if send != nil {
+	if send == nil {
 		return
 	}
 
