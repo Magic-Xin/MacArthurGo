@@ -10,36 +10,35 @@ DARWIN_PLATFORM_LIST = \
 LINUX_PLATFORM_LIST = \
 	linux-386 \
 	linux-amd64 \
-	linux-arm64 \
-	android-arm64
+	linux-arm64
 
 WINDOWS_PLATFORM_LIST = \
 	windows-386 \
     windows-amd64
 
 darwin-amd64:
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-darwin-amd64 ./
+	CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-darwin-amd64 ./
 
 darwin-arm64:
-	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-darwin-arm64 ./
+	CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-darwin-arm64 ./
 
 linux-386:
-	CGO_ENABLED=0 GOOS=linux GOARCH=386 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-linux-386 ./
+	CGO_ENABLED=1 GOOS=linux GOARCH=386 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-linux-386 ./
 
 linux-amd64:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-linux-amd64 ./
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-linux-amd64 ./
 
 linux-arm64:
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-linux-arm64 ./
+	CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-linux-arm64 ./
 
 android-arm64:
-	CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-android-arm64 ./
+	CGO_ENABLED=1 GOOS=android GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-android-arm64 ./
 
 windows-386:
-	CGO_ENABLED=0 GOOS=windows GOARCH=386 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-windows-386 ./
+	CGO_ENABLED=1 GOOS=windows GOARCH=386 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-windows-386 ./
 
 windows-amd64:
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-windows-amd64 ./
+	CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ${BINDIR}/MacArthurGo-windows-amd64 ./
 
 darwin_releases=$(addsuffix .tar, $(DARWIN_PLATFORM_LIST))
 
