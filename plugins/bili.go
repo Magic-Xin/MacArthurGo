@@ -372,6 +372,9 @@ func (a *AISummarize) SaveLoginInfo() {
 	}
 
 	err = os.WriteFile("bili_info.dat", data, 0644)
+	if err != nil {
+		log.Printf("Bili Save Login Info Error: %s", err)
+	}
 }
 
 func (a *AISummarize) LoadLoginInfo() {
