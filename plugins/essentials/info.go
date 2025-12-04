@@ -59,7 +59,8 @@ func (l *LoginInfo) ReceiveAll(send chan<- *[]byte) {
 }
 
 func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if messageStruct.Command == "/info" {
+	switch messageStruct.Command {
+	case "/info":
 		var mem runtime.MemStats
 		runtime.ReadMemStats(&mem)
 
@@ -80,7 +81,7 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send ch
 		message += "HeapAlloc = " + strconv.FormatUint(mem.HeapAlloc/1024/1024, 10) + " MB\n"
 
 		send <- SendMsg(messageStruct, message, nil, false, false, "")
-	} else if messageStruct.Command == "/help" {
+	case "/help":
 		result := []string{"插件\t\t\t\t触发指令"}
 		for _, p := range PluginArray {
 			var res string
@@ -102,7 +103,7 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send ch
 		}
 
 		send <- SendMsg(messageStruct, strings.Join(result, "\n"), nil, false, false, "")
-	} else if messageStruct.Command == "/info_update" {
+	case "/info_update":
 		if messageStruct.UserId != base.Config.Admin {
 			send <- SendMsg(messageStruct, "该指令仅限管理员使用", nil, false, true, "")
 			return
