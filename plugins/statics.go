@@ -73,7 +73,13 @@ func init() {
 	}
 
 	if cfg.Enable {
-		statics.tokenizer = gojieba.NewJieba()
+		dictPath := "./jieba_dict/jieba.dict.utf8"
+		hmmPath := "./jieba_dict/hmm_model.utf8"
+		userPath := "./jieba_dict/user.dict.utf8"
+		idfPath := "./jieba_dict/idf.utf8"
+		stopPath := "./jieba_dict/stop_words.utf8"
+
+		statics.tokenizer = gojieba.NewJieba(dictPath, hmmPath, userPath, idfPath, stopPath)
 	}
 
 	plugin := &essentials.Plugin{
