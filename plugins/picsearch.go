@@ -157,12 +157,12 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 			limiter := make(chan bool, 10)
 			response := make(chan []cqcode.ArrayMessage, 200)
 
+			wgResponse.Add(1)
 			go func() {
-				wgResponse.Add(1)
+				defer wgResponse.Done()
 				for rc := range response {
 					result = append(result, rc)
 				}
-				wgResponse.Done()
 			}()
 
 			wg.Add(2)
