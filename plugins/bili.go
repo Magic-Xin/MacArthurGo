@@ -390,7 +390,7 @@ func (a *AISummarize) LoadLoginInfo() {
 		return
 	}
 
-	if a.LoginInfo.Cookies == nil || len(a.LoginInfo.Cookies) == 0 {
+	if len(a.LoginInfo.Cookies) == 0 {
 		a.loginMsg = "Bili Login Info Cookies is nil or empty, please login manually"
 		return
 	}
