@@ -119,7 +119,7 @@ func init() {
 	f, err := os.Open(configPath)
 	if err != nil {
 		log.Printf("Open config failed: %v", err)
-		panic(nil)
+		panic(err)
 	}
 	defer func(f *os.File) {
 		err = f.Close()
@@ -131,7 +131,7 @@ func init() {
 	err = json.NewDecoder(f).Decode(&Config)
 	if err != nil {
 		log.Printf("Decode config failed: %v", err)
-		panic(nil)
+		panic(err)
 	}
 
 	Config.ConfigPath = configPath
