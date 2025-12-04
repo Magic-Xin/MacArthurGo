@@ -69,6 +69,30 @@
       "intervalTime": 1800,
       "sauceNAOToken": ""
     },
+    "statics": {
+      "enable": false,
+      "chartArgsMap": {
+        "today": "/今日发言",
+        "yesterday": "/昨日发言"
+      },
+      "wordCloudArgsMap": {
+        "today": "/今日词云",
+        "yesterday": "/昨日词云"
+      },
+      "stopWords": ["的", "了", "么", "啊", "吗", "你们", "我们", "http", "https"],
+      "retentionDays": 3,
+      "dataDir": "data/statics",
+      "chart": {
+        "width": 900,
+        "height": 520
+      },
+      "wordCloud": {
+        "width": 900,
+        "height": 520,
+        "maxWords": 80,
+        "fontFile": "./NotoSansSC-Regular.ttf"
+      }
+    },
     "chatAI": {
       "enable": false,
       "chatGPT": {

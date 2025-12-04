@@ -2,11 +2,12 @@ package base
 
 import (
 	"encoding/json"
-	"github.com/tidwall/pretty"
 	"log"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/tidwall/pretty"
 )
 
 var Config config
@@ -74,6 +75,24 @@ type config struct {
 			IntervalTime      int64    `json:"intervalTime"`
 			SauceNAOToken     string   `json:"sauceNAOToken"`
 		} `json:"picSearch"`
+		Statics struct {
+			Enable           bool              `json:"enable"`
+			ChartArgsMap     map[string]string `json:"chartArgsMap"`
+			WordCloudArgsMap map[string]string `json:"wordCloudArgsMap"`
+			StopWords        []string          `json:"stopWords"`
+			RetentionDays    int               `json:"retentionDays"`
+			DataDir          string            `json:"dataDir"`
+			Chart            struct {
+				Width  int `json:"width"`
+				Height int `json:"height"`
+			} `json:"chart"`
+			WordCloud struct {
+				Width    int    `json:"width"`
+				Height   int    `json:"height"`
+				MaxWords int    `json:"maxWords"`
+				FontFile string `json:"fontFile"`
+			} `json:"wordCloud"`
+		} `json:"statics"`
 		ChatAI struct {
 			Enable  bool `json:"enable"`
 			ChatGPT struct {

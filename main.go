@@ -2,10 +2,8 @@ package main
 
 import (
 	"MacArthurGo/base"
-	_ "MacArthurGo/base"
 	"MacArthurGo/client"
 	_ "MacArthurGo/plugins"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -21,7 +19,7 @@ func main() {
 		tz = time.FixedZone("Asia/Shanghai", 8*60*60)
 	}
 
-	fileName := fmt.Sprintf(time.Now().In(tz).Format("20060102150405"))
+	fileName := time.Now().In(tz).Format("20060102150405")
 	logPath := filepath.Join(".", "log")
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
 		err = os.Mkdir(logPath, os.ModeDir|0755)
