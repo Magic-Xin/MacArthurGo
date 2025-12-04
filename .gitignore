@@ -37,3 +37,5 @@ log/*
 img_cache/*
 TODO.md
 .DS_Store
+*.ttf
+*.otf
