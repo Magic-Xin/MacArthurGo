@@ -33,12 +33,6 @@ const (
 	defaultDataDir    = "data/statics"
 )
 
-var defaultStopWords = []string{
-	"的", "了", "呢", "啊", "吗", "吧", "你", "我", "他", "她", "它", "他们", "我们", "你们",
-	"然后", "以及", "就是", "聊天", "群聊", "消息", "http", "https", "www", "com",
-	"哈哈", "哈哈哈", "emm", "这边", "那边", "所以", "因为", "但是", "如果", "不是",
-}
-
 type groupStats struct {
 	Hourly [24]int64        `json:"hourly"`
 	Words  map[string]int64 `json:"words"`
@@ -67,18 +61,18 @@ func init() {
 		log.Printf("statics store init error: %v", err)
 	}
 
+	dictPath := "./jieba_dict/jieba.dict.utf8"
+	hmmPath := "./jieba_dict/hmm_model.utf8"
+	userPath := "./jieba_dict/user.dict.utf8"
+	idfPath := "./jieba_dict/idf.utf8"
+	stopPath := "./jieba_dict/stop_words.utf8"
+
 	statics := &Statics{
 		store:     store,
-		stopWords: buildStopWords(cfg.StopWords),
+		stopWords: buildStopWords(cfg.StopWords, stopPath),
 	}
 
 	if cfg.Enable {
-		dictPath := "./jieba_dict/jieba.dict.utf8"
-		hmmPath := "./jieba_dict/hmm_model.utf8"
-		userPath := "./jieba_dict/user.dict.utf8"
-		idfPath := "./jieba_dict/idf.utf8"
-		stopPath := "./jieba_dict/stop_words.utf8"
-
 		statics.tokenizer = gojieba.NewJieba(dictPath, hmmPath, userPath, idfPath, stopPath)
 	}
 
@@ -675,9 +669,22 @@ func normalizeWord(word string) string {
 	return res
 }
 
-func buildStopWords(custom []string) map[string]struct{} {
-	combined := append([]string{}, defaultStopWords...)
-	combined = append(combined, custom...)
+func buildStopWords(custom []string, dict string) map[string]struct{} {
+	combined := append([]string{}, custom...)
+	dictPath := strings.TrimSpace(dict)
+	if dictPath != "" {
+		if data, err := os.ReadFile(dictPath); err != nil {
+			log.Printf("statics stopwords read %s error: %v", dictPath, err)
+		} else {
+			for _, line := range strings.Split(string(data), "\n") {
+				trimmed := strings.TrimSpace(line)
+				if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "//") {
+					continue
+				}
+				combined = append(combined, trimmed)
+			}
+		}
+	}
 	set := make(map[string]struct{}, len(combined))
 	for _, word := range combined {
 		if norm := normalizeWord(word); norm != "" {
