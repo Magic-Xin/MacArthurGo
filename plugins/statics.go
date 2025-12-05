@@ -322,15 +322,30 @@ func (s *Statics) renderWordCloud(freq map[string]int64) ([]byte, error) {
 		maxWords = 80
 	}
 
-	type pair struct {
-		word  string
-		count int64
-	}
-	items := make([]pair, 0, len(freq))
+	cleaned := make(map[string]int64, len(freq))
 	for word, count := range freq {
 		if count <= 0 {
 			continue
 		}
+		normalized := normalizeWord(word)
+		if normalized == "" {
+			continue
+		}
+		if _, blocked := s.stopWords[normalized]; blocked {
+			continue
+		}
+		cleaned[normalized] += count
+	}
+	if len(cleaned) == 0 {
+		return nil, errors.New("暂无可用词频数据")
+	}
+
+	type pair struct {
+		word  string
+		count int64
+	}
+	items := make([]pair, 0, len(cleaned))
+	for word, count := range cleaned {
 		items = append(items, pair{word: word, count: count})
 	}
 	if len(items) == 0 {
