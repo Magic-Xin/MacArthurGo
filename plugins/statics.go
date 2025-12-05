@@ -328,7 +328,7 @@ func (s *Statics) renderWordCloud(freq map[string]int64) ([]byte, error) {
 			continue
 		}
 		normalized := normalizeWord(word)
-		if normalized == "" {
+		if normalized == "" || len(normalized) < 2 {
 			continue
 		}
 		if _, blocked := s.stopWords[normalized]; blocked {
