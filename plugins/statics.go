@@ -33,6 +33,15 @@ const (
 	defaultDataDir    = "data/statics"
 )
 
+var defaultStopWords = []string{
+	"的", "了", "呢", "啊", "吗", "吧", "你", "我", "他", "她", "它", "他们", "我们",
+	"你们", "是", "在", "有", "就", "都", "和", "也", "很", "还", "要", "说", "会", "看",
+	"没", "去", "来", "想", "知道", "可以", "对", "好", "哦", "哦哦", "哦哦哦",
+	"没有", "一个", "一下", "这个", "那个", "什么", "怎么", "为什么", "怎么会", "怎么了",
+	"然后", "以及", "就是", "聊天", "群聊", "消息", "http", "https", "www", "com",
+	"哈哈", "哈哈哈", "emm", "这边", "那边", "所以", "因为", "但是", "如果", "不是",
+}
+
 type groupStats struct {
 	Hourly [24]int64        `json:"hourly"`
 	Words  map[string]int64 `json:"words"`
@@ -69,7 +78,7 @@ func init() {
 
 	statics := &Statics{
 		store:     store,
-		stopWords: buildStopWords(cfg.StopWords, stopPath),
+		stopWords: buildStopWords(cfg.StopWords),
 	}
 
 	if cfg.Enable {
@@ -684,22 +693,9 @@ func normalizeWord(word string) string {
 	return res
 }
 
-func buildStopWords(custom []string, dict string) map[string]struct{} {
-	combined := append([]string{}, custom...)
-	dictPath := strings.TrimSpace(dict)
-	if dictPath != "" {
-		if data, err := os.ReadFile(dictPath); err != nil {
-			log.Printf("statics stopwords read %s error: %v", dictPath, err)
-		} else {
-			for _, line := range strings.Split(string(data), "\n") {
-				trimmed := strings.TrimSpace(line)
-				if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "//") {
-					continue
-				}
-				combined = append(combined, trimmed)
-			}
-		}
-	}
+func buildStopWords(custom []string) map[string]struct{} {
+	combined := append([]string{}, defaultStopWords...)
+	combined = append(combined, custom...)
 	set := make(map[string]struct{}, len(combined))
 	for _, word := range combined {
 		if norm := normalizeWord(word); norm != "" {
