@@ -44,7 +44,6 @@ func init() {
 		Enabled: base.Config.Plugins.ChatAI.Gemini.Enable,
 		ArgsMap: map[string]string{
 			"flash": base.Config.Plugins.ChatAI.Gemini.ArgsMap["flash"],
-			"think": base.Config.Plugins.ChatAI.Gemini.ArgsMap["think"],
 			"pro":   base.Config.Plugins.ChatAI.Gemini.ArgsMap["pro"],
 			"image": base.Config.Plugins.ChatAI.Gemini.ArgsMap["image"],
 		},
@@ -133,9 +132,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		messageID := messageStruct.MessageId
 		switch key {
 		case "flash":
-			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-flash")
-		case "think":
-			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-2.5-flash")
+			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-3-flash-preview")
 		case "pro":
 			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-3-pro-preview")
 		case "image":

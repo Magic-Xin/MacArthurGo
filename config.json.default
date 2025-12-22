@@ -110,9 +110,9 @@
       "gemini": {
         "enable": true,
         "argsMap": {
-            "flash": "/g",
-            "think": "/gt",
+            "flash": "/gf",
             "pro": "/gp"
+            "image": "/gi"
         },
         "apiKey": ""
       },
