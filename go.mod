@@ -6,7 +6,7 @@ require (
 	github.com/antchfx/htmlquery v1.3.5
 	github.com/google/go-cmp v0.7.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/ncruces/go-sqlite3 v0.30.3
+	github.com/ncruces/go-sqlite3 v0.30.4
 	github.com/psykhi/wordclouds v0.0.0-20231014190151-b9dd58fabbef
 	github.com/refraction-networking/utls v1.8.1
 	github.com/sashabaranov/go-openai v1.41.2
@@ -15,12 +15,12 @@ require (
 	github.com/wcharczuk/go-chart/v2 v2.1.2
 	github.com/yanyiwu/gojieba v1.4.6
 	golang.org/x/net v0.48.0
-	google.golang.org/genai v1.39.0
+	google.golang.org/genai v1.40.0
 )
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
-	cloud.google.com/go/auth v0.17.0 // indirect
+	cloud.google.com/go/auth v0.18.0 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/antchfx/xpath v1.3.5 // indirect
@@ -34,10 +34,10 @@ require (
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.7 // indirect
-	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
+	github.com/googleapis/gax-go/v2 v2.16.0 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/ncruces/julianday v1.0.0 // indirect
-	github.com/tetratelabs/wazero v1.10.1 // indirect
+	github.com/tetratelabs/wazero v1.11.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.64.0 // indirect
 	go.opentelemetry.io/otel v1.39.0 // indirect
