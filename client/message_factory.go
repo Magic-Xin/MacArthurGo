@@ -1,6 +1,7 @@
 package client
 
 import (
+	"MacArthurGo/base"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
@@ -30,6 +31,10 @@ func MessageFactory(msg *[]byte, sendPump chan *[]byte) {
 
 	if messageStruct.Message != nil {
 		if essentials.BanList.IsBanned(messageStruct.UserId) {
+			return
+		}
+
+		if base.Config.Debug && messageStruct.UserId != base.Config.Admin {
 			return
 		}
 

@@ -3,9 +3,10 @@ package client
 import (
 	"MacArthurGo/base"
 	"fmt"
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
+
+	"github.com/gorilla/websocket"
 )
 
 type Client struct {
