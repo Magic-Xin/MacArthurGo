@@ -134,7 +134,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		case "flash":
 			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-3-flash-preview")
 		case "pro":
-			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-3-pro-preview")
+			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-3.1-pro-preview")
 		case "image":
 			res, action = c.Gemini.RequireAnswer(&message, messageID, "gemini-3-pro-image-preview")
 		}
@@ -171,8 +171,8 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 			text += fmt.Sprintf("QWen:\n%s: %s\n\n", c.QWen.Model, c.QWen.Args)
 		}
 		if c.Gemini.Enabled {
-			text += fmt.Sprintf("Gemini:\nGemini-2.5-flash: %s\nGemini-2.0-flash image-generation: %s\nGemini-2.5-flash: %s\nGemini-2.5-pro: %s\n\n",
-				c.Gemini.ArgsMap["flash"], c.Gemini.ArgsMap["image"], c.Gemini.ArgsMap["think"], c.Gemini.ArgsMap["pro"])
+			text += fmt.Sprintf("Gemini:\nGemini-3-flash: %s\nGemini-3.0-pro image-generation: %s\nGemini-3.1-pro: %s\n\n",
+				c.Gemini.ArgsMap["flash"], c.Gemini.ArgsMap["image"], c.Gemini.ArgsMap["pro"])
 		}
 		if c.Github.Enabled {
 			text += fmt.Sprintf("Github:\nChatGPT 4o: %s\nChatGPT o1-preview: %s\nChatGPT o3-mini: %s\nLlama-3.1-405B: %s\nPhi-4: %s\nDeepSeek-R1: %s\n",
