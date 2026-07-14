@@ -44,6 +44,16 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - Corpus reply
 - Daily waifu
 
+### ascii2d setup
+
+ascii2d now protects search requests with a browser challenge. When the picture-search plugin is enabled, run [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) alongside MacArthurGo:
+
+```powershell
+docker run -d --name=flaresolverr -p 8191:8191 -e LOG_LEVEL=info --restart unless-stopped ghcr.io/flaresolverr/flaresolverr:latest
+```
+
+The default `plugins.picSearch.ascii2d.flareSolverrUrl` is `http://127.0.0.1:8191/v1`. Set `proxyUrl` in the same section only when the FlareSolverr browser must use an HTTP or SOCKS proxy. The proxy address must be reachable from inside the FlareSolverr host or container; a loopback or private address on the MacArthurGo machine will not work for a remote FlareSolverr instance unless that route is explicitly available. Browser sessions are closed after each search.
+
 ## TODO
 - [ ] Add more plugins
 

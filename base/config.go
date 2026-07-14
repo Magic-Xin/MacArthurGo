@@ -74,6 +74,11 @@ type config struct {
 			ExpirationTime    int64    `json:"expirationTime"`
 			IntervalTime      int64    `json:"intervalTime"`
 			SauceNAOToken     string   `json:"sauceNAOToken"`
+			ASCII2D           struct {
+				FlareSolverrURL string `json:"flareSolverrUrl"`
+				ProxyURL        string `json:"proxyUrl"`
+				TimeoutSeconds  int    `json:"timeoutSeconds"`
+			} `json:"ascii2d"`
 		} `json:"picSearch"`
 		Statics struct {
 			Enable           bool              `json:"enable"`

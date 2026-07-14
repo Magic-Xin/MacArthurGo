@@ -4,7 +4,9 @@ import (
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"bytes"
+	"context"
 	"crypto/md5"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -12,9 +14,11 @@ import (
 	"io"
 	"log"
 	"net/http"
+	urlpkg "net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func SendAction(action string, params any, echo string) *[]byte {
@@ -155,17 +159,32 @@ func SplitArgument(message *[]cqcode.ArrayMessage) (res []string) {
 }
 
 func GetImageKey(url string) string {
-	const pattern = "rkey=(.*)&?"
-	if match := regexp.MustCompile(pattern).FindAllStringSubmatch(url, -1); match != nil {
-		return match[0][1]
+	if parsed, err := urlpkg.Parse(url); err == nil {
+		if key := parsed.Query().Get("rkey"); key != "" {
+			return key
+		}
 	}
-	return ""
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(url)))
 }
 
 func GetImageData(url string) *bytes.Buffer {
+	imageData, err := FetchImageData(context.Background(), url)
+	if err != nil {
+		log.Printf("Image fetch error: %v", err)
+		return &bytes.Buffer{}
+	}
+	return imageData
+}
+
+func FetchImageData(ctx context.Context, imageURL string) (*bytes.Buffer, error) {
 	tlsConfig := &tls.Config{
-		ServerName: "multimedia.nt.qq.com.cn",
 		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
 			tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
 			tls.TLS_RSA_WITH_AES_256_CBC_SHA,
 			tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
@@ -177,16 +196,22 @@ func GetImageData(url string) *bytes.Buffer {
 	}
 
 	transport := &http.Transport{
+		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: tlsConfig,
 	}
 
 	client := &http.Client{
 		Transport: transport,
+		Timeout:   30 * time.Second,
 	}
 
-	resp, err := client.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
 	if err != nil {
-		panic(err)
+		return nil, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -194,18 +219,29 @@ func GetImageData(url string) *bytes.Buffer {
 			log.Printf("Image fetch close error: %v", err)
 		}
 	}(resp.Body)
-
-	var imageData bytes.Buffer
-	_, err = io.Copy(&imageData, resp.Body)
-	if err != nil {
-		panic(err)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("image request returned %s", resp.Status)
 	}
 
-	return &imageData
+	var imageData bytes.Buffer
+	const maxImageSize = 20 << 20
+	_, err = io.Copy(&imageData, io.LimitReader(resp.Body, maxImageSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if imageData.Len() > maxImageSize {
+		return nil, fmt.Errorf("image exceeds %d MiB", maxImageSize>>20)
+	}
+
+	return &imageData, nil
 }
 
 func ImageToBase64(url string) *string {
-	imageData := GetImageData(url)
+	imageData, err := FetchImageData(context.Background(), url)
+	if err != nil {
+		log.Printf("Image base64 fetch error: %v", err)
+		return nil
+	}
 	imageBase64 := "base64://" + base64.StdEncoding.EncodeToString(imageData.Bytes())
 
 	return &imageBase64
@@ -217,11 +253,13 @@ func GetOriginUrl(url string) *string {
 		log.Printf("Url parser request error: %v", err)
 		return nil
 	}
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("Url parser response error: %v", err)
 		return nil
 	}
+	defer resp.Body.Close()
 
 	originURL := resp.Request.URL.String()
 	return &originURL

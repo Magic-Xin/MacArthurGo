@@ -28,7 +28,7 @@
           "isReply": true,
           "isAt": false,
           "scene": "private"
-        },
+        }
       ]
     },
     "originPic": {
@@ -67,7 +67,12 @@
       "handleBannedHosts": true,
       "expirationTime": 86400,
       "intervalTime": 1800,
-      "sauceNAOToken": ""
+      "sauceNAOToken": "",
+      "ascii2d": {
+        "flareSolverrUrl": "http://127.0.0.1:8191/v1",
+        "proxyUrl": "",
+        "timeoutSeconds": 90
+      }
     },
     "statics": {
       "enable": false,
@@ -111,7 +116,7 @@
         "enable": true,
         "argsMap": {
             "flash": "/gf",
-            "pro": "/gp"
+            "pro": "/gp",
             "image": "/gi"
         },
         "apiKey": ""
@@ -134,6 +139,6 @@
     "waifu": {
       "enable": false,
       "args": ["/waifu", "wife", "/w"]
-    },
+    }
   }
 }

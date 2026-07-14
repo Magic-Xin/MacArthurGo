@@ -25,7 +25,6 @@ import (
 
 	"github.com/psykhi/wordclouds"
 	chart "github.com/wcharczuk/go-chart/v2"
-	"github.com/yanyiwu/gojieba"
 )
 
 const (
@@ -59,31 +58,34 @@ type staticsStore struct {
 
 type Statics struct {
 	store       *staticsStore
-	tokenizer   *gojieba.Jieba
+	tokenizer   wordTokenizer
 	tokenizerMu sync.Mutex
 	stopWords   map[string]struct{}
 }
 
 func init() {
 	cfg := base.Config.Plugins.Statics
-	store, err := newStaticsStore(cfg.DataDir, cfg.RetentionDays)
-	if err != nil {
-		log.Printf("statics store init error: %v", err)
-	}
-
-	dictPath := "./jieba_dict/jieba.dict.utf8"
-	hmmPath := "./jieba_dict/hmm_model.utf8"
-	userPath := "./jieba_dict/user.dict.utf8"
-	idfPath := "./jieba_dict/idf.utf8"
-	stopPath := "./jieba_dict/stop_words.utf8"
-
 	statics := &Statics{
-		store:     store,
 		stopWords: buildStopWords(cfg.StopWords),
 	}
 
 	if cfg.Enable {
-		statics.tokenizer = gojieba.NewJieba(dictPath, hmmPath, userPath, idfPath, stopPath)
+		store, err := newStaticsStore(cfg.DataDir, cfg.RetentionDays)
+		if err != nil {
+			log.Printf("statics store init error: %v", err)
+		} else {
+			statics.store = store
+		}
+
+		dictPath := "./jieba_dict/jieba.dict.utf8"
+		hmmPath := "./jieba_dict/hmm_model.utf8"
+		userPath := "./jieba_dict/user.dict.utf8"
+		idfPath := "./jieba_dict/idf.utf8"
+		stopPath := "./jieba_dict/stop_words.utf8"
+		statics.tokenizer, err = newWordTokenizer(dictPath, hmmPath, userPath, idfPath, stopPath)
+		if err != nil {
+			log.Printf("statics tokenizer init error: %v", err)
+		}
 	}
 
 	plugin := &essentials.Plugin{
