@@ -296,7 +296,6 @@ func (c *Client) get(ctx context.Context, session string, targetURL string, wait
 		Session:       session,
 		MaxTimeout:    c.maxTimeoutMS,
 		WaitInSeconds: waitInSeconds,
-		DisableMedia:  true,
 	})
 	if err != nil {
 		return flareSolution{}, err
