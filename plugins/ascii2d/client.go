@@ -27,9 +27,10 @@ const (
 )
 
 type Config struct {
-	APIURL   string
-	ProxyURL string
-	Timeout  time.Duration
+	APIURL              string
+	CloudflareBypassURL string
+	ProxyURL            string
+	Timeout             time.Duration
 }
 
 type Client struct {
@@ -38,6 +39,7 @@ type Client struct {
 	siteURL      string
 	maxTimeoutMS int
 	httpClient   *http.Client
+	bypass       *bypassClient
 	sessionID    atomic.Uint64
 }
 
@@ -92,6 +94,35 @@ type flareCookie struct {
 }
 
 func NewClient(cfg Config) (*Client, error) {
+	proxyURL := strings.TrimSpace(cfg.ProxyURL)
+	if proxyURL != "" {
+		parsedProxy, parseErr := url.Parse(proxyURL)
+		if parseErr != nil || parsedProxy.Host == "" || (parsedProxy.Scheme != "http" && parsedProxy.Scheme != "https" && parsedProxy.Scheme != "socks4" && parsedProxy.Scheme != "socks5") {
+			return nil, fmt.Errorf("invalid ascii2d proxy URL %q", proxyURL)
+		}
+	}
+
+	timeout := cfg.Timeout
+	if timeout <= 0 {
+		timeout = 90 * time.Second
+	}
+	httpClient := &http.Client{Timeout: timeout + 15*time.Second}
+	client := &Client{
+		proxyURL:     proxyURL,
+		siteURL:      defaultSiteURL,
+		maxTimeoutMS: int(timeout.Milliseconds()),
+		httpClient:   httpClient,
+	}
+
+	if bypassURL := strings.TrimSpace(cfg.CloudflareBypassURL); bypassURL != "" {
+		bypass, err := newBypassClient(bypassURL, proxyURL, httpClient)
+		if err != nil {
+			return nil, err
+		}
+		client.bypass = bypass
+		return client, nil
+	}
+
 	apiURL := strings.TrimSpace(cfg.APIURL)
 	if apiURL == "" {
 		apiURL = defaultAPIURL
@@ -101,26 +132,8 @@ func NewClient(cfg Config) (*Client, error) {
 		return nil, fmt.Errorf("invalid FlareSolverr URL %q", apiURL)
 	}
 
-	proxyURL := strings.TrimSpace(cfg.ProxyURL)
-	if proxyURL != "" {
-		parsedProxy, parseErr := url.Parse(proxyURL)
-		if parseErr != nil || parsedProxy.Host == "" || (parsedProxy.Scheme != "http" && parsedProxy.Scheme != "https" && parsedProxy.Scheme != "socks4" && parsedProxy.Scheme != "socks5") {
-			return nil, fmt.Errorf("invalid FlareSolverr proxy URL %q", proxyURL)
-		}
-	}
-
-	timeout := cfg.Timeout
-	if timeout <= 0 {
-		timeout = 90 * time.Second
-	}
-
-	return &Client{
-		apiURL:       strings.TrimRight(apiURL, "/"),
-		proxyURL:     proxyURL,
-		siteURL:      defaultSiteURL,
-		maxTimeoutMS: int(timeout.Milliseconds()),
-		httpClient:   &http.Client{Timeout: timeout + 15*time.Second},
-	}, nil
+	client.apiURL = strings.TrimRight(apiURL, "/")
+	return client, nil
 }
 
 func (c *Client) Search(ctx context.Context, imageURL string) ([]Result, error) {
@@ -129,15 +142,18 @@ func (c *Client) Search(ctx context.Context, imageURL string) ([]Result, error) 
 		return nil, fmt.Errorf("invalid image URL")
 	}
 
-	session := fmt.Sprintf("macarthurgo-%d-%d", time.Now().UnixNano(), c.sessionID.Add(1))
-	create := flareRequest{Command: "sessions.create", Session: session}
-	if c.proxyURL != "" {
-		create.Proxy = &flareProxy{URL: c.proxyURL}
+	session := ""
+	if c.bypass == nil {
+		session = fmt.Sprintf("macarthurgo-%d-%d", time.Now().UnixNano(), c.sessionID.Add(1))
+		create := flareRequest{Command: "sessions.create", Session: session}
+		if c.proxyURL != "" {
+			create.Proxy = &flareProxy{URL: c.proxyURL}
+		}
+		if _, err = c.call(ctx, create); err != nil {
+			return nil, fmt.Errorf("create FlareSolverr session: %w", err)
+		}
+		defer c.destroySession(session)
 	}
-	if _, err = c.call(ctx, create); err != nil {
-		return nil, fmt.Errorf("create FlareSolverr session: %w", err)
-	}
-	defer c.destroySession(session)
 
 	// ascii2d requires the search mode on URL searches. Without it the
 	// browser stays on /search/url/... instead of redirecting to the color
@@ -145,7 +161,7 @@ func (c *Client) Search(ctx context.Context, imageURL string) ([]Result, error) 
 	searchURL := c.siteURL + "/search/url/" + url.QueryEscape(image.String()) + "?type=color"
 	// ascii2d redirects to the result page asynchronously. FlareSolverr can
 	// otherwise return the initial /search/url/... page before that navigation.
-	color, err := c.get(ctx, session, searchURL, colorSearchWaitSeconds)
+	color, err := c.getWithRetry(ctx, session, searchURL, colorSearchWaitSeconds, false)
 	if err != nil {
 		return nil, fmt.Errorf("open ascii2d color search: %w", err)
 	}
@@ -183,7 +199,7 @@ func (c *Client) Search(ctx context.Context, imageURL string) ([]Result, error) 
 	if bovwURL == "" {
 		bovwErr = errors.New("could not recover the ascii2d result URL from the post-wait HTML")
 	} else {
-		bovw, bovwErr = c.get(ctx, session, bovwURL, 0)
+		bovw, bovwErr = c.getWithRetry(ctx, session, bovwURL, 0, true)
 	}
 	if bovwErr == nil {
 		bovwResult, parseErr := parseResult(bovw.Response, "bovw", bovw.URL, c.siteURL)
@@ -256,6 +272,9 @@ func (c *Client) DownloadThumbnail(ctx context.Context, result Result) ([]byte, 
 	if result.Thumbnail == "" {
 		return nil, errors.New("thumbnail URL is empty")
 	}
+	if c.bypass != nil {
+		return c.bypass.getImage(ctx, result.Thumbnail)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, result.Thumbnail, nil)
 	if err != nil {
 		return nil, err
@@ -289,7 +308,33 @@ func (c *Client) DownloadThumbnail(ctx context.Context, result Result) ([]byte, 
 	return data, nil
 }
 
+func (c *Client) getWithRetry(ctx context.Context, session string, targetURL string, waitInSeconds int, retryAll bool) (flareSolution, error) {
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		solution, err := c.get(ctx, session, targetURL, waitInSeconds)
+		if err == nil {
+			return solution, nil
+		}
+		lastErr = err
+		if ctx.Err() != nil {
+			return flareSolution{}, ctx.Err()
+		}
+		if !retryAll && !errors.Is(err, errFirstByteTimeout) && !strings.Contains(strings.ToLower(err.Error()), errFirstByteTimeout.Error()) {
+			break
+		}
+	}
+	return flareSolution{}, lastErr
+}
+
 func (c *Client) get(ctx context.Context, session string, targetURL string, waitInSeconds int) (flareSolution, error) {
+	if c.bypass != nil {
+		solution, err := c.bypass.getHTML(ctx, targetURL)
+		if err != nil {
+			return flareSolution{}, err
+		}
+		return validateSolution(solution, "CloudflareBypassForScraping")
+	}
+
 	res, err := c.call(ctx, flareRequest{
 		Command:       "request.get",
 		URL:           targetURL,
@@ -301,16 +346,20 @@ func (c *Client) get(ctx context.Context, session string, targetURL string, wait
 	if err != nil {
 		return flareSolution{}, err
 	}
-	if res.Solution.Status < http.StatusOK || res.Solution.Status >= http.StatusMultipleChoices {
-		return flareSolution{}, fmt.Errorf("browser request returned HTTP %d", res.Solution.Status)
+	return validateSolution(res.Solution, "FlareSolverr")
+}
+
+func validateSolution(solution flareSolution, backend string) (flareSolution, error) {
+	if solution.Status < http.StatusOK || solution.Status >= http.StatusMultipleChoices {
+		return flareSolution{}, fmt.Errorf("browser request returned HTTP %d", solution.Status)
 	}
-	if strings.TrimSpace(res.Solution.Response) == "" {
+	if strings.TrimSpace(solution.Response) == "" {
 		return flareSolution{}, errors.New("browser request returned an empty page")
 	}
-	if code := chromiumNetworkErrorCode(res.Solution.Response); code != "" {
-		return flareSolution{}, fmt.Errorf("FlareSolverr browser navigation failed with %s; check network or proxy connectivity from the FlareSolverr host", code)
+	if code := chromiumNetworkErrorCode(solution.Response); code != "" {
+		return flareSolution{}, fmt.Errorf("%s browser navigation failed with %s; check network or proxy connectivity from the bypass service host", backend, code)
 	}
-	return res.Solution, nil
+	return solution, nil
 }
 
 func chromiumNetworkErrorCode(body string) string {

@@ -78,13 +78,13 @@ All tests live in the top-level `test/` directory and exercise packages through 
 
 ### ascii2d setup
 
-ascii2d now protects search requests with a browser challenge. When the picture-search plugin is enabled, run [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) alongside MacArthurGo:
+The ascii2d flow follows [cq-picsearcher-bot](https://github.com/Tsuk1ko/cq-picsearcher-bot): it fetches both the color and feature result pages and uses [CloudflareBypassForScraping](https://github.com/sarperavci/CloudflareBypassForScraping) to pass Cloudflare. Run the bypass service alongside MacArthurGo:
 
 ```powershell
-docker run -d --name=flaresolverr -p 8191:8191 -e LOG_LEVEL=info --restart unless-stopped ghcr.io/flaresolverr/flaresolverr:latest
+docker run -d --name=cf-bypass -p 127.0.0.1:8000:8000 --restart unless-stopped ghcr.io/sarperavci/cloudflarebypassforscraping:latest
 ```
 
-The default `plugins.picSearch.ascii2d.flareSolverrUrl` is `http://127.0.0.1:8191/v1`. Set `proxyUrl` in the same section only when the FlareSolverr browser must use an HTTP or SOCKS proxy. The proxy address must be reachable from inside the FlareSolverr host or container; a loopback or private address on the MacArthurGo machine will not work for a remote FlareSolverr instance unless that route is explicitly available. Browser sessions are closed after each search.
+The default `plugins.picSearch.ascii2d.cloudflareBypassUrl` is `http://127.0.0.1:8000`. When this value is non-empty it takes priority and is also used to download protected thumbnails through mirror mode. Set `proxyUrl` only when the bypass service must use an HTTP or SOCKS proxy; that proxy must be reachable from the service container. Existing configurations can leave `cloudflareBypassUrl` empty and keep `flareSolverrUrl` as a compatibility fallback, although FlareSolverr is no longer the recommended ascii2d backend.
 
 ### Google Lens image-search setup
 

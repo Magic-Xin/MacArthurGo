@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -388,6 +389,171 @@ func TestDownloadThumbnailUsesClearanceCredentials(t *testing.T) {
 	}
 	if string(data) != "image-data" {
 		t.Fatalf("data = %q", data)
+	}
+}
+
+func TestClientSearch_UsesCloudflareBypassForScraping(t *testing.T) {
+	t.Parallel()
+
+	const proxyURL = "http://proxy.example:8080"
+	var htmlCalls atomic.Int32
+	var imageCalls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/html":
+			htmlCalls.Add(1)
+			if got := request.URL.Query().Get("proxy"); got != proxyURL {
+				t.Errorf("HTML proxy query = %q, want %q", got, proxyURL)
+			}
+			if got := request.Header.Get("x-proxy"); got != "" {
+				t.Errorf("HTML request unexpectedly used x-proxy = %q", got)
+			}
+			target := request.URL.Query().Get("url")
+			mode := "color"
+			thumbnail := "https://cdn.ascii2d.net/thumb.jpg?size=small"
+			if strings.Contains(target, "/search/bovw/") {
+				mode = "bovw"
+				thumbnail = "https://cdn.ascii2d.net/bovw.jpg"
+			}
+			writer.Header().Set("x-cf-bypasser-final-url", "https://ascii2d.net/search/"+mode+"/result-token")
+			writer.Header().Set("x-cf-bypasser-user-agent", "bypass-agent")
+			writer.Header().Set("Content-Type", "text/html")
+			_, _ = writer.Write([]byte(ascii2dResultHTML(strings.ToUpper(mode), thumbnail)))
+		case "/thumb.jpg":
+			imageCalls.Add(1)
+			if got := request.Header.Get("x-hostname"); got != "cdn.ascii2d.net" {
+				t.Errorf("image x-hostname = %q", got)
+			}
+			if got := request.Header.Get("x-proxy"); got != proxyURL {
+				t.Errorf("image x-proxy = %q, want %q", got, proxyURL)
+			}
+			if got := request.URL.Query().Get("size"); got != "small" {
+				t.Errorf("image query size = %q", got)
+			}
+			writer.Header().Set("Content-Type", "image/jpeg")
+			_, _ = writer.Write([]byte("mirrored-image"))
+		default:
+			http.Error(writer, "unexpected path", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client, err := ascii2d.NewClient(ascii2d.Config{
+		APIURL:              "://unused-invalid-flaresolverr",
+		CloudflareBypassURL: server.URL,
+		ProxyURL:            proxyURL,
+		Timeout:             time.Second,
+	})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	results, err := client.Search(context.Background(), "https://example.com/image.png")
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(results) != 2 || results[0].Title != "COLOR" || results[1].Title != "BOVW" {
+		t.Fatalf("Search() results = %#v", results)
+	}
+	data, err := client.DownloadThumbnail(context.Background(), results[0])
+	if err != nil {
+		t.Fatalf("DownloadThumbnail: %v", err)
+	}
+	if string(data) != "mirrored-image" {
+		t.Fatalf("thumbnail data = %q", data)
+	}
+	if htmlCalls.Load() != 2 || imageCalls.Load() != 1 {
+		t.Fatalf("calls: html=%d image=%d", htmlCalls.Load(), imageCalls.Load())
+	}
+}
+
+func TestClientSearch_CloudflareBypassRetriesFirstByteTimeout(t *testing.T) {
+	t.Parallel()
+
+	var colorCalls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		target := request.URL.Query().Get("url")
+		mode := "bovw"
+		if strings.Contains(target, "/search/url/") {
+			mode = "color"
+			if colorCalls.Add(1) == 1 {
+				http.Error(writer, "first byte timeout", http.StatusGatewayTimeout)
+				return
+			}
+		}
+		writer.Header().Set("x-cf-bypasser-final-url", "https://ascii2d.net/search/"+mode+"/token")
+		_, _ = writer.Write([]byte(ascii2dResultHTML(mode, "/"+mode+".jpg")))
+	}))
+	defer server.Close()
+
+	client, err := ascii2d.NewClient(ascii2d.Config{CloudflareBypassURL: server.URL, Timeout: time.Second})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	results, err := client.Search(context.Background(), "https://example.com/image.png")
+	if err != nil || len(results) != 2 {
+		t.Fatalf("Search() results = %#v, error = %v", results, err)
+	}
+	if colorCalls.Load() != 2 {
+		t.Fatalf("color calls = %d, want 2", colorCalls.Load())
+	}
+}
+
+func TestClientSearch_SerializesCloudflareBypassRequests(t *testing.T) {
+	t.Parallel()
+
+	var inFlight atomic.Int32
+	var maxInFlight atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		current := inFlight.Add(1)
+		defer inFlight.Add(-1)
+		for {
+			maximum := maxInFlight.Load()
+			if current <= maximum || maxInFlight.CompareAndSwap(maximum, current) {
+				break
+			}
+		}
+		time.Sleep(5 * time.Millisecond)
+		target := request.URL.Query().Get("url")
+		mode := "color"
+		if strings.Contains(target, "/search/bovw/") {
+			mode = "bovw"
+		}
+		writer.Header().Set("x-cf-bypasser-final-url", "https://ascii2d.net/search/"+mode+"/token")
+		_, _ = writer.Write([]byte(ascii2dResultHTML(mode, "/"+mode+".jpg")))
+	}))
+	defer server.Close()
+
+	client, err := ascii2d.NewClient(ascii2d.Config{CloudflareBypassURL: server.URL, Timeout: time.Second})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	var wait sync.WaitGroup
+	errors := make(chan error, 4)
+	for index := 0; index < 4; index++ {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			_, searchErr := client.Search(context.Background(), "https://example.com/image.png")
+			errors <- searchErr
+		}()
+	}
+	wait.Wait()
+	close(errors)
+	for searchErr := range errors {
+		if searchErr != nil {
+			t.Fatalf("Search() error = %v", searchErr)
+		}
+	}
+	if maxInFlight.Load() != 1 {
+		t.Fatalf("maximum concurrent bypass requests = %d, want 1", maxInFlight.Load())
+	}
+}
+
+func TestNewClientRejectsInvalidCloudflareBypassURL(t *testing.T) {
+	t.Parallel()
+
+	if _, err := ascii2d.NewClient(ascii2d.Config{CloudflareBypassURL: "://invalid"}); err == nil {
+		t.Fatal("NewClient accepted an invalid CloudflareBypassForScraping URL")
 	}
 }
 

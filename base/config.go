@@ -82,9 +82,10 @@ type Configuration struct {
 			IntervalTime      int64    `json:"intervalTime"`
 			SauceNAOToken     string   `json:"sauceNAOToken"`
 			ASCII2D           struct {
-				FlareSolverrURL string `json:"flareSolverrUrl"`
-				ProxyURL        string `json:"proxyUrl"`
-				TimeoutSeconds  int    `json:"timeoutSeconds"`
+				CloudflareBypassURL string `json:"cloudflareBypassUrl"`
+				FlareSolverrURL     string `json:"flareSolverrUrl"`
+				ProxyURL            string `json:"proxyUrl"`
+				TimeoutSeconds      int    `json:"timeoutSeconds"`
 			} `json:"ascii2d"`
 			GoogleLens struct {
 				APIKey         string `json:"apiKey"`

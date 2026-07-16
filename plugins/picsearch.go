@@ -51,9 +51,10 @@ type sauceNAOResponse struct {
 func registerPicSearch() error {
 	cfg := base.Config.Plugins.PicSearch
 	asciiClient, err := ascii2d.NewClient(ascii2d.Config{
-		APIURL:   cfg.ASCII2D.FlareSolverrURL,
-		ProxyURL: cfg.ASCII2D.ProxyURL,
-		Timeout:  time.Duration(cfg.ASCII2D.TimeoutSeconds) * time.Second,
+		APIURL:              cfg.ASCII2D.FlareSolverrURL,
+		CloudflareBypassURL: cfg.ASCII2D.CloudflareBypassURL,
+		ProxyURL:            cfg.ASCII2D.ProxyURL,
+		Timeout:             time.Duration(cfg.ASCII2D.TimeoutSeconds) * time.Second,
 	})
 	if err != nil {
 		log.Printf("Ascii2d client init error: %v", err)
@@ -485,7 +486,7 @@ func (p *PicSearch) sauceNAO(imageURL string, response chan<- []cqcode.ArrayMess
 
 func (p *PicSearch) ascii2d(imageURL string, response chan<- []cqcode.ArrayMessage) {
 	if p.ascii2dClient == nil {
-		response <- []cqcode.ArrayMessage{*cqcode.Text("ascii2d：客户端配置无效，请检查 FlareSolverr 地址")}
+		response <- []cqcode.ArrayMessage{*cqcode.Text("ascii2d：客户端配置无效，请检查绕过服务地址")}
 		return
 	}
 
@@ -497,6 +498,8 @@ func (p *PicSearch) ascii2d(imageURL string, response chan<- []cqcode.ArrayMessa
 		message := "ascii2d：搜索失败，详细原因请查看程序日志"
 		if err != nil {
 			switch {
+			case strings.Contains(err.Error(), "CloudflareBypassForScraping"):
+				message = "ascii2d：CloudflareBypassForScraping 请求失败，请检查服务、网络或代理"
 			case strings.Contains(err.Error(), "FlareSolverr browser navigation failed"):
 				message = "ascii2d：FlareSolverr 无法访问目标站点，请检查容器网络或代理"
 			case strings.Contains(err.Error(), "could not recover the ascii2d result URL"):
