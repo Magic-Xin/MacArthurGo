@@ -33,7 +33,7 @@ go.work.sum
 
 *.json
 MacArthurGo
-log/*
+log/
 *.log
 *.db
 img_cache/*

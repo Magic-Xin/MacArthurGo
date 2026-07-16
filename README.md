@@ -18,6 +18,37 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 
 **Attention: Cannot guarantee the availability of the Dev version**
 
+## Architecture
+
+Startup is explicit and ordered: configuration is loaded and validated first,
+then shared infrastructure is opened, plugins are registered, background
+workers are started, and finally the OneBot WebSocket client begins running.
+Plugins no longer depend on package `init()` side effects.
+
+The WebSocket client keeps a bounded event queue, a bounded worker pool, and a
+persistent outbound queue. A disconnected OneBot server is reconnected with
+bounded exponential backoff. Plugin callbacks are serialized per plugin while
+different plugins can still run concurrently, which keeps stateful plugins safe
+without allowing unbounded goroutine growth. Shutdown cancellation is shared by
+the WebSocket client, plugin schedulers, cache cleanup, database cleanup, and
+statistics flushing.
+
+## Development
+
+CGO is required. On Windows with an MSYS2 UCRT64 toolchain, configure the
+compiler in the same PowerShell session before building or testing:
+
+```powershell
+$env:CGO_ENABLED = "1"
+$env:PATH = "C:\msys64\ucrt64\bin;$env:PATH"
+$env:CC = "C:\msys64\ucrt64\bin\gcc.exe"
+$env:CXX = "C:\msys64\ucrt64\bin\g++.exe"
+go test ./...
+go build ./...
+```
+
+All tests live in the top-level `test/` directory and exercise packages through their public behavior. Keep new test fixtures and helpers there rather than alongside production files.
+
 ## Plugins
 - Essential Plugins
   - Help

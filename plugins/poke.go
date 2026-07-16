@@ -9,26 +9,24 @@ import (
 
 type Poke struct{}
 
-func init() {
+func registerPoke() error {
 	plugin := &essentials.Plugin{
-		Name:      "戳一戳",
-		Enabled:   base.Config.Plugins.Poke.Enable,
-		Args:      base.Config.Plugins.Poke.Args,
-		Interface: &Poke{},
+		Name:    "戳一戳",
+		Enabled: base.Config.Plugins.Poke.Enable,
+		Args:    base.Config.Plugins.Poke.Args,
+		Handler: &Poke{},
 	}
-	essentials.PluginArray = append(essentials.PluginArray, plugin)
+	return essentials.Register(plugin)
 }
 
-func (*Poke) ReceiveAll(chan<- *[]byte) {}
-
-func (*Poke) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.Poke.Args) {
+func (*Poke) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- []byte) {
+	if !essentials.CheckArgumentArray(messageStruct.Command, base.Config.Plugins.Poke.Args) {
 		return
 	}
 
 	var uid int64
 
-	for _, m := range *messageStruct.CleanMessage {
+	for _, m := range messageStruct.CleanMessage {
 		if m.Type == "at" {
 			uid, _ = strconv.ParseInt(m.Data["qq"].(string), 10, 64)
 		}
@@ -43,4 +41,4 @@ func (*Poke) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[
 	}
 }
 
-func (*Poke) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
+func (*Poke) ReceiveEcho(*structs.EchoMessageStruct, chan<- []byte) {}

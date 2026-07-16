@@ -1,31 +1,69 @@
 package essentials
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"log"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/ncruces/go-sqlite3/driver"
 )
 
-var db *sql.DB
+var (
+	dbMu sync.RWMutex
+	db   *sql.DB
+)
 
 var identifierPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
-func init() {
-	var err error
-	db, err = sql.Open("sqlite3", "./cache.db")
+func OpenDatabase(path string) error {
+	opened, err := sql.Open("sqlite3", path)
 	if err != nil {
-		log.Printf("Open database error: %v", err)
+		return fmt.Errorf("open database: %w", err)
 	}
+	if err := opened.Ping(); err != nil {
+		opened.Close()
+		return fmt.Errorf("ping database: %w", err)
+	}
+	opened.SetMaxOpenConns(1)
+
+	dbMu.Lock()
+	previous := db
+	db = opened
+	dbMu.Unlock()
+	if previous != nil {
+		_ = previous.Close()
+	}
+	return nil
 }
 
-func CreateDB(table string, key *[]string, value *[]string) error {
-	if len(*key) != len(*value) {
+func CloseDatabase() error {
+	dbMu.Lock()
+	opened := db
+	db = nil
+	dbMu.Unlock()
+	if opened == nil {
+		return nil
+	}
+	return opened.Close()
+}
+
+func database() (*sql.DB, error) {
+	dbMu.RLock()
+	defer dbMu.RUnlock()
+	if db == nil {
+		return nil, errors.New("database is not open")
+	}
+	return db, nil
+}
+
+func CreateDB(table string, key []string, value []string) error {
+	if len(key) != len(value) {
 		return errors.New("key length not equal to value length")
 	}
 	if !validIdentifier(table) {
@@ -33,18 +71,22 @@ func CreateDB(table string, key *[]string, value *[]string) error {
 	}
 
 	cmd := "CREATE TABLE IF NOT EXISTS " + quoteIdentifier(table) + "("
-	for i, k := range *key {
+	for i, k := range key {
 		if !validIdentifier(k) {
 			return fmt.Errorf("invalid column name %q", k)
 		}
 		if i > 0 {
 			cmd += ","
 		}
-		cmd += quoteIdentifier(k) + " " + (*value)[i]
+		cmd += quoteIdentifier(k) + " " + value[i]
 	}
 	cmd += ")"
 
-	_, err := db.Exec(cmd)
+	opened, err := database()
+	if err != nil {
+		return err
+	}
+	_, err = opened.Exec(cmd)
 	if err != nil {
 		return err
 	}
@@ -67,7 +109,11 @@ func InsertDB(table string, keys []string, values []any) error {
 	}
 	cmd := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", quoteIdentifier(table), strings.Join(quoted, ", "), strings.Join(placeholders, ", "))
 
-	_, err := db.Exec(cmd, values...)
+	opened, err := database()
+	if err != nil {
+		return err
+	}
+	_, err = opened.Exec(cmd, values...)
 	if err != nil {
 		return err
 	}
@@ -79,7 +125,11 @@ func SelectDB(table string, target string, whereColumn string, whereValue any) (
 		return nil, errors.New("invalid database identifier")
 	}
 	cmd := fmt.Sprintf("SELECT %s FROM %s WHERE %s = ?", quoteIdentifier(target), quoteIdentifier(table), quoteIdentifier(whereColumn))
-	query, err := db.Query(cmd, whereValue)
+	opened, err := database()
+	if err != nil {
+		return nil, err
+	}
+	query, err := opened.Query(cmd, whereValue)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +185,11 @@ func UpdateDB(table string, whereColumn string, whereValue any, keys []string, v
 	}
 	cmd := fmt.Sprintf("UPDATE %s SET %s WHERE %s = ?", quoteIdentifier(table), strings.Join(assignments, ", "), quoteIdentifier(whereColumn))
 	args := append(append([]any{}, values...), whereValue)
-	_, err := db.Exec(cmd, args...)
+	opened, err := database()
+	if err != nil {
+		return err
+	}
+	_, err = opened.Exec(cmd, args...)
 	if err != nil {
 		return err
 	}
@@ -143,7 +197,7 @@ func UpdateDB(table string, whereColumn string, whereValue any, keys []string, v
 	return nil
 }
 
-func DeleteExpired(table string, arg string, expiration int64, interval int64) {
+func DeleteExpired(ctx context.Context, table string, arg string, expiration int64, interval int64) {
 	if !validIdentifier(table) || !validIdentifier(arg) {
 		log.Printf("Database cleanup skipped: invalid identifier")
 		return
@@ -158,12 +212,21 @@ func DeleteExpired(table string, arg string, expiration int64, interval int64) {
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	defer ticker.Stop()
 	for {
+		opened, err := database()
+		if err != nil {
+			log.Printf("Database cleanup stopped: %v", err)
+			return
+		}
 		cmd := fmt.Sprintf("DELETE FROM %s WHERE %s < ?", quoteIdentifier(table), quoteIdentifier(arg))
-		_, err := db.Exec(cmd, time.Now().Unix()-expiration)
+		_, err = opened.Exec(cmd, time.Now().Unix()-expiration)
 		if err != nil {
 			log.Printf("Database delete error: %v", err)
 		}
-		<-ticker.C
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
 	}
 }
 

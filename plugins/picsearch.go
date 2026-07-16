@@ -20,8 +20,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 type PicSearch struct {
@@ -48,7 +46,7 @@ type sauceNAOResponse struct {
 	} `json:"results"`
 }
 
-func init() {
+func registerPicSearch() error {
 	cfg := base.Config.Plugins.PicSearch
 	asciiClient, err := ascii2d.NewClient(ascii2d.Config{
 		APIURL:   cfg.ASCII2D.FlareSolverrURL,
@@ -66,57 +64,63 @@ func init() {
 		ascii2dClient:     asciiClient,
 	}
 	plugin := &essentials.Plugin{
-		Name:      "搜图",
-		Enabled:   cfg.Enable,
-		Args:      cfg.Args,
-		Interface: &picSearch,
+		Name:    "搜图",
+		Enabled: cfg.Enable,
+		Args:    cfg.Args,
+		Handler: &picSearch,
 	}
-	essentials.PluginArray = append(essentials.PluginArray, plugin)
+	if err := essentials.Register(plugin); err != nil {
+		return err
+	}
 	if !cfg.Enable {
-		return
+		return nil
 	}
 
-	key := &[]string{"uid", "res", "created"}
-	value := &[]string{"TEXT PRIMARY KEY NOT NULL", "TEXT NOT NULL", "NUMERIC NOT NULL"}
+	key := []string{"uid", "res", "created"}
+	value := []string{"TEXT PRIMARY KEY NOT NULL", "TEXT NOT NULL", "NUMERIC NOT NULL"}
 	err = essentials.CreateDB("picSearch", key, value)
 
 	if err != nil {
-		log.Printf("Database picSearch create error: %v", err)
-		return
+		return fmt.Errorf("create picSearch database: %w", err)
 	}
-
-	go essentials.DeleteExpired("picSearch", "created", cfg.ExpirationTime, cfg.IntervalTime)
+	return nil
 }
 
-func (p *PicSearch) ReceiveAll(chan<- *[]byte) {}
+func (p *PicSearch) Start(ctx context.Context, _ chan<- []byte) {
+	cfg := base.Config.Plugins.PicSearch
+	go essentials.DeleteExpired(ctx, "picSearch", "created", cfg.ExpirationTime, cfg.IntervalTime)
+}
 
-func (p *PicSearch) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
+func (p *PicSearch) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- []byte) {
 	rawMsg := messageStruct.RawMessage
 
 	if messageStruct.MessageType == "group" {
-		if p.checkArgs(rawMsg, &base.Config.Plugins.PicSearch.Args) {
-			send <- p.picSearch(messageStruct, &messageStruct.Message, send, false, true, p.checkArgs(rawMsg, &[]string{"purge"}))
+		if p.checkArgs(rawMsg, base.Config.Plugins.PicSearch.Args) {
+			send <- p.picSearch(messageStruct, messageStruct.Message, send, false, true, p.checkArgs(rawMsg, []string{"purge"}))
 		}
 	} else if p.allowPrivate {
-		if p.checkArgs(rawMsg, &base.Config.Plugins.PicSearch.Args) {
-			send <- p.picSearch(messageStruct, &messageStruct.Message, send, false, false, p.checkArgs(rawMsg, &[]string{"purge"}))
+		if p.checkArgs(rawMsg, base.Config.Plugins.PicSearch.Args) {
+			send <- p.picSearch(messageStruct, messageStruct.Message, send, false, false, p.checkArgs(rawMsg, []string{"purge"}))
 		} else {
-			words := essentials.SplitArgument(&messageStruct.Message)
+			words := essentials.SplitArgument(messageStruct.Message)
 			if len(words) == 0 {
-				send <- p.picSearch(messageStruct, &messageStruct.Message, send, false, false, p.checkArgs(rawMsg, &[]string{"purge"}))
+				send <- p.picSearch(messageStruct, messageStruct.Message, send, false, false, p.checkArgs(rawMsg, []string{"purge"}))
 			} else if !strings.HasPrefix(words[0], "/") {
-				send <- p.picSearch(messageStruct, &messageStruct.Message, send, false, false, p.checkArgs(rawMsg, &[]string{"purge"}))
+				send <- p.picSearch(messageStruct, messageStruct.Message, send, false, false, p.checkArgs(rawMsg, []string{"purge"}))
 			}
 		}
 
 	}
 }
 
-func (p *PicSearch) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- *[]byte) {
+func (p *PicSearch) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- []byte) {
 	echo := echoMessageStruct.Echo
 	split := strings.Split(echo, "|")
+	if len(split) < 2 {
+		return
+	}
 
-	if split[0] == "picSearch" && !cmp.Equal(echoMessageStruct.Data, struct{}{}) {
+	if split[0] == "picSearch" && (echoMessageStruct.Data.Message != nil || echoMessageStruct.Status != "ok") {
 		data := echoMessageStruct.Data
 		msg := data.Message
 		value, ok := essentials.GetCache(split[1])
@@ -124,7 +128,7 @@ func (p *PicSearch) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, se
 			log.Println("Pic search get cache error")
 			return
 		}
-		originCtx := value.(essentials.EchoCache).Value
+		originCtx := value.Value
 
 		if echoMessageStruct.Status == "failed" {
 			send <- essentials.SendMsg(&originCtx, "搜图失败", nil, false, false, "")
@@ -132,15 +136,15 @@ func (p *PicSearch) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, se
 		}
 
 		if len(split) == 3 {
-			send <- p.picSearch(&originCtx, &msg, send, true, originCtx.MessageType == "group", split[2] == "purge")
+			send <- p.picSearch(&originCtx, msg, send, true, originCtx.MessageType == "group", split[2] == "purge")
 		} else {
-			send <- p.picSearch(&originCtx, &msg, send, true, originCtx.MessageType == "group", false)
+			send <- p.picSearch(&originCtx, msg, send, true, originCtx.MessageType == "group", false)
 		}
 	}
 }
 
-func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcode.ArrayMessage, send chan<- *[]byte,
-	isEcho bool, isGroup bool, isPurge bool) *[]byte {
+func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg []cqcode.ArrayMessage, send chan<- []byte,
+	isEcho bool, isGroup bool, isPurge bool) []byte {
 	if !isGroup && !p.allowPrivate {
 		return nil
 	}
@@ -153,7 +157,7 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 		lastKey string
 	)
 	start := time.Now()
-	for _, c := range *msg {
+	for _, c := range msg {
 		switch c.Type {
 		case "image":
 			send <- essentials.SendMsg(messageStruct, "正在搜索中，请稍等", nil, false, false, "")
@@ -204,20 +208,21 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg *[]cqcod
 	result = append(result, []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("本次搜图总用时: %0.3fs", time.Since(start).Seconds()))})
 	if p.groupForward {
 		var data []structs.ForwardNode
+		botID, botName := essentials.Info.Account()
 		for _, r := range result {
-			data = append(data, *essentials.ConstructForwardNode(essentials.Info.UserId, essentials.Info.NickName, &r))
+			data = append(data, *essentials.ConstructForwardNode(botID, botName, r))
 		}
 		if isGroup {
-			return essentials.SendGroupForward(messageStruct, &data, *p.genEcho(messageStruct, lastKey, false))
+			return essentials.SendGroupForward(messageStruct, data, *p.genEcho(messageStruct, lastKey, false))
 		}
-		return essentials.SendPrivateForward(messageStruct, &data, *p.genEcho(messageStruct, lastKey, false))
+		return essentials.SendPrivateForward(messageStruct, data, *p.genEcho(messageStruct, lastKey, false))
 	}
 
 	var combined []cqcode.ArrayMessage
 	for _, item := range result {
 		combined = append(combined, item...)
 	}
-	return essentials.SendMsg(messageStruct, "", &combined, false, false, "")
+	return essentials.SendMsg(messageStruct, "", combined, false, false, "")
 }
 
 func (p *PicSearch) searchImage(imageURL string) [][]cqcode.ArrayMessage {
@@ -489,8 +494,8 @@ func (p *PicSearch) ascii2d(imageURL string, response chan<- []cqcode.ArrayMessa
 	}
 }
 
-func (p *PicSearch) checkArgs(rawMsg string, args *[]string) bool {
-	for _, arg := range *args {
+func (p *PicSearch) checkArgs(rawMsg string, args []string) bool {
+	for _, arg := range args {
 		quoted := regexp.QuoteMeta(arg)
 		if match := regexp.MustCompile(`(` + quoted + `$|` + quoted + `\W)`).FindStringIndex(rawMsg); match != nil {
 			return true

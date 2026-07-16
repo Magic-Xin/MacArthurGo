@@ -2,17 +2,24 @@ package base
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"log"
+	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/tidwall/pretty"
 )
 
-var Config config
+var Config = &Configuration{}
 
-type config struct {
+// Configuration contains all runtime settings loaded from config.json.
+// Runtime-only fields are excluded from JSON serialization.
+type Configuration struct {
 	Mutex      sync.RWMutex `json:"-"`
 	ConfigPath string       `json:"-"`
 	StartTime  int64        `json:"-"`
@@ -132,63 +139,94 @@ type config struct {
 	} `json:"plugins"`
 }
 
-func init() {
-	var configPath string
-	if len(os.Args) > 1 {
-		configPath = os.Args[1]
-	} else {
-		configPath = "config.json"
+// ConfigPath returns the configured path from command-line arguments.
+func ConfigPath(args []string) string {
+	if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
+		return args[0]
 	}
-
-	f, err := os.Open(configPath)
-	if err != nil {
-		log.Printf("Open config failed: %v", err)
-		panic(err)
-	}
-	defer func(f *os.File) {
-		err = f.Close()
-		if err != nil {
-			log.Printf("Close config failed: %v", err)
-		}
-	}(f)
-
-	err = json.NewDecoder(f).Decode(&Config)
-	if err != nil {
-		log.Printf("Decode config failed: %v", err)
-		panic(err)
-	}
-
-	Config.ConfigPath = configPath
-	Config.StartTime = time.Now().Unix()
-
-	log.Printf("Config \"%s\" loaded! Initializing...", configPath)
+	return "config.json"
 }
 
-func (c *config) UpdateConfig() {
-	f, err := os.OpenFile(c.ConfigPath, os.O_WRONLY|os.O_TRUNC, 0666)
+// LoadConfig explicitly loads and validates configuration before plugins are
+// registered. Keeping this out of init makes startup order deterministic and
+// allows packages to be tested without a local config.json.
+func LoadConfig(configPath string) error {
+	f, err := os.Open(configPath)
 	if err != nil {
-		log.Printf("Open config failed: %v", err)
-		return
+		return fmt.Errorf("open config %q: %w", configPath, err)
 	}
-	defer func(f *os.File) {
-		err = f.Close()
-		if err != nil {
-			log.Printf("Close config failed: %v", err)
-		}
-	}(f)
+	defer f.Close()
 
-	c.Mutex.Lock()
-	defer c.Mutex.Unlock()
+	var loaded Configuration
+	decoder := json.NewDecoder(f)
+	if err := decoder.Decode(&loaded); err != nil {
+		return fmt.Errorf("decode config %q: %w", configPath, err)
+	}
+	if err := ensureJSONEOF(decoder); err != nil {
+		return fmt.Errorf("decode config %q: %w", configPath, err)
+	}
+	if err := loaded.Validate(); err != nil {
+		return fmt.Errorf("validate config %q: %w", configPath, err)
+	}
+
+	loaded.ConfigPath = configPath
+	loaded.StartTime = time.Now().Unix()
+	Config = &loaded
+
+	log.Printf("Config %q loaded", configPath)
+	return nil
+}
+
+func ensureJSONEOF(decoder *json.Decoder) error {
+	var extra any
+	if err := decoder.Decode(&extra); errors.Is(err, io.EOF) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	return errors.New("multiple JSON values are not allowed")
+}
+
+// Validate catches invalid settings before background workers start.
+func (c *Configuration) Validate() error {
+	address := strings.TrimSpace(c.Address)
+	if address == "" {
+		return errors.New("address is required")
+	}
+	parsed, err := url.Parse(address)
+	if err != nil || (parsed.Scheme != "ws" && parsed.Scheme != "wss") || parsed.Host == "" {
+		return fmt.Errorf("address must be a valid ws:// or wss:// URL")
+	}
+	if c.UpdateInterval < 0 {
+		return errors.New("updateInterval cannot be negative")
+	}
+	if p := c.Plugins.Repeat.Probability; p < 0 || p > 1 {
+		return errors.New("plugins.repeat.probability must be between 0 and 1")
+	}
+	if p := c.Plugins.Repeat.CommonProbability; p < 0 || p > 1 {
+		return errors.New("plugins.repeat.commonProbability must be between 0 and 1")
+	}
+	if c.Plugins.PicSearch.ASCII2D.TimeoutSeconds < 0 {
+		return errors.New("plugins.picSearch.ascii2d.timeoutSeconds cannot be negative")
+	}
+	return nil
+}
+
+// UpdateConfig persists the current configuration after serialization has
+// succeeded, avoiding truncating a valid file when marshaling fails.
+func (c *Configuration) UpdateConfig() error {
+	c.Mutex.RLock()
 	conf, err := json.Marshal(c)
+	c.Mutex.RUnlock()
 	if err != nil {
-		log.Printf("Marshal config error: %v", err)
-		return
+		return fmt.Errorf("marshal config: %w", err)
 	}
 	conf = pretty.Pretty(conf)
-	_, err = f.Write(conf)
-	if err != nil {
-		log.Printf("Write config error: %v", err)
-		return
+	conf = append(conf, '\n')
+
+	if err := os.WriteFile(c.ConfigPath, conf, 0600); err != nil {
+		return fmt.Errorf("write config %q: %w", c.ConfigPath, err)
 	}
 	log.Println("Config updated!")
+	return nil
 }

@@ -5,11 +5,19 @@ import (
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
+)
+
+const (
+	groupMemberListEchoPrefix = "groupMemberList:"
+	groupMemberRequestTTL     = 30 * time.Second
 )
 
 type Waifu struct {
@@ -19,35 +27,43 @@ type Waifu struct {
 }
 
 type DailyWaifu struct {
-	send  chan<- *[]byte
+	send chan<- []byte
+	ctx  context.Context
+
 	Cache sync.Map
+	mu    sync.Mutex
+
+	pending  map[int64][]structs.MessageStruct
+	inFlight map[int64]time.Time
 }
 
-func init() {
+func registerDailyWaifu() error {
 	plugin := &essentials.Plugin{
-		Name:      "每日老婆",
-		Enabled:   base.Config.Plugins.Waifu.Enable,
-		Args:      base.Config.Plugins.Waifu.Args,
-		Interface: &DailyWaifu{},
+		Name:    "每日老婆",
+		Enabled: base.Config.Plugins.Waifu.Enable,
+		Args:    base.Config.Plugins.Waifu.Args,
+		Handler: &DailyWaifu{},
 	}
-	essentials.PluginArray = append(essentials.PluginArray, plugin)
-	go ScheduleRequireUpdate(plugin.Interface.(*DailyWaifu))
+	return essentials.Register(plugin)
 }
 
-func (d *DailyWaifu) ReceiveAll(send chan<- *[]byte) {
-	if d.send == nil && send != nil {
-		d.send = send
-	}
+func (d *DailyWaifu) Start(ctx context.Context, send chan<- []byte) {
+	d.mu.Lock()
+	d.ctx, d.send = ctx, send
+	d.ensureRequestStateLocked()
+	d.mu.Unlock()
+	go ScheduleRequireUpdate(ctx, d)
 }
 
-func (d *DailyWaifu) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.Waifu.Args) {
+func (d *DailyWaifu) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- []byte) {
+	if !essentials.CheckArgumentArray(messageStruct.Command, base.Config.Plugins.Waifu.Args) {
 		return
 	}
 
 	if messageStruct.GroupId == 0 {
-		for _, msg := range *messageStruct.CleanMessage {
-			if msg.Type == "text" && msg.Data["text"].(string) == "update" {
+		for _, msg := range messageStruct.CleanMessage {
+			text, ok := msg.Data["text"].(string)
+			if msg.Type == "text" && ok && text == "update" {
 				if messageStruct.UserId != base.Config.Admin {
 					send <- essentials.SendMsg(messageStruct, "该指令仅限管理员使用", nil, false, true, "")
 				} else {
@@ -59,49 +75,58 @@ func (d *DailyWaifu) ReceiveMessage(messageStruct *structs.MessageStruct, send c
 		return
 	}
 
-	const avatarApi = "https://q1.qlogo.cn/g?b=qq&s=100&nk="
-
 	groupCache, ok := d.Cache.Load(messageStruct.GroupId)
-	if !ok {
-		send <- essentials.SendMsg(messageStruct, "获取群组缓存失败", nil, false, true, "")
-		return
-	}
-
-	groupCacheMap := groupCache.(map[int64]Waifu)
-	userId := messageStruct.UserId
-	if _, ok := groupCacheMap[userId]; ok {
-		wife := groupCacheMap[userId]
-		var msg []cqcode.ArrayMessage
-
-		if wife.Card != "" {
-			msg = append(msg, *cqcode.Text(fmt.Sprintf("你今天的老婆是: %s(%s)\n%d", wife.Card, wife.NickName, wife.UserId)))
-		} else {
-			msg = append(msg, *cqcode.Text(fmt.Sprintf("你今天的老婆是: %s\n%d", wife.NickName, wife.UserId)))
+	if ok {
+		groupCacheMap, valid := groupCache.(map[int64]Waifu)
+		if valid {
+			d.sendWaifuReply(messageStruct, groupCacheMap, send)
+			return
 		}
-		msg = append(msg, *cqcode.Image(fmt.Sprintf("%s%d", avatarApi, wife.UserId)))
-		send <- essentials.SendMsg(messageStruct, "", &msg, false, true, "")
-		return
+		log.Printf("DailyWaifu: invalid cache value for group %d", messageStruct.GroupId)
+		d.Cache.Delete(messageStruct.GroupId)
 	}
 
-	send <- essentials.SendMsg(messageStruct, "获取老婆失败, 你今天没老婆了", nil, false, true, "")
+	// Startup, reconnect, and scheduled refresh can all leave a short window in
+	// which the group cache has not arrived yet. Queue the original command and
+	// lazily fetch that group instead of turning this normal race into an error.
+	d.enqueuePending(messageStruct)
+	d.requestGroupMembers(messageStruct.GroupId, send)
 }
 
-func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, _ chan<- *[]byte) {
-	if echoMessageStruct.Status != "ok" || echoMessageStruct.Echo != "groupMemberList" {
-		return
-	}
-	if len(echoMessageStruct.DataArray) == 0 {
+func (d *DailyWaifu) sendWaifuReply(messageStruct *structs.MessageStruct, groupCache map[int64]Waifu, send chan<- []byte) {
+	const avatarAPI = "https://q1.qlogo.cn/g?b=qq&s=100&nk="
+
+	wife, ok := groupCache[messageStruct.UserId]
+	if !ok {
+		send <- essentials.SendMsg(messageStruct, "获取老婆失败, 你今天没老婆了", nil, false, true, "")
 		return
 	}
 
-	var waifus []Waifu
-	groupId := echoMessageStruct.DataArray[0].GroupId
-	for _, data := range echoMessageStruct.DataArray {
-		waifus = append(waifus, Waifu{
-			UserId:   data.UserId,
-			NickName: data.Nickname,
-			Card:     data.Card,
-		})
+	var msg []cqcode.ArrayMessage
+	if wife.Card != "" {
+		msg = append(msg, *cqcode.Text(fmt.Sprintf("你今天的老婆是: %s(%s)\n%d", wife.Card, wife.NickName, wife.UserId)))
+	} else {
+		msg = append(msg, *cqcode.Text(fmt.Sprintf("你今天的老婆是: %s\n%d", wife.NickName, wife.UserId)))
+	}
+	msg = append(msg, *cqcode.Image(fmt.Sprintf("%s%d", avatarAPI, wife.UserId)))
+	send <- essentials.SendMsg(messageStruct, "", msg, false, true, "")
+}
+
+func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- []byte) {
+	if echoMessageStruct == nil {
+		return
+	}
+
+	groupID, recognized := groupIDFromMemberEcho(echoMessageStruct)
+	if !recognized {
+		return
+	}
+	if echoMessageStruct.Status != "ok" || len(echoMessageStruct.DataArray) == 0 {
+		d.failGroupRequest(groupID, send)
+		return
+	}
+	if groupID == 0 {
+		groupID = echoMessageStruct.DataArray[0].GroupId
 	}
 
 	today := time.Now().In(time.Local)
@@ -124,7 +149,7 @@ func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, _
 		userIDs[i], userIDs[j] = userIDs[j], userIDs[i]
 	})
 
-	pairings := make(map[int64]Waifu, len(waifus))
+	pairings := make(map[int64]Waifu, len(userIDs))
 
 	for i := 0; i < len(userIDs); i += 2 {
 
@@ -162,54 +187,142 @@ func (d *DailyWaifu) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, _
 		}
 	}
 
-	d.Cache.Store(groupId, pairings)
+	d.Cache.Store(groupID, pairings)
+	for _, pending := range d.finishGroupRequest(groupID) {
+		request := pending
+		d.sendWaifuReply(&request, pairings, send)
+	}
+}
+
+func (d *DailyWaifu) enqueuePending(messageStruct *structs.MessageStruct) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.ensureRequestStateLocked()
+	d.pending[messageStruct.GroupId] = append(d.pending[messageStruct.GroupId], *messageStruct)
+}
+
+func (d *DailyWaifu) requestGroupMembers(groupID int64, send chan<- []byte) {
+	if groupID == 0 || send == nil {
+		return
+	}
+
+	now := time.Now()
+	d.mu.Lock()
+	d.ensureRequestStateLocked()
+	if requestedAt, ok := d.inFlight[groupID]; ok && now.Sub(requestedAt) < groupMemberRequestTTL {
+		d.mu.Unlock()
+		return
+	}
+	d.inFlight[groupID] = now
+	ctx := d.ctx
+	d.mu.Unlock()
+
+	action := essentials.SendAction("get_group_member_list",
+		struct {
+			GroupId int64 `json:"group_id"`
+		}{GroupId: groupID}, groupMemberEcho(groupID))
+
+	var done <-chan struct{}
+	if ctx != nil {
+		done = ctx.Done()
+	}
+	select {
+	case send <- action:
+	case <-done:
+		d.mu.Lock()
+		delete(d.inFlight, groupID)
+		d.mu.Unlock()
+	}
+}
+
+func (d *DailyWaifu) ensureRequestStateLocked() {
+	if d.pending == nil {
+		d.pending = make(map[int64][]structs.MessageStruct)
+	}
+	if d.inFlight == nil {
+		d.inFlight = make(map[int64]time.Time)
+	}
+}
+
+func (d *DailyWaifu) finishGroupRequest(groupID int64) []structs.MessageStruct {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.ensureRequestStateLocked()
+	pending := d.pending[groupID]
+	delete(d.pending, groupID)
+	delete(d.inFlight, groupID)
+	return pending
+}
+
+func (d *DailyWaifu) failGroupRequest(groupID int64, send chan<- []byte) {
+	if groupID == 0 {
+		log.Printf("DailyWaifu: group member request failed without a group id")
+		return
+	}
+	for _, pending := range d.finishGroupRequest(groupID) {
+		request := pending
+		send <- essentials.SendMsg(&request, "获取群成员信息失败，请稍后重试", nil, false, true, "")
+	}
+}
+
+func groupMemberEcho(groupID int64) string {
+	return groupMemberListEchoPrefix + strconv.FormatInt(groupID, 10)
+}
+
+func groupIDFromMemberEcho(echoMessageStruct *structs.EchoMessageStruct) (int64, bool) {
+	echo := echoMessageStruct.Echo
+	if strings.HasPrefix(echo, groupMemberListEchoPrefix) {
+		groupID, err := strconv.ParseInt(strings.TrimPrefix(echo, groupMemberListEchoPrefix), 10, 64)
+		return groupID, err == nil && groupID != 0
+	}
+	if echo != "groupMemberList" {
+		return 0, false
+	}
+	if len(echoMessageStruct.DataArray) == 0 {
+		return 0, true
+	}
+	return echoMessageStruct.DataArray[0].GroupId, true
 }
 
 func (d *DailyWaifu) RequireUpdate() {
-	for d.send == nil {
-		log.Printf("DailyWaifu: Waiting for send channel...")
-		time.Sleep(10 * time.Second)
+	d.mu.Lock()
+	send := d.send
+	d.mu.Unlock()
+	if send == nil {
+		log.Printf("DailyWaifu: send channel is not ready")
+		return
 	}
 
-	for _, group := range essentials.Info.GroupList {
-		d.Cache.Clear()
-		d.send <- essentials.SendAction("get_group_member_list",
-			struct {
-				GroupId int64 `json:"group_id"`
-			}{GroupId: group.GroupId}, "groupMemberList")
+	d.Cache.Clear()
+	for _, group := range essentials.Info.Groups() {
+		d.requestGroupMembers(group.GroupId, send)
 	}
 }
 
-func ScheduleRequireUpdate(d *DailyWaifu) {
+func ScheduleRequireUpdate(ctx context.Context, d *DailyWaifu) {
 	if !base.Config.Plugins.Waifu.Enable {
 		return
 	}
 
-	for essentials.Info.UpdateTime[2] == 0 {
-		log.Printf("DailyWaifu: Waiting for group list...")
-		time.Sleep(10 * time.Second)
+	if !essentials.Info.WaitForGroups(ctx) {
+		return
 	}
-
 	d.RequireUpdate()
 
-	location, _ := time.LoadLocation("Asia/Shanghai")
-	now := time.Now().In(location)
-	nextMidnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, location)
-	durationUntilMidnight := time.Until(nextMidnight)
-
-	time.AfterFunc(durationUntilMidnight, func() {
-		for time.Now().Unix()-essentials.Info.UpdateTime[2] > 86400 {
-			log.Printf("DailyWaifu: Waiting for new group list...")
-			time.Sleep(10 * time.Second)
-		}
-		d.RequireUpdate()
-		ticker := time.NewTicker(24 * time.Hour)
-		for range ticker.C {
-			for time.Now().Unix()-essentials.Info.UpdateTime[2] > 86400 {
-				log.Printf("DailyWaifu: Waiting for new group list...")
-				time.Sleep(10 * time.Second)
-			}
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		location = time.FixedZone("Asia/Shanghai", 8*60*60)
+	}
+	for {
+		now := time.Now().In(location)
+		next := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, location)
+		timer := time.NewTimer(time.Until(next))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
 			d.RequireUpdate()
 		}
-	})
+	}
 }
