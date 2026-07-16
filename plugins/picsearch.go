@@ -4,6 +4,7 @@ import (
 	"MacArthurGo/base"
 	"MacArthurGo/plugins/ascii2d"
 	"MacArthurGo/plugins/essentials"
+	"MacArthurGo/plugins/googlelens"
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"bytes"
@@ -28,6 +29,7 @@ type PicSearch struct {
 	handleBannedHosts bool
 	sauceNAOToken     string
 	ascii2dClient     *ascii2d.Client
+	googleLensClient  *googlelens.Client
 }
 
 type sauceNAOResponse struct {
@@ -56,12 +58,23 @@ func registerPicSearch() error {
 	if err != nil {
 		log.Printf("Ascii2d client init error: %v", err)
 	}
+	var googleClient *googlelens.Client
+	if strings.TrimSpace(cfg.GoogleLens.APIKey) != "" {
+		googleClient, err = googlelens.NewClient(googlelens.Config{
+			APIKey:  cfg.GoogleLens.APIKey,
+			Timeout: time.Duration(cfg.GoogleLens.TimeoutSeconds) * time.Second,
+		})
+		if err != nil {
+			log.Printf("Google Lens client init error: %v", err)
+		}
+	}
 	picSearch := PicSearch{
 		groupForward:      cfg.GroupForward,
 		allowPrivate:      cfg.AllowPrivate,
 		handleBannedHosts: cfg.HandleBannedHosts,
 		sauceNAOToken:     cfg.SauceNAOToken,
 		ascii2dClient:     asciiClient,
+		googleLensClient:  googleClient,
 	}
 	plugin := &essentials.Plugin{
 		Name:    "搜图",
@@ -173,6 +186,14 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg []cqcode
 			if cached && !isPurge {
 				result = append(result, []cqcode.ArrayMessage{*cqcode.Text("本次搜图结果来自数据库缓存")})
 				result = append(result, cachedResult...)
+				if p.googleLensClient != nil && !hasGoogleLensResult(cachedResult) {
+					googleResult := p.googleLens(imgURL)
+					result = append(result, googleResult)
+					if isCacheableSearchResult([][]cqcode.ArrayMessage{googleResult}) {
+						cachedResult = append(cachedResult, googleResult)
+						p.storeCachedResult(key, cachedResult, true)
+					}
+				}
 				continue
 			}
 
@@ -226,7 +247,7 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg []cqcode
 }
 
 func (p *PicSearch) searchImage(imageURL string) [][]cqcode.ArrayMessage {
-	response := make(chan []cqcode.ArrayMessage, 4)
+	response := make(chan []cqcode.ArrayMessage, 5)
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
@@ -237,6 +258,13 @@ func (p *PicSearch) searchImage(imageURL string) [][]cqcode.ArrayMessage {
 		defer wg.Done()
 		p.ascii2d(imageURL, response)
 	}()
+	if p.googleLensClient != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			response <- p.googleLens(imageURL)
+		}()
+	}
 	go func() {
 		wg.Wait()
 		close(response)
@@ -267,10 +295,32 @@ func (p *PicSearch) loadCachedResult(key string) ([][]cqcode.ArrayMessage, bool)
 		log.Printf("Unmarshal cached message error: %v", err)
 		return nil, false
 	}
+	result = removeLegacyGoogleSearchResults(result)
 	if !isCacheableSearchResult(result) {
 		return nil, false
 	}
 	return result, true
+}
+
+func removeLegacyGoogleSearchResults(results [][]cqcode.ArrayMessage) [][]cqcode.ArrayMessage {
+	filtered := results[:0]
+	for _, item := range results {
+		legacy := false
+		for _, segment := range item {
+			if segment.Type != "text" {
+				continue
+			}
+			text, _ := segment.Data["text"].(string)
+			if strings.HasPrefix(text, "Google 搜图") {
+				legacy = true
+				break
+			}
+		}
+		if !legacy {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
 }
 
 func (p *PicSearch) storeCachedResult(key string, result [][]cqcode.ArrayMessage, exists bool) {
@@ -303,7 +353,7 @@ func isCacheableSearchResult(result [][]cqcode.ArrayMessage) bool {
 				continue
 			}
 			text, _ := segment.Data["text"].(string)
-			if strings.HasPrefix(text, "ascii2d：") || strings.HasPrefix(text, "SauceNAO：") {
+			if strings.HasPrefix(text, "ascii2d：") || strings.HasPrefix(text, "SauceNAO：") || strings.HasPrefix(text, "Google Lens：") {
 				return false
 			}
 		}
@@ -492,6 +542,47 @@ func (p *PicSearch) ascii2d(imageURL string, response chan<- []cqcode.ArrayMessa
 		message = append(message, *cqcode.Text("\n" + strings.Join(details, "\n")))
 		response <- message
 	}
+}
+
+func (p *PicSearch) googleLens(imageURL string) []cqcode.ArrayMessage {
+	result, err := p.googleLensClient.Search(context.Background(), imageURL)
+	if err != nil {
+		log.Printf("Google Lens search error: %v", err)
+		return []cqcode.ArrayMessage{*cqcode.Text("Google Lens：搜索失败，详细原因请查看程序日志")}
+	}
+
+	message := []cqcode.ArrayMessage{*cqcode.Text("Google Lens\n")}
+	if thumbnail := p.ThumbnailToBase64(result.Thumbnail); thumbnail != nil {
+		message = append(message, *cqcode.Image(*thumbnail))
+	} else {
+		message = append(message, *cqcode.Image(result.Thumbnail))
+	}
+	link := result.Link
+	if p.handleBannedHosts {
+		p.HandleBannedHostsArray(&link)
+	}
+	var details []string
+	if result.Title != "" {
+		details = append(details, "「"+result.Title+"」")
+	}
+	details = append(details, link)
+	message = append(message, *cqcode.Text("\n" + strings.Join(details, "\n")))
+	return message
+}
+
+func hasGoogleLensResult(results [][]cqcode.ArrayMessage) bool {
+	for _, item := range results {
+		for _, segment := range item {
+			if segment.Type != "text" {
+				continue
+			}
+			text, _ := segment.Data["text"].(string)
+			if strings.HasPrefix(text, "Google Lens\n") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (p *PicSearch) checkArgs(rawMsg string, args []string) bool {

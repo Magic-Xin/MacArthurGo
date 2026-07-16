@@ -53,6 +53,8 @@ github.com/psykhi/wordclouds v0.0.0-20231014190151-b9dd58fabbef h1:ejUg635m79C08
 github.com/psykhi/wordclouds v0.0.0-20231014190151-b9dd58fabbef/go.mod h1:dQvaG/qpa4wU5tXfzQdHivHQ9ZDWKG0ha+3kKgUNYL4=
 github.com/sashabaranov/go-openai v1.41.2 h1:vfPRBZNMpnqu8ELsclWcAvF19lDNgh1t6TVfFFOPiSM=
 github.com/sashabaranov/go-openai v1.41.2/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
+github.com/serpapi/serpapi-golang v0.0.0-20260126142127-0e41c7993cda h1:w3JksZEWJDI7x+No5yh2/8S86hq1dmJy7n5btakG30U=
+github.com/serpapi/serpapi-golang v0.0.0-20260126142127-0e41c7993cda/go.mod h1:xVL4PnCuCPwkXhVVQysVrX3hEv7nWnIbfnDj2B+hsPw=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/tidwall/pretty v1.2.1 h1:qjsOFOWWQl+N3RsoF5/ssm1pHmJJwhjlSbZ51I6wMl4=

@@ -43,6 +43,7 @@ func TestLoadConfig_Invalid(t *testing.T) {
 	}{
 		{name: "address", content: `{"address":"http://127.0.0.1"}`, want: "ws:// or wss://"},
 		{name: "probability", content: `{"address":"ws://127.0.0.1","plugins":{"repeat":{"probability":1.1}}}`, want: "probability"},
+		{name: "google timeout", content: `{"address":"ws://127.0.0.1","plugins":{"picSearch":{"googleLens":{"timeoutSeconds":-1}}}}`, want: "googleLens.timeoutSeconds"},
 		{name: "trailing value", content: `{"address":"ws://127.0.0.1"} {}`, want: "multiple JSON values"},
 	}
 	for _, test := range tests {

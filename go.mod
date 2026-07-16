@@ -9,6 +9,7 @@ require (
 	github.com/ncruces/go-sqlite3 v0.35.2
 	github.com/psykhi/wordclouds v0.0.0-20231014190151-b9dd58fabbef
 	github.com/sashabaranov/go-openai v1.41.2
+	github.com/serpapi/serpapi-golang v0.0.0-20260126142127-0e41c7993cda
 	github.com/tidwall/pretty v1.2.1
 	github.com/vinta/pangu v3.0.0+incompatible
 	github.com/wcharczuk/go-chart/v2 v2.1.2

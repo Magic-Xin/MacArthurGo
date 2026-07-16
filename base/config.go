@@ -86,6 +86,10 @@ type Configuration struct {
 				ProxyURL        string `json:"proxyUrl"`
 				TimeoutSeconds  int    `json:"timeoutSeconds"`
 			} `json:"ascii2d"`
+			GoogleLens struct {
+				APIKey         string `json:"apiKey"`
+				TimeoutSeconds int    `json:"timeoutSeconds"`
+			} `json:"googleLens"`
 		} `json:"picSearch"`
 		Statics struct {
 			Enable           bool              `json:"enable"`
@@ -208,6 +212,9 @@ func (c *Configuration) Validate() error {
 	}
 	if c.Plugins.PicSearch.ASCII2D.TimeoutSeconds < 0 {
 		return errors.New("plugins.picSearch.ascii2d.timeoutSeconds cannot be negative")
+	}
+	if c.Plugins.PicSearch.GoogleLens.TimeoutSeconds < 0 {
+		return errors.New("plugins.picSearch.googleLens.timeoutSeconds cannot be negative")
 	}
 	return nil
 }

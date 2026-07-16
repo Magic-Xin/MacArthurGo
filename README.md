@@ -69,6 +69,7 @@ All tests live in the top-level `test/` directory and exercise packages through 
 - Picture Search
   - SauceNao
   - Ascii2d
+  - Google Lens (SerpApi)
 - Poke
 - Roll
 - Repeat
@@ -84,6 +85,10 @@ docker run -d --name=flaresolverr -p 8191:8191 -e LOG_LEVEL=info --restart unles
 ```
 
 The default `plugins.picSearch.ascii2d.flareSolverrUrl` is `http://127.0.0.1:8191/v1`. Set `proxyUrl` in the same section only when the FlareSolverr browser must use an HTTP or SOCKS proxy. The proxy address must be reachable from inside the FlareSolverr host or container; a loopback or private address on the MacArthurGo machine will not work for a remote FlareSolverr instance unless that route is explicitly available. Browser sessions are closed after each search.
+
+### Google Lens image-search setup
+
+Google Lens results use the official [SerpApi Go client](https://github.com/serpapi/serpapi-golang) and its [Google Lens API](https://serpapi.com/google-lens-api). Set a SerpApi key in `plugins.picSearch.googleLens.apiKey`; the provider is disabled when the key is empty. Requests are fixed to `type=visual_matches` and `safe=off` without a language restriction. The reply contains one result's title, thumbnail, and link, selected by source priority (Pixiv, then Twitter/X, then other sites) and by the lowest result position within the same priority.
 
 ## TODO
 - [ ] Add more plugins
