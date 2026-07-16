@@ -3,17 +3,22 @@ package essentials
 import (
 	"MacArthurGo/base"
 	"MacArthurGo/structs"
-	"encoding/json"
+	"context"
 	"fmt"
 	"log"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 type LoginInfo struct {
-	send       chan<- *[]byte
+	mu         sync.RWMutex
+	send       chan<- []byte
+	ctx        context.Context
+	groupReady chan struct{}
+	readyOnce  sync.Once
 	NickName   string
 	UserId     string
 	FriendList []Friend
@@ -37,30 +42,31 @@ type Group struct {
 
 var Info LoginInfo
 
-func init() {
-	Info = LoginInfo{
-		UpdateTime: []int64{0, 0, 0},
-	}
+func registerInfo() error {
+	Info = LoginInfo{}
+	Info.ensureState()
 	plugin := &Plugin{
-		Name:      "info",
-		Enabled:   true,
-		Args:      []string{"/info", "/help"},
-		Interface: &Info,
+		Name:    "info",
+		Enabled: true,
+		Args:    []string{"/info", "/help"},
+		Handler: &Info,
 	}
-	PluginArray = append(PluginArray, plugin)
-
-	go SchedulerRequireUpdate(&Info)
+	return Register(plugin)
 }
 
-func (l *LoginInfo) ReceiveAll(send chan<- *[]byte) {
-	if l.send == nil && send != nil {
-		l.send = send
-	}
+func (l *LoginInfo) Start(ctx context.Context, send chan<- []byte) {
+	l.mu.Lock()
+	l.ensureStateLocked()
+	l.ctx = ctx
+	l.send = send
+	l.mu.Unlock()
+	go SchedulerRequireUpdate(ctx, l)
 }
 
-func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
+func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- []byte) {
 	switch messageStruct.Command {
 	case "/info":
+		friendCount, groupCount := l.Counts()
 		var mem runtime.MemStats
 		runtime.ReadMemStats(&mem)
 
@@ -69,10 +75,10 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send ch
 		message += "分支: " + base.Branch + "\n" + "版本: " + base.Version + "\n" + "编译时间: " + base.BuildTime + "\n"
 		message += "已运行时间: " + l.timeToString(time.Now().Unix()-base.Config.StartTime) + "\n\n"
 
-		message += "已添加好友数量: " + strconv.Itoa(len(l.FriendList)) + "\n"
-		message += "已加入群组数量: " + strconv.Itoa(len(l.GroupList)) + "\n\n"
+		message += "已添加好友数量: " + strconv.Itoa(friendCount) + "\n"
+		message += "已加入群组数量: " + strconv.Itoa(groupCount) + "\n\n"
 
-		message += "已加载插件: " + strconv.Itoa(len(PluginArray)) + " 个\n"
+		message += "已加载插件: " + strconv.Itoa(PluginCount()) + " 个\n"
 		message += "Goroutine 数量: " + strconv.Itoa(runtime.NumGoroutine()) + "\n\n"
 
 		message += "内存使用情况:\n"
@@ -83,7 +89,7 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send ch
 		send <- SendMsg(messageStruct, message, nil, false, false, "")
 	case "/help":
 		result := []string{"插件\t\t\t\t触发指令"}
-		for _, p := range PluginArray {
+		for _, p := range Plugins() {
 			var res string
 			res += p.Name
 			if !p.Enabled {
@@ -114,10 +120,13 @@ func (l *LoginInfo) ReceiveMessage(messageStruct *structs.MessageStruct, send ch
 	}
 }
 
-func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- *[]byte) {
+func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- []byte) {
 	if echoMessageStruct.Status != "ok" {
 		return
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.ensureStateLocked()
 
 	sendStruct := structs.MessageStruct{
 		MessageType: "private",
@@ -136,36 +145,34 @@ func (l *LoginInfo) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, se
 		l.UpdateTime[0] = time.Now().Unix()
 	case "friendList":
 		data := echoMessageStruct.DataArray
-		bytesData, err := json.Marshal(data)
-		if err != nil {
-			log.Printf("FriendList Marshal error: %v", err)
-			return
-		}
-		err = json.Unmarshal(bytesData, &l.FriendList)
-		if err != nil {
-			log.Printf("FriendList Unmarshal error: %v", err)
-			return
+		l.FriendList = make([]Friend, len(data))
+		for i, item := range data {
+			l.FriendList[i] = Friend{
+				UserId:   item.UserId,
+				Nickname: item.Nickname,
+				Remark:   item.Remark,
+			}
 		}
 
 		log.Printf("Get friend list count: %d", len(l.FriendList))
-		//send <- SendMsg(&sendStruct, fmt.Sprintf("好友列表加载成功，好友数量: %d", len(l.FriendList)), nil, false, false, "")
+		//send <- SendMsg(&sendStruct, fmt.Sprintf("好友列表加载成功，好友数量: %d", friendCount), nil, false, false, "")
 		l.UpdateTime[1] = time.Now().Unix()
 	case "groupList":
 		data := echoMessageStruct.DataArray
-		bytesData, err := json.Marshal(data)
-		if err != nil {
-			log.Printf("GroupList Marshal error: %v", err)
-			return
-		}
-		err = json.Unmarshal(bytesData, &l.GroupList)
-		if err != nil {
-			log.Printf("GroupList Unmarshal error: %v", err)
-			return
+		l.GroupList = make([]Group, len(data))
+		for i, item := range data {
+			l.GroupList[i] = Group{
+				GroupId:        item.GroupId,
+				GroupName:      item.GroupName,
+				MemberCount:    item.MemberCount,
+				MaxMemberCount: item.MaxMemberCount,
+			}
 		}
 
 		log.Printf("Get group list count: %d", len(l.GroupList))
-		//send <- SendMsg(&sendStruct, fmt.Sprintf("群组列表加载成功，群组数量: %d", len(l.GroupList)), nil, false, false, "")
+		//send <- SendMsg(&sendStruct, fmt.Sprintf("群组列表加载成功，群组数量: %d", groupCount), nil, false, false, "")
 		l.UpdateTime[2] = time.Now().Unix()
+		l.readyOnce.Do(func() { close(l.groupReady) })
 	}
 }
 
@@ -182,28 +189,95 @@ func (*LoginInfo) timeToString(time int64) string {
 }
 
 func (l *LoginInfo) RequireUpdate() {
-	if l.send == nil {
-		log.Printf("LoginInfo: Waiting for send channel...")
-		time.Sleep(10 * time.Second)
+	l.mu.RLock()
+	send, ctx := l.send, l.ctx
+	l.mu.RUnlock()
+	if send == nil {
+		log.Printf("LoginInfo: send channel is not ready")
+		return
 	}
-	l.send <- SendAction("get_login_info", struct{}{}, "info")
-	l.send <- SendAction("get_friend_list", struct{}{}, "friendList")
-	l.send <- SendAction("get_group_list", struct{}{}, "groupList")
+	for _, action := range [][]byte{
+		SendAction("get_login_info", struct{}{}, "info"),
+		SendAction("get_friend_list", struct{}{}, "friendList"),
+		SendAction("get_group_list", struct{}{}, "groupList"),
+	} {
+		select {
+		case send <- action:
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
-func SchedulerRequireUpdate(l *LoginInfo) {
+func SchedulerRequireUpdate(ctx context.Context, l *LoginInfo) {
 	l.RequireUpdate()
 
-	location, _ := time.LoadLocation("Asia/Shanghai")
-	now := time.Now().In(location)
-	nextMidnight := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, location)
-	durationUntilMidnight := time.Until(nextMidnight)
-
-	time.AfterFunc(durationUntilMidnight, func() {
-		l.RequireUpdate()
-		ticker := time.NewTicker(24 * time.Hour)
-		for range ticker.C {
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		location = time.FixedZone("Asia/Shanghai", 8*60*60)
+	}
+	for {
+		timer := time.NewTimer(untilNextMidnight(location))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
 			l.RequireUpdate()
 		}
-	})
+	}
+}
+
+func untilNextMidnight(location *time.Location) time.Duration {
+	now := time.Now().In(location)
+	next := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, location)
+	return time.Until(next)
+}
+
+func (l *LoginInfo) Counts() (friends, groups int) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return len(l.FriendList), len(l.GroupList)
+}
+
+func (l *LoginInfo) Groups() []Group {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return append([]Group(nil), l.GroupList...)
+}
+
+func (l *LoginInfo) Account() (userID, nickname string) {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.UserId, l.NickName
+}
+
+func (l *LoginInfo) WaitForGroups(ctx context.Context) bool {
+	l.mu.Lock()
+	l.ensureStateLocked()
+	ready := l.groupReady
+	l.mu.Unlock()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-ready:
+		return true
+	}
+}
+
+func (l *LoginInfo) ensureState() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.ensureStateLocked()
+}
+
+func (l *LoginInfo) ensureStateLocked() {
+	if l.groupReady == nil {
+		l.groupReady = make(chan struct{})
+	}
+	if len(l.UpdateTime) < 3 {
+		updateTime := make([]int64, 3)
+		copy(updateTime, l.UpdateTime)
+		l.UpdateTime = updateTime
+	}
 }

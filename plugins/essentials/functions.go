@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/sha256"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -21,7 +20,14 @@ import (
 	"time"
 )
 
-func SendAction(action string, params any, echo string) *[]byte {
+// HTTPClient is shared across plugins so connections are pooled and every
+// request has a finite upper bound.
+var HTTPClient = &http.Client{
+	Transport: http.DefaultTransport.(*http.Transport).Clone(),
+	Timeout:   60 * time.Second,
+}
+
+func SendAction(action string, params any, echo string) []byte {
 	if action == "" {
 		return nil
 	}
@@ -29,11 +35,11 @@ func SendAction(action string, params any, echo string) *[]byte {
 	act := structs.Action{Action: action, Params: params, Echo: echo}
 	jsonMsg, _ := json.Marshal(act)
 
-	return &jsonMsg
+	return jsonMsg
 }
 
 // SendFile Deprecated
-func SendFile(messageStruct *structs.MessageStruct, file string, name string) *[]byte {
+func SendFile(messageStruct *structs.MessageStruct, file string, name string) []byte {
 	if file == "" || messageStruct == nil {
 		return nil
 	}
@@ -50,17 +56,17 @@ func SendFile(messageStruct *structs.MessageStruct, file string, name string) *[
 	}
 
 	jsonMsg, _ := json.Marshal(act)
-	return &jsonMsg
+	return jsonMsg
 }
 
-func SendMsg(messageStruct *structs.MessageStruct, message string, messageArray *[]cqcode.ArrayMessage, at bool, reply bool, echo string) *[]byte {
+func SendMsg(messageStruct *structs.MessageStruct, message string, messageArray []cqcode.ArrayMessage, at bool, reply bool, echo string) []byte {
 	if (message == "" && messageArray == nil) || messageStruct == nil {
 		return nil
 	}
 
 	arrayMessage := []cqcode.ArrayMessage{{Type: "text", Data: map[string]any{"text": message}}}
 	if messageArray != nil {
-		arrayMessage = append(arrayMessage, *messageArray...)
+		arrayMessage = append(arrayMessage, messageArray...)
 	}
 
 	if at && messageStruct.MessageType == "group" {
@@ -72,10 +78,10 @@ func SendMsg(messageStruct *structs.MessageStruct, message string, messageArray 
 		arrayMessage = append([]cqcode.ArrayMessage{*cqcode.Reply(msgId)}, arrayMessage...)
 	}
 
-	return constructMessage(messageStruct, &arrayMessage, echo)
+	return constructMessage(messageStruct, arrayMessage, echo)
 }
 
-func SendPoke(messageStruct *structs.MessageStruct, uid int64) *[]byte {
+func SendPoke(messageStruct *structs.MessageStruct, uid int64) []byte {
 	switch messageStruct.MessageType {
 	case "group":
 		return SendAction("group_poke",
@@ -92,43 +98,43 @@ func SendPoke(messageStruct *structs.MessageStruct, uid int64) *[]byte {
 	return nil
 }
 
-func SendMusic(messageStruct *structs.MessageStruct, urlType string, id string) *[]byte {
-	return constructMessage(messageStruct, &[]cqcode.ArrayMessage{*cqcode.Music(urlType, id)}, "")
+func SendMusic(messageStruct *structs.MessageStruct, urlType string, id string) []byte {
+	return constructMessage(messageStruct, []cqcode.ArrayMessage{*cqcode.Music(urlType, id)}, "")
 }
 
-func SendPrivateForward(messageStruct *structs.MessageStruct, data *[]structs.ForwardNode, echo string) *[]byte {
+func SendPrivateForward(messageStruct *structs.MessageStruct, data []structs.ForwardNode, echo string) []byte {
 	params := structs.PrivateForward{
 		UserId:   messageStruct.UserId,
-		Messages: *data,
+		Messages: data,
 	}
 
 	return SendAction("send_private_forward_msg", params, echo)
 }
 
-func SendGroupForward(messageStruct *structs.MessageStruct, data *[]structs.ForwardNode, echo string) *[]byte {
+func SendGroupForward(messageStruct *structs.MessageStruct, data []structs.ForwardNode, echo string) []byte {
 	params := structs.GroupForward{
 		GroupId:  messageStruct.GroupId,
-		Messages: *data,
+		Messages: data,
 	}
 
 	return SendAction("send_group_forward_msg", params, echo)
 }
 
-func ConstructForwardNode(uin string, name string, data *[]cqcode.ArrayMessage) *structs.ForwardNode {
+func ConstructForwardNode(uin string, name string, data []cqcode.ArrayMessage) *structs.ForwardNode {
 	node := structs.NewForwardNode()
 	node.Data.Uin = uin
 	node.Data.Name = name
-	node.Data.Content = *data
+	node.Data.Content = data
 
 	return node
 }
 
-func CheckArgumentArray(command string, args *[]string) bool {
+func CheckArgumentArray(command string, args []string) bool {
 	if args == nil {
 		return false
 	}
 
-	for _, arg := range *args {
+	for _, arg := range args {
 		if arg == command {
 			return true
 		}
@@ -136,12 +142,12 @@ func CheckArgumentArray(command string, args *[]string) bool {
 	return false
 }
 
-func CheckArgumentMap(command string, argsMap *map[string]string) (string, bool) {
+func CheckArgumentMap(command string, argsMap map[string]string) (string, bool) {
 	if argsMap == nil {
 		return "", false
 	}
 
-	for key, value := range *argsMap {
+	for key, value := range argsMap {
 		if value == command {
 			return key, true
 		}
@@ -149,10 +155,12 @@ func CheckArgumentMap(command string, argsMap *map[string]string) (string, bool)
 	return "", false
 }
 
-func SplitArgument(message *[]cqcode.ArrayMessage) (res []string) {
-	for _, msg := range *message {
+func SplitArgument(message []cqcode.ArrayMessage) (res []string) {
+	for _, msg := range message {
 		if msg.Type == "text" {
-			res = append(res, strings.Fields(msg.Data["text"].(string))...)
+			if text, ok := msg.Data["text"].(string); ok {
+				res = append(res, strings.Fields(text)...)
+			}
 		}
 	}
 	return res
@@ -177,39 +185,13 @@ func GetImageData(url string) *bytes.Buffer {
 }
 
 func FetchImageData(ctx context.Context, imageURL string) (*bytes.Buffer, error) {
-	tlsConfig := &tls.Config{
-		CipherSuites: []uint16{
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-			tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-			tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_RSA_WITH_AES_128_CBC_SHA256,
-			tls.TLS_RSA_WITH_AES_128_CBC_SHA,
-			tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA,
-		},
-		InsecureSkipVerify: false,
-	}
-
-	transport := &http.Transport{
-		Proxy:           http.ProxyFromEnvironment,
-		TLSClientConfig: tlsConfig,
-	}
-
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   30 * time.Second,
-	}
-
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := client.Do(req)
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -248,13 +230,14 @@ func ImageToBase64(url string) *string {
 }
 
 func GetOriginUrl(url string) *string {
-	req, err := http.NewRequest("GET", url, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		log.Printf("Url parser request error: %v", err)
 		return nil
 	}
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		log.Printf("Url parser response error: %v", err)
 		return nil
@@ -265,11 +248,11 @@ func GetOriginUrl(url string) *string {
 	return &originURL
 }
 
-func Md5(origin *[]byte) string {
-	return fmt.Sprintf("%x", md5.Sum(*origin))
+func Md5(origin []byte) string {
+	return fmt.Sprintf("%x", md5.Sum(origin))
 }
 
-func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.ArrayMessage, echo string) *[]byte {
+func constructMessage(messageStruct *structs.MessageStruct, message []cqcode.ArrayMessage, echo string) []byte {
 	if messageStruct.MessageType == "" {
 		return nil
 	}
@@ -279,12 +262,12 @@ func constructMessage(messageStruct *structs.MessageStruct, message *[]cqcode.Ar
 		MessageType: messageStruct.MessageType,
 		UserId:      messageStruct.UserId,
 		GroupId:     messageStruct.GroupId,
-		Message:     *message,
+		Message:     message,
 	}
 	act = structs.Action{Action: "send_msg", Params: msg, Echo: echo}
 
 	jsonMsg, _ := json.Marshal(act)
-	return &jsonMsg
+	return jsonMsg
 }
 
 func RemoveMarkdown(input string) string {

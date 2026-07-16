@@ -2,108 +2,264 @@ package client
 
 import (
 	"MacArthurGo/base"
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"runtime"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
+const (
+	defaultQueueSize    = 256
+	defaultReadLimit    = 8 << 20
+	writeTimeout        = 10 * time.Second
+	pongTimeout         = 60 * time.Second
+	pingInterval        = 45 * time.Second
+	minReconnectDelay   = time.Second
+	maxReconnectDelay   = 30 * time.Second
+	stableConnectionAge = time.Minute
+)
+
+type EventHandler func([]byte, chan<- []byte) error
+
+type Options struct {
+	Address      string
+	AuthToken    string
+	QueueSize    int
+	Workers      int
+	EventHandler EventHandler
+	Dialer       *websocket.Dialer
+	ReconnectMin time.Duration
+	ReconnectMax time.Duration
+}
+
+// Client owns a persistent inbound worker pool and outbound queue. Individual
+// WebSocket connections can be replaced without changing the channel plugins
+// use to send actions.
 type Client struct {
-	Conn     *websocket.Conn
-	SendPump chan *[]byte
+	address      string
+	authToken    string
+	dialer       *websocket.Dialer
+	handler      EventHandler
+	workers      int
+	reconnectMin time.Duration
+	reconnectMax time.Duration
+	outbound     chan []byte
+	events       chan []byte
 }
 
-func InitWebsocketConnection(addr string, at string) (*websocket.Conn, error) {
-	header := http.Header{}
-	if at != "" {
-		header = http.Header{"AUTHORIZATION": []string{fmt.Sprintf("Bearer %s", at)}}
+func New(options Options) *Client {
+	queueSize := options.QueueSize
+	if queueSize <= 0 {
+		queueSize = defaultQueueSize
 	}
-	c, _, err := websocket.DefaultDialer.Dial(addr, header)
-	if err != nil {
-		log.Printf("Dial error: %v", err)
-		return nil, err
+	workers := options.Workers
+	if workers <= 0 {
+		workers = max(4, runtime.GOMAXPROCS(0))
 	}
-	return c, nil
+	handler := options.EventHandler
+	if handler == nil {
+		handler = MessageFactory
+	}
+	dialer := options.Dialer
+	if dialer == nil {
+		clone := *websocket.DefaultDialer
+		dialer = &clone
+	}
+	reconnectMin := options.ReconnectMin
+	if reconnectMin <= 0 {
+		reconnectMin = minReconnectDelay
+	}
+	reconnectMax := options.ReconnectMax
+	if reconnectMax < reconnectMin {
+		reconnectMax = maxReconnectDelay
+	}
+	return &Client{
+		address:      options.Address,
+		authToken:    options.AuthToken,
+		dialer:       dialer,
+		handler:      handler,
+		workers:      workers,
+		reconnectMin: reconnectMin,
+		reconnectMax: reconnectMax,
+		outbound:     make(chan []byte, queueSize),
+		events:       make(chan []byte, queueSize),
+	}
 }
 
-func (c *Client) ReadPump() {
-	defer func(conn *websocket.Conn) {
-		err := conn.Close()
-		if err != nil {
-			log.Fatalf("Close error: %v", err)
+func (c *Client) Sender() chan<- []byte {
+	return c.outbound
+}
+
+// Run maintains the WebSocket connection until ctx is canceled. Disconnects
+// are retried with bounded exponential backoff.
+func (c *Client) Run(ctx context.Context) error {
+	if c.address == "" {
+		return errors.New("websocket address is empty")
+	}
+
+	workerCtx, cancelWorkers := context.WithCancel(ctx)
+	workersDone := c.startWorkers(workerCtx)
+	defer func() {
+		cancelWorkers()
+		select {
+		case <-workersDone:
+		case <-time.After(writeTimeout):
+			log.Printf("Timed out waiting for event workers to stop")
 		}
-	}(c.Conn)
+	}()
 
+	delay := c.reconnectMin
 	for {
-		_, message, err := c.Conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Fatalf("Unexpected close error: %v", err)
-			}
-			break
+		if err := ctx.Err(); err != nil {
+			return nil
 		}
-
-		if base.Config.Debug {
-			log.Printf("Receive: %s\n", string(message))
+		connectedAt := time.Now()
+		err := c.runConnection(ctx)
+		if ctx.Err() != nil {
+			return nil
 		}
+		log.Printf("WebSocket disconnected: %v", err)
+		if time.Since(connectedAt) >= stableConnectionAge {
+			delay = c.reconnectMin
+		}
+		log.Printf("Reconnecting in %s", delay)
+		if !waitContext(ctx, delay) {
+			return nil
+		}
+		delay = min(delay*2, c.reconnectMax)
+	}
+}
 
+func (c *Client) startWorkers(ctx context.Context) <-chan struct{} {
+	done := make(chan struct{})
+	remaining := make(chan struct{}, c.workers)
+	for range c.workers {
 		go func() {
-			MessageFactory(&message, c.SendPump)
+			defer func() { remaining <- struct{}{} }()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case event := <-c.events:
+					if err := c.handler(event, c.outbound); err != nil {
+						log.Printf("Handle OneBot event: %v", err)
+					}
+				}
+			}
 		}()
 	}
+	go func() {
+		for range c.workers {
+			<-remaining
+		}
+		close(done)
+	}()
+	return done
 }
 
-func (c *Client) WritePump() {
-	defer func(conn *websocket.Conn) {
-		err := conn.Close()
-		if err != nil {
-			log.Fatalf("Close error: %v", err)
+func (c *Client) runConnection(ctx context.Context) error {
+	header := make(http.Header)
+	if c.authToken != "" {
+		header.Set("Authorization", "Bearer "+c.authToken)
+	}
+	conn, response, err := c.dialer.DialContext(ctx, c.address, header)
+	if err != nil {
+		if response != nil {
+			return fmt.Errorf("dial websocket (%s): %w", response.Status, err)
 		}
-	}(c.Conn)
+		return fmt.Errorf("dial websocket: %w", err)
+	}
+	log.Printf("WebSocket connected to %s", c.address)
+
+	connectionCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	defer conn.Close()
+
+	errorsCh := make(chan error, 2)
+	go func() { errorsCh <- c.readPump(connectionCtx, conn) }()
+	go func() { errorsCh <- c.writePump(connectionCtx, conn) }()
+
+	select {
+	case <-ctx.Done():
+		cancel()
+		_ = conn.WriteControl(
+			websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseNormalClosure, "shutdown"),
+			time.Now().Add(writeTimeout),
+		)
+		return nil
+	case err := <-errorsCh:
+		cancel()
+		return err
+	}
+}
+
+func (c *Client) readPump(ctx context.Context, conn *websocket.Conn) error {
+	conn.SetReadLimit(defaultReadLimit)
+	_ = conn.SetReadDeadline(time.Now().Add(pongTimeout))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(pongTimeout))
+	})
 
 	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			if ctx.Err() != nil || websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+				return nil
+			}
+			return fmt.Errorf("read websocket: %w", err)
+		}
+		if base.Config.Debug {
+			log.Printf("Receive: %s", message)
+		}
 		select {
-		case message, ok := <-c.SendPump:
-			if message == nil {
+		case c.events <- message:
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+func (c *Client) writePump(ctx context.Context, conn *websocket.Conn) error {
+	ticker := time.NewTicker(pingInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case message := <-c.outbound:
+			if len(message) == 0 {
 				continue
 			}
-
-			if !ok {
-				err := c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
-				if err != nil {
-					log.Fatalf("Client channel error: %v", err)
-				}
-				return
-			}
-
 			if base.Config.Debug {
-				log.Printf("Send: %s\n", string(*message))
+				log.Printf("Send: %s", message)
 			}
-
-			w, err := c.Conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				log.Fatalf("Next writer error: %v", err)
+			if err := conn.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+				return fmt.Errorf("set websocket write deadline: %w", err)
 			}
-
-			_, err = w.Write(*message)
-			if err != nil {
-				log.Fatalf("Write message error: %v", err)
+			if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
+				return fmt.Errorf("write websocket: %w", err)
 			}
-
-			err = w.Close()
-			if err != nil {
-				log.Fatalf("Writer close error: %v", err)
+		case <-ticker.C:
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeTimeout)); err != nil {
+				return fmt.Errorf("ping websocket: %w", err)
 			}
 		}
 	}
 }
 
-func (c *Client) Close() {
-	if err := c.Conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")); err != nil {
-		log.Printf("Failed to close websocket connection: %v", err)
-		return
+func waitContext(ctx context.Context, duration time.Duration) bool {
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
 	}
-
-	close(c.SendPump)
 }

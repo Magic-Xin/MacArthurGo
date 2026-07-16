@@ -2,10 +2,12 @@ package plugins
 
 import (
 	"MacArthurGo/base"
+	"MacArthurGo/internal/urlmatch"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
@@ -62,7 +64,11 @@ type LiveData struct {
 	Url          string
 }
 
-func init() {
+var (
+	biliShortPattern = regexp.MustCompile(`((b23\.tv|bili2233\.cn)\\?/\w+)`)
+)
+
+func registerBili() error {
 	login := BiliLogin{}
 	aiSummarize := AISummarize{
 		Enabled:      base.Config.Plugins.Bili.AiSummarize.Enable,
@@ -73,39 +79,36 @@ func init() {
 		AiSummarize: &aiSummarize,
 	}
 	plugin := &essentials.Plugin{
-		Name:      "B 站链接解析",
-		Enabled:   base.Config.Plugins.Bili.Enable,
-		Interface: &bili,
+		Name:    "B 站链接解析",
+		Enabled: base.Config.Plugins.Bili.Enable,
+		Handler: &bili,
 	}
-	essentials.PluginArray = append(essentials.PluginArray, plugin)
 
 	bili.AiSummarize.LoadLoginInfo()
+	return essentials.Register(plugin)
 }
 
-func (b *Bili) ReceiveAll(send chan<- *[]byte) {
-	if send == nil {
+func (b *Bili) Start(ctx context.Context, send chan<- []byte) {
+	if send == nil || b.AiSummarize.loginMsg == "" {
 		return
 	}
-
-	if b.AiSummarize.loginMsg != "" {
-		send <- essentials.SendMsg(nil, b.AiSummarize.loginMsg, nil, false, false, "")
+	message := structs.MessageStruct{MessageType: "private", UserId: base.Config.Admin}
+	select {
+	case send <- essentials.SendMsg(&message, b.AiSummarize.loginMsg, nil, false, false, ""):
 		b.AiSummarize.loginMsg = ""
+	case <-ctx.Done():
 	}
 }
 
-func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	const biliShort = `((b23.tv|bili2233.cn)\\?/\w+)`
-	const video = `[m|www].bilibili.com/video/(\w+)`
-	const live = `live.bilibili.com/(\d+)`
-
-	if essentials.CheckArgumentArray(messageStruct.Command, &[]string{"/bili_login"}) && messageStruct.UserId == base.Config.Admin {
+func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- []byte) {
+	if essentials.CheckArgumentArray(messageStruct.Command, []string{"/bili_login"}) && messageStruct.UserId == base.Config.Admin {
 		b.AiSummarize.Login(messageStruct, send)
 		return
 	}
 
 	rawMsg := messageStruct.RawMessage
-	if match := regexp.MustCompile(biliShort).FindAllStringSubmatch(rawMsg, -1); match != nil {
-		replaceUrl := strings.Replace(match[0][1], "\\", "", -1)
+	if match := biliShortPattern.FindStringSubmatch(rawMsg); match != nil {
+		replaceUrl := strings.Replace(match[1], "\\", "", -1)
 		if orgUrl := essentials.GetOriginUrl("https://" + replaceUrl); orgUrl != nil {
 			rawMsg = *orgUrl
 		}
@@ -116,10 +119,10 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- 
 		liveData  *LiveData
 	)
 
-	if match := regexp.MustCompile(video).FindAllStringSubmatch(rawMsg, -1); match != nil {
-		videoData = b.getVideoData(match[0][1])
-	} else if match = regexp.MustCompile(live).FindAllStringSubmatch(rawMsg, -1); match != nil {
-		liveData = b.getLiveData(match[0][1])
+	if videoID, ok := urlmatch.BiliVideoID(rawMsg); ok {
+		videoData = b.getVideoData(videoID)
+	} else if roomID, ok := urlmatch.BiliLiveRoomID(rawMsg); ok {
+		liveData = b.getLiveData(roomID)
 	} else {
 		return
 	}
@@ -127,7 +130,7 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- 
 	if videoData != nil {
 		e, r := b.AiSummarize.Summarize(videoData, true)
 		if r != nil {
-			videoData.Summary = "AI 视频总结：" + (*r)[0]
+			videoData.Summary = "AI 视频总结：" + r[0]
 		} else {
 			videoData.Summary = e
 		}
@@ -137,7 +140,7 @@ func (b *Bili) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- 
 	}
 }
 
-func (b *Bili) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
+func (b *Bili) ReceiveEcho(*structs.EchoMessageStruct, chan<- []byte) {}
 
 func (b *Bili) getVideoData(vid string) *VideoData {
 	const api = "https://api.bilibili.com/x/web-interface/view?"
@@ -153,7 +156,7 @@ func (b *Bili) getVideoData(vid string) *VideoData {
 		log.Printf("Video url parser request error: %v", err)
 		return nil
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := essentials.HTTPClient.Do(req)
 	if err != nil {
 		log.Printf("Video url parser response error: %v", err)
 		return nil
@@ -210,7 +213,7 @@ func (b *Bili) getLiveData(roomId string) *LiveData {
 		log.Printf("Live url parser request error: %v", err)
 		return nil
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := essentials.HTTPClient.Do(req)
 	if err != nil {
 		log.Printf("Live url parser response error: %v", err)
 		return nil
@@ -268,7 +271,7 @@ func (b *Bili) getLiveData(roomId string) *LiveData {
 	return data
 }
 
-func (a *AISummarize) Login(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
+func (a *AISummarize) Login(messageStruct *structs.MessageStruct, send chan<- []byte) {
 	const genQr = "https://passport.bilibili.com/x/passport-login/web/qrcode/generate"
 	const login = "https://passport.bilibili.com/x/passport-login/web/qrcode/poll"
 
@@ -278,13 +281,14 @@ func (a *AISummarize) Login(messageStruct *structs.MessageStruct, send chan<- *[
 		return
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := essentials.HTTPClient.Do(req)
 	if err != nil {
 		log.Printf("Bili Login Error: %s", err)
 		return
 	}
 
 	body, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
 	if err != nil {
 		log.Printf("Bili Login Error: %s", err)
 		return
@@ -315,13 +319,14 @@ func (a *AISummarize) Login(messageStruct *structs.MessageStruct, send chan<- *[
 			return
 		}
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := essentials.HTTPClient.Do(req)
 		if err != nil {
 			log.Printf("Bili Login Error: %s", err)
 			return
 		}
 
 		body, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
 		if err != nil {
 			log.Printf("Bili Login Error: %s", err)
 			return
@@ -395,7 +400,7 @@ func (a *AISummarize) LoadLoginInfo() {
 	}
 }
 
-func (a *AISummarize) Summarize(videoData *VideoData, sumOnly bool) (string, *[]string) {
+func (a *AISummarize) Summarize(videoData *VideoData, sumOnly bool) (string, []string) {
 	if !a.Enabled {
 		return "", nil
 	}
@@ -462,7 +467,7 @@ func (a *AISummarize) Summarize(videoData *VideoData, sumOnly bool) (string, *[]
 	}
 
 	if sumOnly {
-		return "", &[]string{res.Summary}
+		return "", []string{res.Summary}
 	}
 
 	var sum []string
@@ -470,7 +475,7 @@ func (a *AISummarize) Summarize(videoData *VideoData, sumOnly bool) (string, *[]
 		sum = append(sum, fmt.Sprintf("摘要: %s\n", res.Summary))
 	}
 	if len(res.Outline) == 0 {
-		return "", &sum
+		return "", sum
 	}
 
 	for i, o := range res.Outline {
@@ -480,7 +485,7 @@ func (a *AISummarize) Summarize(videoData *VideoData, sumOnly bool) (string, *[]
 		}
 		sum = append(sum, contents)
 	}
-	return "", &sum
+	return "", sum
 }
 
 func (a *AISummarize) requireSummarize(url string) (*map[string]any, error) {
@@ -504,7 +509,7 @@ func (a *AISummarize) requireSummarize(url string) (*map[string]any, error) {
 		req.AddCookie(c)
 	}
 
-	response, err := http.DefaultClient.Do(req)
+	response, err := essentials.HTTPClient.Do(req)
 	if err != nil {
 		log.Printf("Request failed: %s", err)
 		return nil, err
@@ -541,7 +546,7 @@ func (*AISummarize) timestampToString(timestamp int64) string {
 	return fmt.Sprintf("%02d:%02d:%02d", hour, minute, second)
 }
 
-func (v *VideoData) ToArrayMessage() *[]cqcode.ArrayMessage {
+func (v *VideoData) ToArrayMessage() []cqcode.ArrayMessage {
 	var messageArray []cqcode.ArrayMessage
 	messageArray = append(messageArray, *cqcode.Image(v.ThumbnailUrl + "\n"))
 	messageArray = append(messageArray, *cqcode.Text("av" + v.Aid + "\n"))
@@ -552,10 +557,10 @@ func (v *VideoData) ToArrayMessage() *[]cqcode.ArrayMessage {
 	if v.Summary != "" {
 		messageArray = append(messageArray, *cqcode.Text(v.Summary))
 	}
-	return &messageArray
+	return messageArray
 }
 
-func (l *LiveData) ToArrayMessage() *[]cqcode.ArrayMessage {
+func (l *LiveData) ToArrayMessage() []cqcode.ArrayMessage {
 	var messageArray []cqcode.ArrayMessage
 	messageArray = append(messageArray, *cqcode.Image(l.ThumbnailUrl + "\n"))
 	messageArray = append(messageArray, *cqcode.Text(l.Title + "\n"))
@@ -564,7 +569,7 @@ func (l *LiveData) ToArrayMessage() *[]cqcode.ArrayMessage {
 	messageArray = append(messageArray, *cqcode.Text("分区: " + l.AreaName + "\n"))
 	messageArray = append(messageArray, *cqcode.Text(l.Status + "\n"))
 	messageArray = append(messageArray, *cqcode.Text(l.Url))
-	return &messageArray
+	return messageArray
 }
 
 // Wbi
@@ -712,7 +717,8 @@ func removeUnwantedChars(v url.Values, chars ...byte) url.Values {
 	}
 	s, err := url.ParseQuery(string(b))
 	if err != nil {
-		panic(err)
+		log.Printf("Parse sanitized query: %v", err)
+		return v
 	}
 	return s
 }

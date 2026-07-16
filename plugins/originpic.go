@@ -13,22 +13,19 @@ import (
 
 type OriginPic struct{}
 
-func init() {
+func registerOriginPic() error {
 	originPic := OriginPic{}
 	plugin := &essentials.Plugin{
-		Name:      "原图",
-		Enabled:   base.Config.Plugins.OriginPic.Enable,
-		Args:      base.Config.Plugins.OriginPic.Args,
-		Interface: &originPic,
+		Name:    "原图",
+		Enabled: base.Config.Plugins.OriginPic.Enable,
+		Args:    base.Config.Plugins.OriginPic.Args,
+		Handler: &originPic,
 	}
-
-	essentials.PluginArray = append(essentials.PluginArray, plugin)
+	return essentials.Register(plugin)
 }
 
-func (*OriginPic) ReceiveAll(chan<- *[]byte) {}
-
-func (*OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.OriginPic.Args) {
+func (*OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- []byte) {
+	if !essentials.CheckArgumentArray(messageStruct.Command, base.Config.Plugins.OriginPic.Args) {
 		return
 	}
 
@@ -53,13 +50,16 @@ func (*OriginPic) ReceiveMessage(messageStruct *structs.MessageStruct, send chan
 	}
 }
 
-func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- *[]byte) {
+func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- []byte) {
 	if echoMessageStruct.Status != "ok" {
 		return
 	}
 
 	echo := echoMessageStruct.Echo
 	split := strings.Split(echo, "|")
+	if len(split) < 2 {
+		return
+	}
 
 	if split[0] == "originPic" {
 		contexts := echoMessageStruct.Data
@@ -73,7 +73,7 @@ func (o *OriginPic) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, se
 			log.Println("Origin picture cache not found")
 			return
 		}
-		messageStruct := value.(essentials.EchoCache).Value
+		messageStruct := value.Value
 
 		for _, m := range message {
 			if m.Type == "image" {

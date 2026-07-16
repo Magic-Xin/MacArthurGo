@@ -6,6 +6,7 @@ import (
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -63,7 +64,7 @@ type Statics struct {
 	stopWords   map[string]struct{}
 }
 
-func init() {
+func registerStatics() error {
 	cfg := base.Config.Plugins.Statics
 	statics := &Statics{
 		stopWords: buildStopWords(cfg.StopWords),
@@ -89,16 +90,33 @@ func init() {
 	}
 
 	plugin := &essentials.Plugin{
-		Name:      "群聊统计",
-		Enabled:   cfg.Enable,
-		Interface: statics,
+		Name:    "群聊统计",
+		Enabled: cfg.Enable,
+		Handler: statics,
 	}
-	essentials.PluginArray = append(essentials.PluginArray, plugin)
+	return essentials.Register(plugin)
 }
 
-func (s *Statics) ReceiveAll(chan<- *[]byte) {}
+func (s *Statics) Start(ctx context.Context, _ chan<- []byte) {
+	if s.store != nil {
+		s.store.startAutoFlush(ctx)
+	}
+}
 
-func (s *Statics) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
+func (s *Statics) Stop() error {
+	if s.store != nil {
+		s.store.flushDirtyDates()
+	}
+	s.tokenizerMu.Lock()
+	defer s.tokenizerMu.Unlock()
+	if s.tokenizer != nil {
+		s.tokenizer.Free()
+		s.tokenizer = nil
+	}
+	return nil
+}
+
+func (s *Statics) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- []byte) {
 	if messageStruct == nil || messageStruct.MessageType != "group" || messageStruct.GroupId == 0 {
 		return
 	}
@@ -115,17 +133,17 @@ func (s *Statics) ReceiveMessage(messageStruct *structs.MessageStruct, send chan
 		return
 	}
 
-	if label, ok := essentials.CheckArgumentMap(messageStruct.Command, &base.Config.Plugins.Statics.ChartArgsMap); ok {
+	if label, ok := essentials.CheckArgumentMap(messageStruct.Command, base.Config.Plugins.Statics.ChartArgsMap); ok {
 		s.respondWithChart(messageStruct, label, send)
 		return
 	}
 
-	if label, ok := essentials.CheckArgumentMap(messageStruct.Command, &base.Config.Plugins.Statics.WordCloudArgsMap); ok {
+	if label, ok := essentials.CheckArgumentMap(messageStruct.Command, base.Config.Plugins.Statics.WordCloudArgsMap); ok {
 		s.respondWithWordCloud(messageStruct, label, send)
 	}
 }
 
-func (s *Statics) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
+func (s *Statics) ReceiveEcho(*structs.EchoMessageStruct, chan<- []byte) {}
 
 func (s *Statics) recordMessage(messageStruct *structs.MessageStruct) {
 	if s.store == nil {
@@ -144,7 +162,7 @@ func (s *Statics) recordMessage(messageStruct *structs.MessageStruct) {
 	}
 }
 
-func (s *Statics) respondWithChart(messageStruct *structs.MessageStruct, label string, send chan<- *[]byte) {
+func (s *Statics) respondWithChart(messageStruct *structs.MessageStruct, label string, send chan<- []byte) {
 	dateKey := resolveDateKey(label)
 	counts := s.store.getHourly(dateKey, messageStruct.GroupId)
 	var total int64
@@ -166,10 +184,10 @@ func (s *Statics) respondWithChart(messageStruct *structs.MessageStruct, label s
 
 	msg := fmt.Sprintf("%s发言折线图（%s），总计 %d 条", describeDay(label), dateKey, total)
 	arr := buildImageArray(img)
-	send <- essentials.SendMsg(messageStruct, msg, &arr, false, true, "")
+	send <- essentials.SendMsg(messageStruct, msg, arr, false, true, "")
 }
 
-func (s *Statics) respondWithWordCloud(messageStruct *structs.MessageStruct, label string, send chan<- *[]byte) {
+func (s *Statics) respondWithWordCloud(messageStruct *structs.MessageStruct, label string, send chan<- []byte) {
 	dateKey := resolveDateKey(label)
 	freq := s.store.getWordFreq(dateKey, messageStruct.GroupId)
 	if len(freq) == 0 {
@@ -186,13 +204,13 @@ func (s *Statics) respondWithWordCloud(messageStruct *structs.MessageStruct, lab
 
 	msg := fmt.Sprintf("%s词云（%s）", describeDay(label), dateKey)
 	arr := buildImageArray(img)
-	send <- essentials.SendMsg(messageStruct, msg, &arr, false, true, "")
+	send <- essentials.SendMsg(messageStruct, msg, arr, false, true, "")
 }
 
 func (s *Statics) collectPlainText(messageStruct *structs.MessageStruct) string {
 	var segments []cqcode.ArrayMessage
-	if messageStruct.CleanMessage != nil && len(*messageStruct.CleanMessage) > 0 {
-		segments = *messageStruct.CleanMessage
+	if len(messageStruct.CleanMessage) > 0 {
+		segments = messageStruct.CleanMessage
 	} else {
 		segments = messageStruct.Message
 	}
@@ -487,7 +505,6 @@ func newStaticsStore(dir string, retention int) (*staticsStore, error) {
 	if err := store.loadRecent(); err != nil {
 		return nil, err
 	}
-	store.startAutoFlush()
 	return store, nil
 }
 
@@ -536,13 +553,19 @@ func (s *staticsStore) loadRecent() error {
 	return nil
 }
 
-func (s *staticsStore) startAutoFlush() {
+func (s *staticsStore) startAutoFlush(ctx context.Context) {
 	s.flushOnce.Do(func() {
 		go func() {
 			ticker := time.NewTicker(30 * time.Second)
 			defer ticker.Stop()
-			for range ticker.C {
-				s.flushDirtyDates()
+			for {
+				select {
+				case <-ctx.Done():
+					s.flushDirtyDates()
+					return
+				case <-ticker.C:
+					s.flushDirtyDates()
+				}
 			}
 		}()
 	})

@@ -9,6 +9,7 @@ import (
 
 type MessageStruct struct {
 	Time        int64  `json:"time"`
+	PostType    string `json:"post_type"`
 	MessageType string `json:"message_type"`
 	MessageId   int64  `json:"message_id"`
 	GroupId     int64  `json:"group_id"`
@@ -22,7 +23,7 @@ type MessageStruct struct {
 	Echo       string                `json:"echo"`
 
 	Command      string
-	CleanMessage *[]cqcode.ArrayMessage
+	CleanMessage []cqcode.ArrayMessage
 }
 
 func (m *MessageStruct) UnmarshalJSON(data []byte) error {

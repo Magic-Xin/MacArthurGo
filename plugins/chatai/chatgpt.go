@@ -15,7 +15,7 @@ type ChatGPT struct {
 	ApiKey  string
 }
 
-func (c *ChatGPT) RequireAnswer(str string) *[]string {
+func (c *ChatGPT) RequireAnswer(str string) []string {
 	var res []string
 	client := openai.NewClient(c.ApiKey)
 	resp, err := client.CreateChatCompletion(
@@ -34,9 +34,13 @@ func (c *ChatGPT) RequireAnswer(str string) *[]string {
 	if err != nil {
 		log.Printf("ChatCompletion error: %v", err)
 		res = append(res, fmt.Sprintf("ChatCompletion error: %v", err))
-		return &res
+		return res
+	}
+	if len(resp.Choices) == 0 {
+		res = append(res, "ChatCompletion error: response contained no choices")
+		return res
 	}
 
 	res = append(res, c.Model+": "+resp.Choices[0].Message.Content)
-	return &res
+	return res
 }

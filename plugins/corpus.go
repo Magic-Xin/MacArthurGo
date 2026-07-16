@@ -5,6 +5,7 @@ import (
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -14,21 +15,25 @@ type Corpus struct {
 }
 
 type Rules struct {
-	Regexp  string
+	Pattern *regexp.Regexp
 	Reply   string
 	IsReply bool
 	IsAt    bool
 	Scene   string
 	Users   []int64
 	Groups  []int64
-	Message *[]cqcode.ArrayMessage
+	Message []cqcode.ArrayMessage
 }
 
-func init() {
+func registerCorpus() error {
 	var rules []Rules
 	for _, v := range base.Config.Plugins.Corpus.Rules {
+		pattern, err := regexp.Compile(v.Regexp)
+		if err != nil {
+			return fmt.Errorf("compile corpus rule %q: %w", v.Regexp, err)
+		}
 		rule := Rules{
-			Regexp:  v.Regexp,
+			Pattern: pattern,
 			Reply:   v.Reply,
 			IsReply: v.IsReply,
 			IsAt:    v.IsAt,
@@ -39,7 +44,7 @@ func init() {
 
 		cq := cqcode.FromStr(v.Reply)
 		if cq != nil {
-			rule.Message = cq
+			rule.Message = *cq
 		}
 
 		rules = append(rules, rule)
@@ -49,16 +54,14 @@ func init() {
 		rules: &rules,
 	}
 	plugin := &essentials.Plugin{
-		Name:      "语料库回复",
-		Enabled:   base.Config.Plugins.Corpus.Enable,
-		Interface: &corpus,
+		Name:    "语料库回复",
+		Enabled: base.Config.Plugins.Corpus.Enable,
+		Handler: &corpus,
 	}
-	essentials.PluginArray = append(essentials.PluginArray, plugin)
+	return essentials.Register(plugin)
 }
 
-func (*Corpus) ReceiveAll(chan<- *[]byte) {}
-
-func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
+func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- []byte) {
 	message := messageStruct.Message
 	if message == nil || messageStruct.MessageType == "" {
 		return
@@ -71,7 +74,7 @@ func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 	}
 
 	for _, v := range *c.rules {
-		if match := regexp.MustCompile(v.Regexp).MatchString(text); match {
+		if match := v.Pattern.MatchString(text); match {
 			if v.Scene != "a" && v.Scene != "all" {
 				if !strings.HasPrefix(messageStruct.MessageType, v.Scene) {
 					continue
@@ -98,7 +101,7 @@ func (c *Corpus) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 	}
 }
 
-func (*Corpus) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
+func (*Corpus) ReceiveEcho(*structs.EchoMessageStruct, chan<- []byte) {}
 
 func (*Corpus) Contain(arr []int64, item int64) bool {
 	for _, v := range arr {

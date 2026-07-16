@@ -3,7 +3,10 @@ package main
 import (
 	"MacArthurGo/base"
 	"MacArthurGo/client"
-	_ "MacArthurGo/plugins"
+	"MacArthurGo/plugins"
+	"MacArthurGo/plugins/essentials"
+	"context"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -14,46 +17,93 @@ import (
 )
 
 func main() {
-	tz, err := time.LoadLocation("Asia/Shanghai")
+	logFile, err := setupLogging("log")
 	if err != nil {
-		tz = time.FixedZone("Asia/Shanghai", 8*60*60)
+		log.Printf("Initialize logging: %v", err)
+		os.Exit(1)
 	}
 
-	fileName := time.Now().In(tz).Format("20060102150405")
-	logPath := filepath.Join(".", "log")
-	if _, err := os.Stat(logPath); os.IsNotExist(err) {
-		err = os.Mkdir(logPath, os.ModeDir|0755)
-		if err != nil {
-			log.Fatalf("Can not create log folder error: %v", err)
+	err = run(os.Args[1:])
+	if err != nil {
+		log.Printf("MacArthurGo stopped: %v", err)
+	}
+	if closeErr := logFile.Close(); closeErr != nil {
+		log.Printf("Close log file: %v", closeErr)
+	}
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func run(args []string) error {
+	if err := base.LoadConfig(base.ConfigPath(args)); err != nil {
+		return err
+	}
+	formatBuildTime()
+
+	if err := essentials.OpenDatabase("cache.db"); err != nil {
+		return err
+	}
+	defer func() {
+		if err := essentials.CloseDatabase(); err != nil {
+			log.Printf("Close database: %v", err)
 		}
+	}()
+
+	if err := plugins.RegisterAll(); err != nil {
+		return err
 	}
-	logFile, err := os.OpenFile(filepath.Join(".", "log", fileName), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+
+	bot := client.New(client.Options{
+		Address:   base.Config.Address,
+		AuthToken: base.Config.AuthToken,
+	})
+	essentials.StartPlugins(ctx, bot.Sender())
+	defer func() {
+		stop()
+		essentials.StopPlugins()
+	}()
+
+	if err := bot.Run(ctx); err != nil {
+		return fmt.Errorf("run OneBot client: %w", err)
+	}
+	log.Println("Shutdown complete")
+	return nil
+}
+
+func setupLogging(directory string) (*os.File, error) {
+	if err := os.MkdirAll(directory, 0755); err != nil {
+		return nil, fmt.Errorf("create log directory: %w", err)
+	}
+	location := shanghaiLocation()
+	fileName := time.Now().In(location).Format("20060102150405") + ".log"
+	path := filepath.Join(directory, fileName)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Fatalf("Can not open or create logfile error: %v", err)
+		return nil, fmt.Errorf("open log file: %w", err)
 	}
-	mw := io.MultiWriter(os.Stdout, logFile)
-	log.SetOutput(mw)
+	log.SetOutput(io.MultiWriter(os.Stdout, file))
+	return file, nil
+}
 
-	if base.BuildTime != "" {
-		buildTime, _ := time.Parse(time.RFC3339, base.BuildTime)
-		base.BuildTime = buildTime.In(tz).Format("2006-01-02 15:04:05")
+func formatBuildTime() {
+	if base.BuildTime == "" {
+		return
 	}
-
-	conn, err := client.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
-	for err != nil {
-		time.Sleep(30 * time.Second)
-		log.Println("Can not connect to server, retrying...")
-		conn, err = client.InitWebsocketConnection(base.Config.Address, base.Config.AuthToken)
+	buildTime, err := time.Parse(time.RFC3339, base.BuildTime)
+	if err != nil {
+		log.Printf("Parse build time %q: %v", base.BuildTime, err)
+		return
 	}
-	wsClient := &client.Client{Conn: conn, SendPump: make(chan *[]byte)}
+	base.BuildTime = buildTime.In(shanghaiLocation()).Format("2006-01-02 15:04:05")
+}
 
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
-
-	go wsClient.ReadPump()
-	go wsClient.WritePump()
-
-	<-interrupt
-	log.Println("Shutting down...")
-	wsClient.Close()
+func shanghaiLocation() *time.Location {
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		return time.FixedZone("Asia/Shanghai", 8*60*60)
+	}
+	return location
 }

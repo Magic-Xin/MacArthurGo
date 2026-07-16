@@ -72,6 +72,10 @@
         "flareSolverrUrl": "http://127.0.0.1:8191/v1",
         "proxyUrl": "",
         "timeoutSeconds": 90
+      },
+      "googleLens": {
+        "apiKey": "",
+        "timeoutSeconds": 30
       }
     },
     "statics": {
