@@ -35,14 +35,10 @@ statistics flushing.
 
 ## Development
 
-CGO is required. On Windows with an MSYS2 UCRT64 toolchain, configure the
-compiler in the same PowerShell session before building or testing:
+CGO is required. Enable it before building or testing:
 
 ```powershell
 $env:CGO_ENABLED = "1"
-$env:PATH = "C:\msys64\ucrt64\bin;$env:PATH"
-$env:CC = "C:\msys64\ucrt64\bin\gcc.exe"
-$env:CXX = "C:\msys64\ucrt64\bin\g++.exe"
 go test ./...
 go build ./...
 ```
@@ -77,23 +73,18 @@ All tests live in the top-level `test/` directory and exercise packages through 
 - Corpus reply
 - Daily waifu
 
-### ascii2d setup
+### CloudflareBypassForScraping
 
-The ascii2d flow follows [cq-picsearcher-bot](https://github.com/Tsuk1ko/cq-picsearcher-bot): it fetches both the color and feature result pages and uses [CloudflareBypassForScraping](https://github.com/sarperavci/CloudflareBypassForScraping) to pass Cloudflare. Run the bypass service alongside MacArthurGo:
+Run [CloudflareBypassForScraping](https://github.com/sarperavci/CloudflareBypassForScraping) alongside MacArthurGo:
 
 ```powershell
 docker run -d --name=cf-bypass -p 127.0.0.1:8000:8000 --restart unless-stopped ghcr.io/sarperavci/cloudflarebypassforscraping:latest
 ```
 
-The default `plugins.picSearch.ascii2d.cloudflareBypassUrl` is `http://127.0.0.1:8000`; it is required for ascii2d searches and is also used to download protected thumbnails through mirror mode. Set `proxyUrl` only when the bypass service must use an HTTP or SOCKS proxy; that proxy must be reachable from the service container.
+The default configuration connects to the service at `http://127.0.0.1:8000`. MacArthurGo uses it for:
 
-### SoutuBot setup
-
-SoutuBot uses the same CloudflareBypassForScraping service through mirror mode and does not import the reference [SoutuBot-go](https://github.com/Miuzarte/SoutuBot-go) module. Configure it under `plugins.picSearch.soutuBot`; empty bypass, proxy, or timeout values inherit the corresponding ascii2d setting for existing configurations. `similarityThreshold` defaults to `45`. A maximum similarity below the threshold produces only a low-confidence notice; accepted searches start with a `SoutuBot` heading and return three Chinese-labeled text lines without thumbnails, with a blank line between each line. Each line contains the concrete source detail-page URL and the highest-similarity Japanese, Chinese, or English entry, or `未找到日文结果` / `未找到中文结果` / `未找到英文结果` when that language is absent.
-
-### Google Lens image-search setup
-
-Google Lens results use the official [SerpApi Go client](https://github.com/serpapi/serpapi-golang) and its [Google Lens API](https://serpapi.com/google-lens-api). Set a SerpApi key in `plugins.picSearch.googleLens.apiKey`; the provider is disabled when the key is empty. Requests are fixed to `type=visual_matches` and `safe=off` without a language restriction. The reply contains one result's title, thumbnail, and link, selected by source priority (Pixiv, then Twitter/X, then other sites) and by the lowest result position within the same priority.
+- **ascii2d:** loading color and feature search result pages and downloading protected thumbnails.
+- **SoutuBot:** loading the homepage state and forwarding image-search requests through mirror mode.
 
 ## TODO
 - [ ] Add more plugins
