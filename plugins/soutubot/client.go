@@ -203,11 +203,11 @@ func FormatMatches(matches []Item) string {
 			source,
 		))
 	}
-	return "SoutuBot\n" + strings.Join(lines, "\n")
+	return "SoutuBot\n\n" + strings.Join(lines, "\n\n")
 }
 
 func IsFormattedMatches(value string) bool {
-	lines := strings.Split(value, "\n")
+	lines := strings.Split(value, "\n\n")
 	if len(lines) != 4 || lines[0] != "SoutuBot" {
 		return false
 	}

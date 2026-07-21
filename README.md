@@ -89,7 +89,7 @@ The default `plugins.picSearch.ascii2d.cloudflareBypassUrl` is `http://127.0.0.1
 
 ### SoutuBot setup
 
-SoutuBot uses the same CloudflareBypassForScraping service through mirror mode and does not import the reference [SoutuBot-go](https://github.com/Miuzarte/SoutuBot-go) module. Configure it under `plugins.picSearch.soutuBot`; empty bypass, proxy, or timeout values inherit the corresponding ascii2d setting for existing configurations. `similarityThreshold` defaults to `45`. A maximum similarity below the threshold produces only a low-confidence notice; accepted searches start with a `SoutuBot` heading and return three Chinese-labeled text lines without thumbnails. Each line contains the concrete source detail-page URL and the highest-similarity Japanese, Chinese, or English entry, or `未找到日文结果` / `未找到中文结果` / `未找到英文结果` when that language is absent.
+SoutuBot uses the same CloudflareBypassForScraping service through mirror mode and does not import the reference [SoutuBot-go](https://github.com/Miuzarte/SoutuBot-go) module. Configure it under `plugins.picSearch.soutuBot`; empty bypass, proxy, or timeout values inherit the corresponding ascii2d setting for existing configurations. `similarityThreshold` defaults to `45`. A maximum similarity below the threshold produces only a low-confidence notice; accepted searches start with a `SoutuBot` heading and return three Chinese-labeled text lines without thumbnails, with a blank line between each line. Each line contains the concrete source detail-page URL and the highest-similarity Japanese, Chinese, or English entry, or `未找到日文结果` / `未找到中文结果` / `未找到英文结果` when that language is absent.
 
 ### Google Lens image-search setup
 

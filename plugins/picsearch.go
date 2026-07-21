@@ -385,7 +385,7 @@ func removeLegacySoutuBotResults(results [][]cqcode.ArrayMessage) [][]cqcode.Arr
 
 func isLegacySoutuBotResult(text string) bool {
 	if strings.HasPrefix(text, "SoutuBot\n") {
-		return false
+		return !soutubot.IsFormattedMatches(text)
 	}
 	englishLabels := strings.Contains(text, " | Similarity: ") &&
 		strings.Contains(text, " | Language: ") &&

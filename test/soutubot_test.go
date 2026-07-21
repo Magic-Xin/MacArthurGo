@@ -131,9 +131,9 @@ func TestSoutuBotClientSearchUsesCloudflareBypassForScraping(t *testing.T) {
 	if matches[0].Title != "Japanese\n highest" || matches[1].Title != "Chinese highest" || matches[2].Title != "English overall" {
 		t.Fatalf("selected matches = %#v", matches)
 	}
-	want := "SoutuBot\n" +
-		"标题: Japanese highest | 相似度: 90.00% | 语言: 🇯🇵 | 来源: https://panda.chaika.moe/g/300\n" +
-		"标题: Chinese highest | 相似度: 88.00% | 语言: 🇨🇳 | 来源: https://e-hentai.org/g/200/token\n" +
+	want := "SoutuBot\n\n" +
+		"标题: Japanese highest | 相似度: 90.00% | 语言: 🇯🇵 | 来源: https://panda.chaika.moe/g/300\n\n" +
+		"标题: Chinese highest | 相似度: 88.00% | 语言: 🇨🇳 | 来源: https://e-hentai.org/g/200/token\n\n" +
 		"标题: English overall | 相似度: 99.00% | 语言: 🇬🇧 | 来源: https://e-hentai.org/g/400/token"
 	if got := soutubot.FormatMatches(matches); got != want {
 		t.Fatalf("formatted matches = %q, want %q", got, want)
@@ -141,7 +141,10 @@ func TestSoutuBotClientSearchUsesCloudflareBypassForScraping(t *testing.T) {
 	if !soutubot.IsFormattedMatches(want) {
 		t.Fatal("formatted matches were not recognized")
 	}
-	missingChinese := "SoutuBot\n标题: Japanese highest | 相似度: 90.00% | 语言: 🇯🇵 | 来源: https://panda.chaika.moe/g/300\n未找到中文结果\n" +
+	if soutubot.IsFormattedMatches(strings.ReplaceAll(want, "\n\n", "\n")) {
+		t.Fatal("legacy single-spaced matches were recognized as current")
+	}
+	missingChinese := "SoutuBot\n\n标题: Japanese highest | 相似度: 90.00% | 语言: 🇯🇵 | 来源: https://panda.chaika.moe/g/300\n\n未找到中文结果\n\n" +
 		"标题: English overall | 相似度: 99.00% | 语言: 🇬🇧 | 来源: https://e-hentai.org/g/400/token"
 	if got := soutubot.FormatMatches([]soutubot.Item{matches[0], matches[2]}); got != missingChinese {
 		t.Fatalf("formatted match without Chinese result = %q, want %q", got, missingChinese)
@@ -149,7 +152,7 @@ func TestSoutuBotClientSearchUsesCloudflareBypassForScraping(t *testing.T) {
 	if !soutubot.IsFormattedMatches(missingChinese) {
 		t.Fatal("result without a Chinese match was not recognized")
 	}
-	missingJapanese := "SoutuBot\n未找到日文结果\n标题: Chinese highest | 相似度: 88.00% | 语言: 🇨🇳 | 来源: https://e-hentai.org/g/200/token\n" +
+	missingJapanese := "SoutuBot\n\n未找到日文结果\n\n标题: Chinese highest | 相似度: 88.00% | 语言: 🇨🇳 | 来源: https://e-hentai.org/g/200/token\n\n" +
 		"标题: English overall | 相似度: 99.00% | 语言: 🇬🇧 | 来源: https://e-hentai.org/g/400/token"
 	if got := soutubot.FormatMatches(matches[1:]); got != missingJapanese {
 		t.Fatalf("formatted match without Japanese result = %q, want %q", got, missingJapanese)
@@ -157,8 +160,8 @@ func TestSoutuBotClientSearchUsesCloudflareBypassForScraping(t *testing.T) {
 	if !soutubot.IsFormattedMatches(missingJapanese) {
 		t.Fatal("result without a Japanese match was not recognized")
 	}
-	missingEnglish := "SoutuBot\n标题: Japanese highest | 相似度: 90.00% | 语言: 🇯🇵 | 来源: https://panda.chaika.moe/g/300\n" +
-		"标题: Chinese highest | 相似度: 88.00% | 语言: 🇨🇳 | 来源: https://e-hentai.org/g/200/token\n未找到英文结果"
+	missingEnglish := "SoutuBot\n\n标题: Japanese highest | 相似度: 90.00% | 语言: 🇯🇵 | 来源: https://panda.chaika.moe/g/300\n\n" +
+		"标题: Chinese highest | 相似度: 88.00% | 语言: 🇨🇳 | 来源: https://e-hentai.org/g/200/token\n\n未找到英文结果"
 	if got := soutubot.FormatMatches(matches[:2]); got != missingEnglish {
 		t.Fatalf("formatted match without English result = %q, want %q", got, missingEnglish)
 	}
