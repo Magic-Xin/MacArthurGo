@@ -33,6 +33,9 @@ func TestLoadConfig_Valid(t *testing.T) {
 	if base.Config.StartTime == 0 {
 		t.Fatal("Config.StartTime was not initialized")
 	}
+	if threshold := base.Config.Plugins.PicSearch.SoutuBot.SimilarityThreshold; threshold != 45 {
+		t.Fatalf("SoutuBot similarity threshold = %.2f, want 45", threshold)
+	}
 }
 
 func TestLoadConfig_Invalid(t *testing.T) {
@@ -43,6 +46,8 @@ func TestLoadConfig_Invalid(t *testing.T) {
 	}{
 		{name: "address", content: `{"address":"http://127.0.0.1"}`, want: "ws:// or wss://"},
 		{name: "probability", content: `{"address":"ws://127.0.0.1","plugins":{"repeat":{"probability":1.1}}}`, want: "probability"},
+		{name: "soutubot timeout", content: `{"address":"ws://127.0.0.1","plugins":{"picSearch":{"soutuBot":{"timeoutSeconds":-1}}}}`, want: "soutuBot.timeoutSeconds"},
+		{name: "soutubot threshold", content: `{"address":"ws://127.0.0.1","plugins":{"picSearch":{"soutuBot":{"similarityThreshold":101}}}}`, want: "soutuBot.similarityThreshold"},
 		{name: "google timeout", content: `{"address":"ws://127.0.0.1","plugins":{"picSearch":{"googleLens":{"timeoutSeconds":-1}}}}`, want: "googleLens.timeoutSeconds"},
 		{name: "trailing value", content: `{"address":"ws://127.0.0.1"} {}`, want: "multiple JSON values"},
 	}

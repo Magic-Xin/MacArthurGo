@@ -69,6 +69,7 @@ All tests live in the top-level `test/` directory and exercise packages through 
 - Picture Search
   - SauceNao
   - Ascii2d
+  - SoutuBot
   - Google Lens (SerpApi)
 - Poke
 - Roll
@@ -86,6 +87,10 @@ docker run -d --name=cf-bypass -p 127.0.0.1:8000:8000 --restart unless-stopped g
 
 The default `plugins.picSearch.ascii2d.cloudflareBypassUrl` is `http://127.0.0.1:8000`. When this value is non-empty it takes priority and is also used to download protected thumbnails through mirror mode. Set `proxyUrl` only when the bypass service must use an HTTP or SOCKS proxy; that proxy must be reachable from the service container. Existing configurations can leave `cloudflareBypassUrl` empty and keep `flareSolverrUrl` as a compatibility fallback, although FlareSolverr is no longer the recommended ascii2d backend.
 
+### SoutuBot setup
+
+SoutuBot uses the same CloudflareBypassForScraping service through mirror mode and does not import the reference [SoutuBot-go](https://github.com/Miuzarte/SoutuBot-go) module. Configure it under `plugins.picSearch.soutuBot`; empty bypass, proxy, or timeout values inherit the corresponding ascii2d setting for existing configurations. `similarityThreshold` defaults to `45`. A maximum similarity below the threshold produces only a low-confidence notice; accepted searches start with a `SoutuBot` heading and return three Chinese-labeled text lines without thumbnails. Each line contains the concrete source detail-page URL and the highest-similarity Japanese, Chinese, or English entry, or `未找到日文结果` / `未找到中文结果` / `未找到英文结果` when that language is absent.
+
 ### Google Lens image-search setup
 
 Google Lens results use the official [SerpApi Go client](https://github.com/serpapi/serpapi-golang) and its [Google Lens API](https://serpapi.com/google-lens-api). Set a SerpApi key in `plugins.picSearch.googleLens.apiKey`; the provider is disabled when the key is empty. Requests are fixed to `type=visual_matches` and `safe=off` without a language restriction. The reply contains one result's title, thumbnail, and link, selected by source priority (Pixiv, then Twitter/X, then other sites) and by the lowest result position within the same priority.
@@ -97,6 +102,7 @@ Google Lens results use the official [SerpApi Go client](https://github.com/serp
 - [cq-picsearcher-bot](https://github.com/Tsuk1ko/cq-picsearcher-bot)
 - [saucenao](https://saucenao.com/)
 - [ascii2d](https://ascii2d.net)
+- [SoutuBot-go](https://github.com/Miuzarte/SoutuBot-go)
 - [go-cqhttp](https://github.com/Mrs4s/go-cqhttp)
 - [Lagrange.Core](https://github.com/KonataDev/Lagrange.Core)
 - [onebot-11](https://github.com/botuniverse/onebot-11)

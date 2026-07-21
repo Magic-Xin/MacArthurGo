@@ -5,6 +5,7 @@ import (
 	"MacArthurGo/plugins/ascii2d"
 	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/plugins/googlelens"
+	"MacArthurGo/plugins/soutubot"
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"bytes"
@@ -29,6 +30,8 @@ type PicSearch struct {
 	handleBannedHosts bool
 	sauceNAOToken     string
 	ascii2dClient     *ascii2d.Client
+	soutuBotClient    *soutubot.Client
+	soutuBotThreshold float64
 	googleLensClient  *googlelens.Client
 }
 
@@ -59,6 +62,26 @@ func registerPicSearch() error {
 	if err != nil {
 		log.Printf("Ascii2d client init error: %v", err)
 	}
+	soutuBotBypassURL := cfg.SoutuBot.CloudflareBypassURL
+	if strings.TrimSpace(soutuBotBypassURL) == "" {
+		soutuBotBypassURL = cfg.ASCII2D.CloudflareBypassURL
+	}
+	soutuBotProxyURL := cfg.SoutuBot.ProxyURL
+	if strings.TrimSpace(soutuBotProxyURL) == "" {
+		soutuBotProxyURL = cfg.ASCII2D.ProxyURL
+	}
+	soutuBotTimeout := cfg.SoutuBot.TimeoutSeconds
+	if soutuBotTimeout == 0 {
+		soutuBotTimeout = cfg.ASCII2D.TimeoutSeconds
+	}
+	soutuBotClient, err := soutubot.NewClient(soutubot.Config{
+		CloudflareBypassURL: soutuBotBypassURL,
+		ProxyURL:            soutuBotProxyURL,
+		Timeout:             time.Duration(soutuBotTimeout) * time.Second,
+	})
+	if err != nil {
+		log.Printf("SoutuBot client init error: %v", err)
+	}
 	var googleClient *googlelens.Client
 	if strings.TrimSpace(cfg.GoogleLens.APIKey) != "" {
 		googleClient, err = googlelens.NewClient(googlelens.Config{
@@ -75,6 +98,8 @@ func registerPicSearch() error {
 		handleBannedHosts: cfg.HandleBannedHosts,
 		sauceNAOToken:     cfg.SauceNAOToken,
 		ascii2dClient:     asciiClient,
+		soutuBotClient:    soutuBotClient,
+		soutuBotThreshold: cfg.SoutuBot.SimilarityThreshold,
 		googleLensClient:  googleClient,
 	}
 	plugin := &essentials.Plugin{
@@ -187,6 +212,14 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg []cqcode
 			if cached && !isPurge {
 				result = append(result, []cqcode.ArrayMessage{*cqcode.Text("本次搜图结果来自数据库缓存")})
 				result = append(result, cachedResult...)
+				if p.soutuBotClient != nil && !hasSoutuBotResult(cachedResult) {
+					soutuBotResult := p.soutuBot(imgURL)
+					result = append(result, soutuBotResult)
+					if isCacheableSearchResult([][]cqcode.ArrayMessage{soutuBotResult}) {
+						cachedResult = append(cachedResult, soutuBotResult)
+						p.storeCachedResult(key, cachedResult, true)
+					}
+				}
 				if p.googleLensClient != nil && !hasGoogleLensResult(cachedResult) {
 					googleResult := p.googleLens(imgURL)
 					result = append(result, googleResult)
@@ -248,9 +281,9 @@ func (p *PicSearch) picSearch(messageStruct *structs.MessageStruct, msg []cqcode
 }
 
 func (p *PicSearch) searchImage(imageURL string) [][]cqcode.ArrayMessage {
-	response := make(chan []cqcode.ArrayMessage, 5)
+	response := make(chan []cqcode.ArrayMessage, 6)
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		p.sauceNAO(imageURL, response)
@@ -258,6 +291,10 @@ func (p *PicSearch) searchImage(imageURL string) [][]cqcode.ArrayMessage {
 	go func() {
 		defer wg.Done()
 		p.ascii2d(imageURL, response)
+	}()
+	go func() {
+		defer wg.Done()
+		response <- p.soutuBot(imageURL)
 	}()
 	if p.googleLensClient != nil {
 		wg.Add(1)
@@ -297,6 +334,7 @@ func (p *PicSearch) loadCachedResult(key string) ([][]cqcode.ArrayMessage, bool)
 		return nil, false
 	}
 	result = removeLegacyGoogleSearchResults(result)
+	result = removeLegacySoutuBotResults(result)
 	if !isCacheableSearchResult(result) {
 		return nil, false
 	}
@@ -322,6 +360,42 @@ func removeLegacyGoogleSearchResults(results [][]cqcode.ArrayMessage) [][]cqcode
 		}
 	}
 	return filtered
+}
+
+func removeLegacySoutuBotResults(results [][]cqcode.ArrayMessage) [][]cqcode.ArrayMessage {
+	filtered := results[:0]
+	for _, item := range results {
+		legacy := false
+		for _, segment := range item {
+			if segment.Type != "text" {
+				continue
+			}
+			text, _ := segment.Data["text"].(string)
+			if isLegacySoutuBotResult(text) {
+				legacy = true
+				break
+			}
+		}
+		if !legacy {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
+}
+
+func isLegacySoutuBotResult(text string) bool {
+	if strings.HasPrefix(text, "SoutuBot\n") {
+		return false
+	}
+	englishLabels := strings.Contains(text, " | Similarity: ") &&
+		strings.Contains(text, " | Language: ") &&
+		strings.Contains(text, " | Source: ")
+	chineseLabels := strings.Contains(text, " | 相似度: ") &&
+		strings.Contains(text, " | 语言: ") &&
+		strings.Contains(text, " | 来源: ")
+	missingOnly := text == "未找到日文结果\n未找到中文结果" ||
+		text == "未找到日文结果\n未找到中文结果\n未找到英文结果"
+	return englishLabels || chineseLabels || missingOnly
 }
 
 func (p *PicSearch) storeCachedResult(key string, result [][]cqcode.ArrayMessage, exists bool) {
@@ -354,7 +428,7 @@ func isCacheableSearchResult(result [][]cqcode.ArrayMessage) bool {
 				continue
 			}
 			text, _ := segment.Data["text"].(string)
-			if strings.HasPrefix(text, "ascii2d：") || strings.HasPrefix(text, "SauceNAO：") || strings.HasPrefix(text, "Google Lens：") {
+			if strings.HasPrefix(text, "ascii2d：") || strings.HasPrefix(text, "SauceNAO：") || strings.HasPrefix(text, "SoutuBot：") || strings.HasPrefix(text, "Google Lens：") {
 				return false
 			}
 		}
@@ -547,6 +621,36 @@ func (p *PicSearch) ascii2d(imageURL string, response chan<- []cqcode.ArrayMessa
 	}
 }
 
+func (p *PicSearch) soutuBot(imageURL string) []cqcode.ArrayMessage {
+	if p.soutuBotClient == nil {
+		return []cqcode.ArrayMessage{*cqcode.Text("SoutuBot：客户端配置无效，请检查 CloudflareBypassForScraping 地址")}
+	}
+
+	imageData, err := essentials.FetchImageData(context.Background(), imageURL)
+	if err != nil {
+		log.Printf("SoutuBot image fetch error: %v", err)
+		return []cqcode.ArrayMessage{*cqcode.Text("SoutuBot：下载待搜索图片失败")}
+	}
+	result, err := p.soutuBotClient.Search(context.Background(), imageData.Bytes())
+	if err != nil {
+		log.Printf("SoutuBot search error: %v", err)
+		message := "SoutuBot：搜索失败，详细原因请查看程序日志"
+		if strings.Contains(err.Error(), "CloudflareBypassForScraping") {
+			message = "SoutuBot：CloudflareBypassForScraping 请求失败，请检查服务、网络或代理"
+		}
+		return []cqcode.ArrayMessage{*cqcode.Text(message)}
+	}
+	if len(result.Data) == 0 {
+		return []cqcode.ArrayMessage{*cqcode.Text("SoutuBot：未找到相似结果")}
+	}
+
+	matches, maxSimilarity := soutubot.SelectBestMatches(result.Data, p.soutuBotThreshold)
+	if maxSimilarity < p.soutuBotThreshold {
+		return []cqcode.ArrayMessage{*cqcode.Text(fmt.Sprintf("SoutuBot：置信度过低（最高 Similarity %.2f%%，阈值 %.2f%%）", maxSimilarity, p.soutuBotThreshold))}
+	}
+	return []cqcode.ArrayMessage{*cqcode.Text(soutubot.FormatMatches(matches))}
+}
+
 func (p *PicSearch) googleLens(imageURL string) []cqcode.ArrayMessage {
 	result, err := p.googleLensClient.Search(context.Background(), imageURL)
 	if err != nil {
@@ -571,6 +675,21 @@ func (p *PicSearch) googleLens(imageURL string) []cqcode.ArrayMessage {
 	details = append(details, link)
 	message = append(message, *cqcode.Text("\n" + strings.Join(details, "\n")))
 	return message
+}
+
+func hasSoutuBotResult(results [][]cqcode.ArrayMessage) bool {
+	for _, item := range results {
+		for _, segment := range item {
+			if segment.Type != "text" {
+				continue
+			}
+			text, _ := segment.Data["text"].(string)
+			if soutubot.IsFormattedMatches(text) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func hasGoogleLensResult(results [][]cqcode.ArrayMessage) bool {

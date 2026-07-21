@@ -17,6 +17,8 @@ import (
 
 var Config = &Configuration{}
 
+const defaultSoutuBotSimilarityThreshold = 45.0
+
 // Configuration contains all runtime settings loaded from config.json.
 // Runtime-only fields are excluded from JSON serialization.
 type Configuration struct {
@@ -87,6 +89,12 @@ type Configuration struct {
 				ProxyURL            string `json:"proxyUrl"`
 				TimeoutSeconds      int    `json:"timeoutSeconds"`
 			} `json:"ascii2d"`
+			SoutuBot struct {
+				CloudflareBypassURL string  `json:"cloudflareBypassUrl"`
+				ProxyURL            string  `json:"proxyUrl"`
+				TimeoutSeconds      int     `json:"timeoutSeconds"`
+				SimilarityThreshold float64 `json:"similarityThreshold"`
+			} `json:"soutuBot"`
 			GoogleLens struct {
 				APIKey         string `json:"apiKey"`
 				TimeoutSeconds int    `json:"timeoutSeconds"`
@@ -163,6 +171,7 @@ func LoadConfig(configPath string) error {
 	defer f.Close()
 
 	var loaded Configuration
+	loaded.Plugins.PicSearch.SoutuBot.SimilarityThreshold = defaultSoutuBotSimilarityThreshold
 	decoder := json.NewDecoder(f)
 	if err := decoder.Decode(&loaded); err != nil {
 		return fmt.Errorf("decode config %q: %w", configPath, err)
@@ -213,6 +222,12 @@ func (c *Configuration) Validate() error {
 	}
 	if c.Plugins.PicSearch.ASCII2D.TimeoutSeconds < 0 {
 		return errors.New("plugins.picSearch.ascii2d.timeoutSeconds cannot be negative")
+	}
+	if c.Plugins.PicSearch.SoutuBot.TimeoutSeconds < 0 {
+		return errors.New("plugins.picSearch.soutuBot.timeoutSeconds cannot be negative")
+	}
+	if threshold := c.Plugins.PicSearch.SoutuBot.SimilarityThreshold; threshold < 0 || threshold > 100 {
+		return errors.New("plugins.picSearch.soutuBot.similarityThreshold must be between 0 and 100")
 	}
 	if c.Plugins.PicSearch.GoogleLens.TimeoutSeconds < 0 {
 		return errors.New("plugins.picSearch.googleLens.timeoutSeconds cannot be negative")

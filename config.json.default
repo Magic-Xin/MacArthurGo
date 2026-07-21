@@ -74,6 +74,12 @@
         "proxyUrl": "",
         "timeoutSeconds": 90
       },
+      "soutuBot": {
+        "cloudflareBypassUrl": "http://127.0.0.1:8000",
+        "proxyUrl": "",
+        "timeoutSeconds": 90,
+        "similarityThreshold": 45
+      },
       "googleLens": {
         "apiKey": "",
         "timeoutSeconds": 30
