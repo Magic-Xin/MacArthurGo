@@ -14,18 +14,18 @@ require (
 	github.com/vinta/pangu v3.0.0+incompatible
 	github.com/wcharczuk/go-chart/v2 v2.1.2
 	github.com/yanyiwu/gojieba v1.4.7
-	google.golang.org/genai v1.63.0
+	google.golang.org/genai v1.64.0
 )
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
 	cloud.google.com/go/auth v0.22.0 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
-	github.com/antchfx/xpath v1.3.6 // indirect
+	github.com/antchfx/xpath v1.3.7 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
-	github.com/go-logr/logr v1.4.3 // indirect
+	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
@@ -45,8 +45,8 @@ require (
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
-	google.golang.org/api v0.288.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260713224248-f5fc221cf8c4 // indirect
-	google.golang.org/grpc v1.82.0 // indirect
+	google.golang.org/api v0.289.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260720211330-0afa2a65878a // indirect
+	google.golang.org/grpc v1.82.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
