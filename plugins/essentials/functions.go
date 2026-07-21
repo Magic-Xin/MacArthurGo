@@ -166,13 +166,23 @@ func SplitArgument(message []cqcode.ArrayMessage) (res []string) {
 	return res
 }
 
-func GetImageKey(url string) string {
-	if parsed, err := urlpkg.Parse(url); err == nil {
-		if key := parsed.Query().Get("rkey"); key != "" {
-			return key
+func GetImageKey(imageURL string) string {
+	canonicalURL := imageURL
+	if parsed, err := urlpkg.Parse(imageURL); err == nil {
+		if query, queryErr := urlpkg.ParseQuery(parsed.RawQuery); queryErr == nil {
+			for key := range query {
+				// rkey authorizes media downloads and may be shared by different images.
+				if strings.EqualFold(key, "rkey") {
+					query.Del(key)
+				}
+			}
+			parsed.RawQuery = query.Encode()
+			parsed.ForceQuery = false
+			parsed.Fragment = ""
+			canonicalURL = parsed.String()
 		}
 	}
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(url)))
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(canonicalURL)))
 }
 
 func GetImageData(url string) *bytes.Buffer {

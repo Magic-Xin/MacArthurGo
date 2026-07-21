@@ -74,6 +74,24 @@ func TestDatabase_RejectsInvalidIdentifier(t *testing.T) {
 	}
 }
 
+func TestGetImageKey_DifferentImagesDoNotShareRKey(t *testing.T) {
+	first := "https://multimedia.nt.qq.com.cn/download?appid=1407&fileid=image-a&spec=0&rkey=shared-token"
+	second := "https://multimedia.nt.qq.com.cn/download?appid=1407&fileid=image-b&spec=0&rkey=shared-token"
+
+	if firstKey, secondKey := essentials.GetImageKey(first), essentials.GetImageKey(second); firstKey == secondKey {
+		t.Fatalf("GetImageKey() returned the same key %q for different images", firstKey)
+	}
+}
+
+func TestGetImageKey_RKeyDoesNotChangeImageIdentity(t *testing.T) {
+	first := "https://multimedia.nt.qq.com.cn/download?rkey=token-one&spec=0&fileid=image-a&appid=1407"
+	second := "https://multimedia.nt.qq.com.cn/download?appid=1407&fileid=image-a&spec=0&rkey=token-two"
+
+	if firstKey, secondKey := essentials.GetImageKey(first), essentials.GetImageKey(second); firstKey != secondKey {
+		t.Fatalf("GetImageKey() keys differ after only rkey/query order changed: %q != %q", firstKey, secondKey)
+	}
+}
+
 func TestLoginInfo_GroupListSignalsReadiness(t *testing.T) {
 	info := &essentials.LoginInfo{}
 
