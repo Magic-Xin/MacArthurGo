@@ -85,7 +85,7 @@ The ascii2d flow follows [cq-picsearcher-bot](https://github.com/Tsuk1ko/cq-pics
 docker run -d --name=cf-bypass -p 127.0.0.1:8000:8000 --restart unless-stopped ghcr.io/sarperavci/cloudflarebypassforscraping:latest
 ```
 
-The default `plugins.picSearch.ascii2d.cloudflareBypassUrl` is `http://127.0.0.1:8000`. When this value is non-empty it takes priority and is also used to download protected thumbnails through mirror mode. Set `proxyUrl` only when the bypass service must use an HTTP or SOCKS proxy; that proxy must be reachable from the service container. Existing configurations can leave `cloudflareBypassUrl` empty and keep `flareSolverrUrl` as a compatibility fallback, although FlareSolverr is no longer the recommended ascii2d backend.
+The default `plugins.picSearch.ascii2d.cloudflareBypassUrl` is `http://127.0.0.1:8000`; it is required for ascii2d searches and is also used to download protected thumbnails through mirror mode. Set `proxyUrl` only when the bypass service must use an HTTP or SOCKS proxy; that proxy must be reachable from the service container.
 
 ### SoutuBot setup
 

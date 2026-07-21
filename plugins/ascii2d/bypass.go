@@ -29,13 +29,13 @@ func newBypassClient(baseURL string, proxyURL string, httpClient *http.Client) (
 	return &bypassClient{baseURL: baseURL, proxyURL: proxyURL, httpClient: httpClient}, nil
 }
 
-func (c *bypassClient) getHTML(ctx context.Context, targetURL string) (flareSolution, error) {
+func (c *bypassClient) getHTML(ctx context.Context, targetURL string) (pageResponse, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	endpoint, err := url.Parse(c.baseURL + "/html")
 	if err != nil {
-		return flareSolution{}, err
+		return pageResponse{}, err
 	}
 	query := endpoint.Query()
 	query.Set("url", targetURL)
@@ -46,37 +46,36 @@ func (c *bypassClient) getHTML(ctx context.Context, targetURL string) (flareSolu
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return flareSolution{}, err
+		return pageResponse{}, err
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return flareSolution{}, fmt.Errorf("CloudflareBypassForScraping HTML request: %w", unwrapURLError(err))
+		return pageResponse{}, fmt.Errorf("CloudflareBypassForScraping HTML request: %w", unwrapURLError(err))
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxAPIResponse+1))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxHTMLResponse+1))
 	if err != nil {
-		return flareSolution{}, fmt.Errorf("read CloudflareBypassForScraping HTML: %w", err)
+		return pageResponse{}, fmt.Errorf("read CloudflareBypassForScraping HTML: %w", err)
 	}
-	if len(body) > maxAPIResponse {
-		return flareSolution{}, errors.New("CloudflareBypassForScraping HTML exceeds 16 MiB")
+	if len(body) > maxHTMLResponse {
+		return pageResponse{}, errors.New("CloudflareBypassForScraping HTML exceeds 16 MiB")
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		if strings.Contains(strings.ToLower(string(body)), errFirstByteTimeout.Error()) {
-			return flareSolution{}, errFirstByteTimeout
+			return pageResponse{}, errFirstByteTimeout
 		}
-		return flareSolution{}, fmt.Errorf("CloudflareBypassForScraping returned %s", resp.Status)
+		return pageResponse{}, fmt.Errorf("CloudflareBypassForScraping returned %s", resp.Status)
 	}
 
 	finalURL := strings.TrimSpace(resp.Header.Get("x-cf-bypasser-final-url"))
 	if finalURL == "" {
 		finalURL = targetURL
 	}
-	return flareSolution{
-		URL:       finalURL,
-		Status:    http.StatusOK,
-		Response:  string(body),
-		UserAgent: strings.TrimSpace(resp.Header.Get("x-cf-bypasser-user-agent")),
+	return pageResponse{
+		URL:      finalURL,
+		Status:   http.StatusOK,
+		Response: string(body),
 	}, nil
 }
 

@@ -85,7 +85,6 @@ type Configuration struct {
 			SauceNAOToken     string   `json:"sauceNAOToken"`
 			ASCII2D           struct {
 				CloudflareBypassURL string `json:"cloudflareBypassUrl"`
-				FlareSolverrURL     string `json:"flareSolverrUrl"`
 				ProxyURL            string `json:"proxyUrl"`
 				TimeoutSeconds      int    `json:"timeoutSeconds"`
 			} `json:"ascii2d"`

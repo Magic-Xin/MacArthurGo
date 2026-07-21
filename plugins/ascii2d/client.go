@@ -1,17 +1,13 @@
 package ascii2d
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/antchfx/htmlquery"
@@ -20,27 +16,19 @@ import (
 var chromiumErrorCodePattern = regexp.MustCompile(`["']errorCode["']\s*:\s*["'](ERR_[A-Z0-9_]+)["']`)
 
 const (
-	defaultAPIURL          = "http://127.0.0.1:8191/v1"
-	defaultSiteURL         = "https://ascii2d.net"
-	colorSearchWaitSeconds = 5
-	maxAPIResponse         = 16 << 20
+	defaultSiteURL  = "https://ascii2d.net"
+	maxHTMLResponse = 16 << 20
 )
 
 type Config struct {
-	APIURL              string
 	CloudflareBypassURL string
 	ProxyURL            string
 	Timeout             time.Duration
 }
 
 type Client struct {
-	apiURL       string
-	proxyURL     string
-	siteURL      string
-	maxTimeoutMS int
-	httpClient   *http.Client
-	bypass       *bypassClient
-	sessionID    atomic.Uint64
+	siteURL string
+	bypass  *bypassClient
 }
 
 type Result struct {
@@ -53,44 +41,12 @@ type Result struct {
 	ResultURL  string
 	Info       string
 	SourceType string
-	cookies    []flareCookie
-	userAgent  string
 }
 
-type flareRequest struct {
-	Command       string      `json:"cmd"`
-	URL           string      `json:"url,omitempty"`
-	Session       string      `json:"session,omitempty"`
-	MaxTimeout    int         `json:"maxTimeout,omitempty"`
-	WaitInSeconds int         `json:"waitInSeconds,omitempty"`
-	DisableMedia  bool        `json:"disableMedia,omitempty"`
-	Proxy         *flareProxy `json:"proxy,omitempty"`
-}
-
-type flareProxy struct {
-	URL string `json:"url"`
-}
-
-type flareResponse struct {
-	Status   string        `json:"status"`
-	Message  string        `json:"message"`
-	Solution flareSolution `json:"solution"`
-}
-
-type flareSolution struct {
-	URL       string        `json:"url"`
-	Status    int           `json:"status"`
-	Response  string        `json:"response"`
-	Cookies   []flareCookie `json:"cookies"`
-	UserAgent string        `json:"userAgent"`
-}
-
-type flareCookie struct {
-	Name   string `json:"name"`
-	Value  string `json:"value"`
-	Domain string `json:"domain"`
-	Path   string `json:"path"`
-	Secure bool   `json:"secure"`
+type pageResponse struct {
+	URL      string
+	Status   int
+	Response string
 }
 
 func NewClient(cfg Config) (*Client, error) {
@@ -107,33 +63,11 @@ func NewClient(cfg Config) (*Client, error) {
 		timeout = 90 * time.Second
 	}
 	httpClient := &http.Client{Timeout: timeout + 15*time.Second}
-	client := &Client{
-		proxyURL:     proxyURL,
-		siteURL:      defaultSiteURL,
-		maxTimeoutMS: int(timeout.Milliseconds()),
-		httpClient:   httpClient,
+	bypass, err := newBypassClient(cfg.CloudflareBypassURL, proxyURL, httpClient)
+	if err != nil {
+		return nil, err
 	}
-
-	if bypassURL := strings.TrimSpace(cfg.CloudflareBypassURL); bypassURL != "" {
-		bypass, err := newBypassClient(bypassURL, proxyURL, httpClient)
-		if err != nil {
-			return nil, err
-		}
-		client.bypass = bypass
-		return client, nil
-	}
-
-	apiURL := strings.TrimSpace(cfg.APIURL)
-	if apiURL == "" {
-		apiURL = defaultAPIURL
-	}
-	parsed, err := url.Parse(apiURL)
-	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return nil, fmt.Errorf("invalid FlareSolverr URL %q", apiURL)
-	}
-
-	client.apiURL = strings.TrimRight(apiURL, "/")
-	return client, nil
+	return &Client{siteURL: defaultSiteURL, bypass: bypass}, nil
 }
 
 func (c *Client) Search(ctx context.Context, imageURL string) ([]Result, error) {
@@ -142,35 +76,16 @@ func (c *Client) Search(ctx context.Context, imageURL string) ([]Result, error) 
 		return nil, fmt.Errorf("invalid image URL")
 	}
 
-	session := ""
-	if c.bypass == nil {
-		session = fmt.Sprintf("macarthurgo-%d-%d", time.Now().UnixNano(), c.sessionID.Add(1))
-		create := flareRequest{Command: "sessions.create", Session: session}
-		if c.proxyURL != "" {
-			create.Proxy = &flareProxy{URL: c.proxyURL}
-		}
-		if _, err = c.call(ctx, create); err != nil {
-			return nil, fmt.Errorf("create FlareSolverr session: %w", err)
-		}
-		defer c.destroySession(session)
-	}
-
 	// ascii2d requires the search mode on URL searches. Without it the
-	// browser stays on /search/url/... instead of redirecting to the color
-	// result page, even though FlareSolverr itself reports a successful 200.
+	// browser stays on /search/url/... instead of redirecting to the color result page.
 	searchURL := c.siteURL + "/search/url/" + url.QueryEscape(image.String()) + "?type=color"
-	// ascii2d redirects to the result page asynchronously. FlareSolverr can
-	// otherwise return the initial /search/url/... page before that navigation.
-	color, err := c.getWithRetry(ctx, session, searchURL, colorSearchWaitSeconds, false)
+	color, err := c.getWithRetry(ctx, searchURL, false)
 	if err != nil {
 		return nil, fmt.Errorf("open ascii2d color search: %w", err)
 	}
 
-	// FlareSolverr snapshots driver.current_url before waitInSeconds, but takes
-	// page_source after that wait. The URL can therefore still point at
-	// /search/url/... while Response already contains the redirected result
-	// page. Recover the actual result URLs from the post-wait HTML instead of
-	// treating that stale URL snapshot as a failed navigation.
+	// Recover result URLs from the rendered HTML when the bypass service's final
+	// URL still points at the initial /search/url/... page.
 	colorURL := findResultPageURL(color, "color", c.siteURL)
 	bovwURL := findResultPageURL(color, "bovw", c.siteURL)
 	if colorURL == "" && bovwURL != "" {
@@ -187,25 +102,21 @@ func (c *Client) Search(ctx context.Context, imageURL string) ([]Result, error) 
 	}
 	colorResult, colorErr := parseResult(color.Response, "color", colorResultURL, c.siteURL)
 	if colorErr == nil {
-		colorResult.cookies = color.Cookies
-		colorResult.userAgent = color.UserAgent
 		results = append(results, colorResult)
 	}
 
 	var (
-		bovw    flareSolution
+		bovw    pageResponse
 		bovwErr error
 	)
 	if bovwURL == "" {
 		bovwErr = errors.New("could not recover the ascii2d result URL from the post-wait HTML")
 	} else {
-		bovw, bovwErr = c.getWithRetry(ctx, session, bovwURL, 0, true)
+		bovw, bovwErr = c.getWithRetry(ctx, bovwURL, true)
 	}
 	if bovwErr == nil {
 		bovwResult, parseErr := parseResult(bovw.Response, "bovw", bovw.URL, c.siteURL)
 		if parseErr == nil {
-			bovwResult.cookies = bovw.Cookies
-			bovwResult.userAgent = bovw.UserAgent
 			results = append(results, bovwResult)
 		} else {
 			bovwErr = parseErr
@@ -218,7 +129,7 @@ func (c *Client) Search(ctx context.Context, imageURL string) ([]Result, error) 
 	return results, errors.Join(colorErr, bovwErr)
 }
 
-func findResultPageURL(solution flareSolution, mode string, siteURL string) string {
+func findResultPageURL(solution pageResponse, mode string, siteURL string) string {
 	candidates := []string{solution.URL}
 	doc, err := htmlquery.Parse(strings.NewReader(solution.Response))
 	if err == nil {
@@ -272,94 +183,41 @@ func (c *Client) DownloadThumbnail(ctx context.Context, result Result) ([]byte, 
 	if result.Thumbnail == "" {
 		return nil, errors.New("thumbnail URL is empty")
 	}
-	if c.bypass != nil {
-		return c.bypass.getImage(ctx, result.Thumbnail)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, result.Thumbnail, nil)
-	if err != nil {
-		return nil, err
-	}
-	if result.userAgent != "" {
-		req.Header.Set("User-Agent", result.userAgent)
-	}
-	req.Header.Set("Referer", c.siteURL+"/")
-	for _, cookie := range result.cookies {
-		req.AddCookie(&http.Cookie{Name: cookie.Name, Value: cookie.Value, Path: cookie.Path, Domain: cookie.Domain, Secure: cookie.Secure})
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("thumbnail request returned %s", resp.Status)
-	}
-	if contentType := resp.Header.Get("Content-Type"); contentType != "" && !strings.HasPrefix(contentType, "image/") && contentType != "application/octet-stream" {
-		return nil, fmt.Errorf("thumbnail returned unexpected content type %q", contentType)
-	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20+1))
-	if err != nil {
-		return nil, err
-	}
-	if len(data) > 10<<20 {
-		return nil, errors.New("thumbnail exceeds 10 MiB")
-	}
-	return data, nil
+	return c.bypass.getImage(ctx, result.Thumbnail)
 }
 
-func (c *Client) getWithRetry(ctx context.Context, session string, targetURL string, waitInSeconds int, retryAll bool) (flareSolution, error) {
+func (c *Client) getWithRetry(ctx context.Context, targetURL string, retryAll bool) (pageResponse, error) {
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
-		solution, err := c.get(ctx, session, targetURL, waitInSeconds)
+		response, err := c.bypass.getHTML(ctx, targetURL)
 		if err == nil {
-			return solution, nil
+			response, err = validatePageResponse(response)
+			if err == nil {
+				return response, nil
+			}
 		}
 		lastErr = err
 		if ctx.Err() != nil {
-			return flareSolution{}, ctx.Err()
+			return pageResponse{}, ctx.Err()
 		}
 		if !retryAll && !errors.Is(err, errFirstByteTimeout) && !strings.Contains(strings.ToLower(err.Error()), errFirstByteTimeout.Error()) {
 			break
 		}
 	}
-	return flareSolution{}, lastErr
+	return pageResponse{}, lastErr
 }
 
-func (c *Client) get(ctx context.Context, session string, targetURL string, waitInSeconds int) (flareSolution, error) {
-	if c.bypass != nil {
-		solution, err := c.bypass.getHTML(ctx, targetURL)
-		if err != nil {
-			return flareSolution{}, err
-		}
-		return validateSolution(solution, "CloudflareBypassForScraping")
+func validatePageResponse(response pageResponse) (pageResponse, error) {
+	if response.Status < http.StatusOK || response.Status >= http.StatusMultipleChoices {
+		return pageResponse{}, fmt.Errorf("browser request returned HTTP %d", response.Status)
 	}
-
-	res, err := c.call(ctx, flareRequest{
-		Command:       "request.get",
-		URL:           targetURL,
-		Session:       session,
-		MaxTimeout:    c.maxTimeoutMS,
-		WaitInSeconds: waitInSeconds,
-		DisableMedia:  true,
-	})
-	if err != nil {
-		return flareSolution{}, err
+	if strings.TrimSpace(response.Response) == "" {
+		return pageResponse{}, errors.New("browser request returned an empty page")
 	}
-	return validateSolution(res.Solution, "FlareSolverr")
-}
-
-func validateSolution(solution flareSolution, backend string) (flareSolution, error) {
-	if solution.Status < http.StatusOK || solution.Status >= http.StatusMultipleChoices {
-		return flareSolution{}, fmt.Errorf("browser request returned HTTP %d", solution.Status)
+	if code := chromiumNetworkErrorCode(response.Response); code != "" {
+		return pageResponse{}, fmt.Errorf("CloudflareBypassForScraping browser navigation failed with %s; check network or proxy connectivity from the bypass service host", code)
 	}
-	if strings.TrimSpace(solution.Response) == "" {
-		return flareSolution{}, errors.New("browser request returned an empty page")
-	}
-	if code := chromiumNetworkErrorCode(solution.Response); code != "" {
-		return flareSolution{}, fmt.Errorf("%s browser navigation failed with %s; check network or proxy connectivity from the bypass service host", backend, code)
-	}
-	return solution, nil
+	return response, nil
 }
 
 func chromiumNetworkErrorCode(body string) string {
@@ -371,48 +229,6 @@ func chromiumNetworkErrorCode(body string) string {
 		return ""
 	}
 	return match[1]
-}
-
-func (c *Client) call(ctx context.Context, payload flareRequest) (flareResponse, error) {
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return flareResponse{}, err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.apiURL, bytes.NewReader(body))
-	if err != nil {
-		return flareResponse{}, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return flareResponse{}, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
-		return flareResponse{}, fmt.Errorf("FlareSolverr returned %s", resp.Status)
-	}
-
-	var result flareResponse
-	decoder := json.NewDecoder(io.LimitReader(resp.Body, maxAPIResponse))
-	if err = decoder.Decode(&result); err != nil {
-		return flareResponse{}, fmt.Errorf("decode FlareSolverr response: %w", err)
-	}
-	if result.Status != "ok" {
-		message := strings.TrimSpace(result.Message)
-		if message == "" {
-			message = "unknown error"
-		}
-		return flareResponse{}, errors.New(message)
-	}
-	return result, nil
-}
-
-func (c *Client) destroySession(session string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	_, _ = c.call(ctx, flareRequest{Command: "sessions.destroy", Session: session})
 }
 
 func parseResult(body string, mode string, resultURL string, siteURL string) (Result, error) {

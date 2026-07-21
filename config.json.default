@@ -70,7 +70,6 @@
       "sauceNAOToken": "",
       "ascii2d": {
         "cloudflareBypassUrl": "http://127.0.0.1:8000",
-        "flareSolverrUrl": "",
         "proxyUrl": "",
         "timeoutSeconds": 90
       },
