@@ -3,6 +3,7 @@ package client
 import (
 	"MacArthurGo/base"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -237,7 +238,7 @@ func (c *Client) writePump(ctx context.Context, conn *websocket.Conn) error {
 				continue
 			}
 			if base.Config.Debug {
-				log.Printf("Send: %s", message)
+				log.Printf("Send: %s", debugOutboundMessage(message))
 			}
 			if err := conn.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
 				return fmt.Errorf("set websocket write deadline: %w", err)
@@ -251,6 +252,26 @@ func (c *Client) writePump(ctx context.Context, conn *websocket.Conn) error {
 			}
 		}
 	}
+}
+
+func debugOutboundMessage(message []byte) string {
+	var action struct {
+		Action string `json:"action"`
+		Echo   string `json:"echo"`
+		Params struct {
+			StreamID    string `json:"stream_id"`
+			ChunkIndex  int    `json:"chunk_index"`
+			TotalChunks int    `json:"total_chunks"`
+			IsComplete  bool   `json:"is_complete"`
+		} `json:"params"`
+	}
+	if err := json.Unmarshal(message, &action); err != nil || action.Action != "upload_file_stream" {
+		return string(message)
+	}
+	if action.Params.IsComplete {
+		return fmt.Sprintf("upload_file_stream stream_id=%s complete=true echo=%s payload_bytes=%d", action.Params.StreamID, action.Echo, len(message))
+	}
+	return fmt.Sprintf("upload_file_stream stream_id=%s chunk=%d/%d echo=%s payload_bytes=%d", action.Params.StreamID, action.Params.ChunkIndex+1, action.Params.TotalChunks, action.Echo, len(message))
 }
 
 func waitContext(ctx context.Context, duration time.Duration) bool {

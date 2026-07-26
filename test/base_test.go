@@ -49,6 +49,8 @@ func TestLoadConfig_Invalid(t *testing.T) {
 		{name: "soutubot timeout", content: `{"address":"ws://127.0.0.1","plugins":{"picSearch":{"soutuBot":{"timeoutSeconds":-1}}}}`, want: "soutuBot.timeoutSeconds"},
 		{name: "soutubot threshold", content: `{"address":"ws://127.0.0.1","plugins":{"picSearch":{"soutuBot":{"similarityThreshold":101}}}}`, want: "soutuBot.similarityThreshold"},
 		{name: "google timeout", content: `{"address":"ws://127.0.0.1","plugins":{"picSearch":{"googleLens":{"timeoutSeconds":-1}}}}`, want: "googleLens.timeoutSeconds"},
+		{name: "jm password", content: `{"address":"ws://127.0.0.1","plugins":{"jm":{"enable":true}}}`, want: "jm.pdfPassword"},
+		{name: "jm workers", content: `{"address":"ws://127.0.0.1","plugins":{"jm":{"chapterWorkers":-1}}}`, want: "jm.chapterWorkers"},
 		{name: "trailing value", content: `{"address":"ws://127.0.0.1"} {}`, want: "multiple JSON values"},
 	}
 	for _, test := range tests {

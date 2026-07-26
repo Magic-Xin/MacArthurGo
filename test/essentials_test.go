@@ -173,8 +173,8 @@ func TestRegisterAll_ExplicitStartup(t *testing.T) {
 		if err := plugins.RegisterAll(); err != nil {
 			t.Fatalf("RegisterAll() error = %v", err)
 		}
-		if got := essentials.PluginCount(); got != 14 {
-			t.Fatalf("PluginCount() = %d, want 14", got)
+		if got := essentials.PluginCount(); got != 15 {
+			t.Fatalf("PluginCount() = %d, want 15", got)
 		}
 		return
 	}

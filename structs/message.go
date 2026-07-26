@@ -80,6 +80,16 @@ type EchoMessageStruct struct {
 			UserId int64 `json:"user_id"`
 		}
 		Message []cqcode.ArrayMessage `json:"message"`
+
+		// NapCat stream API
+		Type           string `json:"type"`
+		Status         string `json:"status"`
+		StreamID       string `json:"stream_id"`
+		ReceivedChunks int    `json:"received_chunks"`
+		TotalChunks    int    `json:"total_chunks"`
+		FilePath       string `json:"file_path"`
+		FileSize       int64  `json:"file_size"`
+		SHA256         string `json:"sha256"`
 	} `json:"data"`
 	DataArray []struct {
 		//friendList
@@ -96,8 +106,12 @@ type EchoMessageStruct struct {
 		//groupMemberList
 		Card string `json:"card"`
 	}
-	Echo   string `json:"echo"`
-	Status string `json:"status"`
+	Echo    string `json:"echo"`
+	Status  string `json:"status"`
+	Retcode int    `json:"retcode"`
+	Message string `json:"message"`
+	Wording string `json:"wording"`
+	Stream  string `json:"stream"`
 }
 
 type EchoMessageArrayStruct struct {

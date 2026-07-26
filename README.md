@@ -72,6 +72,7 @@ All tests live in the top-level `test/` directory and exercise packages through 
 - Repeat
 - Corpus reply
 - Daily waifu
+- JM comic downloader
 
 ### CloudflareBypassForScraping
 

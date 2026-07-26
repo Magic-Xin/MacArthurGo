@@ -59,6 +59,16 @@
     "music": {
       "enable": false
     },
+    "jm": {
+      "enable": false,
+      "pdfPassword": "",
+      "dataDir": "data/jm",
+      "timeoutSeconds": 25,
+      "retryTimes": 1,
+      "imageWorkers": 8,
+      "chapterWorkers": 2,
+      "maxConcurrentJobs": 2
+    },
     "picSearch":{
       "enable": false,
       "args": ["/search", "/s"],

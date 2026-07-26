@@ -38,8 +38,11 @@ func SendAction(action string, params any, echo string) []byte {
 	return jsonMsg
 }
 
-// SendFile Deprecated
 func SendFile(messageStruct *structs.MessageStruct, file string, name string) []byte {
+	return SendFileWithEcho(messageStruct, file, name, "")
+}
+
+func SendFileWithEcho(messageStruct *structs.MessageStruct, file string, name string, echo string) []byte {
 	if file == "" || messageStruct == nil {
 		return nil
 	}
@@ -48,11 +51,11 @@ func SendFile(messageStruct *structs.MessageStruct, file string, name string) []
 	if messageStruct.MessageType == "group" {
 		groupId := messageStruct.GroupId
 		params := structs.GroupFile{GroupId: groupId, File: file, Name: name}
-		act = structs.Action{Action: "upload_group_file", Params: params}
+		act = structs.Action{Action: "upload_group_file", Params: params, Echo: echo}
 	} else {
 		userId := messageStruct.UserId
 		params := structs.PrivateFile{UserId: userId, File: file, Name: name}
-		act = structs.Action{Action: "upload_private_file", Params: params}
+		act = structs.Action{Action: "upload_private_file", Params: params, Echo: echo}
 	}
 
 	jsonMsg, _ := json.Marshal(act)

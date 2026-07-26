@@ -74,6 +74,16 @@ type Configuration struct {
 		Music struct {
 			Enable bool `json:"enable"`
 		} `json:"music"`
+		JM struct {
+			Enable            bool   `json:"enable"`
+			PDFPassword       string `json:"pdfPassword"`
+			DataDir           string `json:"dataDir"`
+			TimeoutSeconds    int    `json:"timeoutSeconds"`
+			RetryTimes        int    `json:"retryTimes"`
+			ImageWorkers      int    `json:"imageWorkers"`
+			ChapterWorkers    int    `json:"chapterWorkers"`
+			MaxConcurrentJobs int    `json:"maxConcurrentJobs"`
+		} `json:"jm"`
 		PicSearch struct {
 			Enable            bool     `json:"enable"`
 			Args              []string `json:"args"`
@@ -230,6 +240,24 @@ func (c *Configuration) Validate() error {
 	}
 	if c.Plugins.PicSearch.GoogleLens.TimeoutSeconds < 0 {
 		return errors.New("plugins.picSearch.googleLens.timeoutSeconds cannot be negative")
+	}
+	if c.Plugins.JM.Enable && strings.TrimSpace(c.Plugins.JM.PDFPassword) == "" {
+		return errors.New("plugins.jm.pdfPassword is required when the plugin is enabled")
+	}
+	if c.Plugins.JM.TimeoutSeconds < 0 {
+		return errors.New("plugins.jm.timeoutSeconds cannot be negative")
+	}
+	if c.Plugins.JM.RetryTimes < 0 {
+		return errors.New("plugins.jm.retryTimes cannot be negative")
+	}
+	if c.Plugins.JM.ImageWorkers < 0 {
+		return errors.New("plugins.jm.imageWorkers cannot be negative")
+	}
+	if c.Plugins.JM.ChapterWorkers < 0 {
+		return errors.New("plugins.jm.chapterWorkers cannot be negative")
+	}
+	if c.Plugins.JM.MaxConcurrentJobs < 0 {
+		return errors.New("plugins.jm.maxConcurrentJobs cannot be negative")
 	}
 	return nil
 }

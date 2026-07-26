@@ -37,6 +37,7 @@ log/
 *.log
 *.db
 img_cache/*
+data/jm/
 TODO.md
 .DS_Store
 *.ttf
