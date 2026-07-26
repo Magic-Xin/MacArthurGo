@@ -129,7 +129,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		messageID := messageStruct.MessageId
 		switch key {
 		case "flash":
-			res, action = c.Gemini.RequireAnswer(message, messageID, "gemini-3.5-flash")
+			res, action = c.Gemini.RequireAnswer(message, messageID, "gemini-3.6-flash")
 		case "pro":
 			res, action = c.Gemini.RequireAnswer(message, messageID, "gemini-3.1-pro-preview")
 		case "image":
@@ -168,7 +168,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 			text += fmt.Sprintf("QWen:\n%s: %s\n\n", c.QWen.Model, c.QWen.Args)
 		}
 		if c.Gemini.Enabled {
-			text += fmt.Sprintf("Gemini:\nGemini-3.5-flash: %s\nGemini-3.0-pro image-generation: %s\nGemini-3.1-pro: %s\n\n",
+			text += fmt.Sprintf("Gemini:\nGemini-3.6-flash: %s\nGemini-3.0-pro image-generation: %s\nGemini-3.1-pro: %s\n\n",
 				c.Gemini.ArgsMap["flash"], c.Gemini.ArgsMap["image"], c.Gemini.ArgsMap["pro"])
 		}
 		if c.Github.Enabled {
