@@ -122,6 +122,20 @@ func ParseRequest(command string, message []cqcode.ArrayMessage) (Request, error
 	}
 }
 
+func ValidateDownloadRequest(request Request) error {
+	if request.AlbumID == "350234" && (request.Kind == RequestAlbum || request.Kind == RequestChapter) {
+		return errors.New("董卓滚啊")
+	}
+	return nil
+}
+
+func ProgressMessage(request Request) string {
+	if request.Kind == RequestInfo {
+		return ""
+	}
+	return fmt.Sprintf("正在下载 JM%s 并生成加密 PDF，请稍候…", request.AlbumID)
+}
+
 func NewService(options Options) (*Service, error) {
 	if strings.TrimSpace(options.DataDir) == "" {
 		options.DataDir = defaultDataDir

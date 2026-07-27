@@ -62,6 +62,42 @@ func TestJMParseRequest(t *testing.T) {
 	}
 }
 
+func TestJMValidateDownloadRequest(t *testing.T) {
+	tests := []struct {
+		name    string
+		request jmcomic.Request
+		wantErr string
+	}{
+		{name: "blocked album", request: jmcomic.Request{Kind: jmcomic.RequestAlbum, AlbumID: "350234"}, wantErr: "董卓滚啊"},
+		{name: "blocked chapter", request: jmcomic.Request{Kind: jmcomic.RequestChapter, AlbumID: "350234", Sequence: 1}, wantErr: "董卓滚啊"},
+		{name: "info remains available", request: jmcomic.Request{Kind: jmcomic.RequestInfo, AlbumID: "350234"}},
+		{name: "other album", request: jmcomic.Request{Kind: jmcomic.RequestAlbum, AlbumID: "350235"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := jmcomic.ValidateDownloadRequest(test.request)
+			if test.wantErr == "" {
+				if err != nil {
+					t.Fatalf("ValidateDownloadRequest() error = %v", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != test.wantErr {
+				t.Fatalf("ValidateDownloadRequest() error = %v, want %q", err, test.wantErr)
+			}
+		})
+	}
+}
+
+func TestJMProgressMessage(t *testing.T) {
+	if got := jmcomic.ProgressMessage(jmcomic.Request{Kind: jmcomic.RequestInfo, AlbumID: "123"}); got != "" {
+		t.Fatalf("info progress message = %q, want empty", got)
+	}
+	if got := jmcomic.ProgressMessage(jmcomic.Request{Kind: jmcomic.RequestAlbum, AlbumID: "123"}); !strings.Contains(got, "正在下载 JM123") {
+		t.Fatalf("download progress message = %q", got)
+	}
+}
+
 func TestJMPhotoIDsAndChapterSelection(t *testing.T) {
 	album := &jmapi.AlbumDetail{
 		ID: "100",

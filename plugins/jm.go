@@ -123,16 +123,18 @@ func (j *JM) ReceiveMessage(message *structs.MessageStruct, send chan<- []byte) 
 		j.send(ctx, send, essentials.SendMsg(message, err.Error(), nil, false, true, ""))
 		return
 	}
+	if err := jmcomic.ValidateDownloadRequest(request); err != nil {
+		j.send(ctx, send, essentials.SendMsg(message, err.Error(), nil, false, true, ""))
+		return
+	}
 	if !j.startJob() {
 		j.send(ctx, send, essentials.SendMsg(message, "JM 任务已满，请稍后再试", nil, false, true, ""))
 		return
 	}
 
-	status := fmt.Sprintf("正在查询 JM%s…", request.AlbumID)
-	if request.Kind != jmcomic.RequestInfo {
-		status = fmt.Sprintf("正在下载 JM%s 并生成加密 PDF，请稍候…", request.AlbumID)
+	if status := jmcomic.ProgressMessage(request); status != "" {
+		j.send(ctx, send, essentials.SendMsg(message, status, nil, false, true, ""))
 	}
-	j.send(ctx, send, essentials.SendMsg(message, status, nil, false, true, ""))
 	origin := *message
 	go j.runJob(request, origin, send)
 }
