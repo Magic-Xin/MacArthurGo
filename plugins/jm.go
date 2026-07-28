@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	jmapi "github.com/laoin114514/jmapi"
 )
 
 const (
@@ -188,7 +190,9 @@ func (j *JM) runJob(request jmcomic.Request, origin structs.MessageStruct, send 
 		err    error
 	)
 	if request.Kind == jmcomic.RequestAlbum {
-		result, err = j.service.DownloadAlbum(ctx, request.AlbumID, j.password)
+		result, err = j.service.DownloadAlbumWithMetadata(ctx, request.AlbumID, j.password, func(album *jmapi.AlbumDetail) {
+			j.send(ctx, send, essentials.SendMsg(&origin, jmcomic.FormatDownloadProgress(album), nil, false, true, ""))
+		})
 	} else {
 		result, err = j.service.DownloadChapter(ctx, request.AlbumID, request.Sequence, j.password)
 	}

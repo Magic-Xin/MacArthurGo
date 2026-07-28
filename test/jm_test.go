@@ -93,7 +93,10 @@ func TestJMProgressMessage(t *testing.T) {
 	if got := jmcomic.ProgressMessage(jmcomic.Request{Kind: jmcomic.RequestInfo, AlbumID: "123"}); got != "" {
 		t.Fatalf("info progress message = %q, want empty", got)
 	}
-	if got := jmcomic.ProgressMessage(jmcomic.Request{Kind: jmcomic.RequestAlbum, AlbumID: "123"}); !strings.Contains(got, "正在下载 JM123") {
+	if got := jmcomic.ProgressMessage(jmcomic.Request{Kind: jmcomic.RequestAlbum, AlbumID: "123"}); got != "" {
+		t.Fatalf("album progress message = %q, want deferred metadata message", got)
+	}
+	if got := jmcomic.ProgressMessage(jmcomic.Request{Kind: jmcomic.RequestChapter, AlbumID: "123", Sequence: 1}); !strings.Contains(got, "正在下载 JM123") {
 		t.Fatalf("download progress message = %q", got)
 	}
 }
@@ -141,6 +144,26 @@ func TestJMFormatAlbumInfo(t *testing.T) {
 	for _, want := range []string{"JM123", "标题：测试本子", "作者：作者甲、作者乙", "标签：标签一、标签二", "章节数：2", "页数：42", "1. 开篇", "2. 终章"} {
 		if !strings.Contains(info, want) {
 			t.Fatalf("FormatAlbumInfo() missing %q in %q", want, info)
+		}
+	}
+}
+
+func TestJMFormatDownloadProgress(t *testing.T) {
+	album := &jmapi.AlbumDetail{
+		ID:     "1198446",
+		Name:   "测试标题",
+		Author: []string{"作者甲", "作者乙"},
+		Tags:   []string{"标签一", "标签二"},
+	}
+	message := jmcomic.FormatDownloadProgress(album)
+	for _, want := range []string{
+		"正在下载 JM1198446 并生成加密 PDF，请稍候…",
+		"标题：测试标题",
+		"作者：作者甲、作者乙",
+		"标签：标签一、标签二",
+	} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("FormatDownloadProgress() missing %q in %q", want, message)
 		}
 	}
 }

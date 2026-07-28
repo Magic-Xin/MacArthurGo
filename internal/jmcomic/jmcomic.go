@@ -130,7 +130,7 @@ func ValidateDownloadRequest(request Request) error {
 }
 
 func ProgressMessage(request Request) string {
-	if request.Kind == RequestInfo {
+	if request.Kind != RequestChapter {
 		return ""
 	}
 	return fmt.Sprintf("正在下载 JM%s 并生成加密 PDF，请稍候…", request.AlbumID)
@@ -181,6 +181,14 @@ func (s *Service) GetAlbum(ctx context.Context, albumID string) (*jmapi.AlbumDet
 }
 
 func (s *Service) DownloadAlbum(ctx context.Context, albumID, password string) (*DownloadResult, error) {
+	return s.downloadAlbum(ctx, albumID, password, nil)
+}
+
+func (s *Service) DownloadAlbumWithMetadata(ctx context.Context, albumID, password string, onMetadata func(*jmapi.AlbumDetail)) (*DownloadResult, error) {
+	return s.downloadAlbum(ctx, albumID, password, onMetadata)
+}
+
+func (s *Service) downloadAlbum(ctx context.Context, albumID, password string, onMetadata func(*jmapi.AlbumDetail)) (*DownloadResult, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -194,6 +202,12 @@ func (s *Service) DownloadAlbum(ctx context.Context, albumID, password string) (
 	}
 	if album.ID == "" {
 		album.ID = albumID
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if onMetadata != nil {
+		onMetadata(album)
 	}
 	photoIDs := PhotoIDs(album)
 	if len(photoIDs) == 0 {
@@ -287,6 +301,19 @@ func FormatAlbumInfo(album *jmapi.AlbumDetail) string {
 		}
 	}
 	return builder.String()
+}
+
+func FormatDownloadProgress(album *jmapi.AlbumDetail) string {
+	if album == nil {
+		return "正在下载 JM未知 并生成加密 PDF，请稍候…\n标题：未知\n作者：未知\n标签：未知"
+	}
+	return fmt.Sprintf(
+		"正在下载 JM%s 并生成加密 PDF，请稍候…\n标题：%s\n作者：%s\n标签：%s",
+		fallback(album.ID, "未知"),
+		fallback(album.Name, "未知"),
+		joinOrUnknown(album.Author),
+		joinOrUnknown(album.Tags),
+	)
 }
 
 func BuildEncryptedPDF(imagePaths []string, outputPath, password string) error {
