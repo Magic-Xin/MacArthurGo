@@ -33,7 +33,7 @@ jobs:
             goarch: amd64
             runner: windows-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install Linux C++ toolchain
         if: matrix.goos == 'linux'
@@ -46,7 +46,7 @@ jobs:
         shell: pwsh
         run: choco install make --yes --no-progress
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
@@ -63,7 +63,7 @@ jobs:
           VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
         run: make package
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.goos }}-${{ matrix.goarch }}
           path: out/MacArthurGo-${{ matrix.goos }}-${{ matrix.goarch }}.*
@@ -76,7 +76,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: out
           merge-multiple: true
@@ -87,7 +87,7 @@ jobs:
           sha256sum MacArthurGo-* > SHA256SUMS
 
       - name: Upload release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           fail_on_unmatched_files: true

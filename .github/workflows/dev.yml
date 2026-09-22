@@ -6,19 +6,19 @@ on:
     branches:
       - "dev"
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
-env:
-  COMMIT_ID: "${{ github.sha }}"
-  NAME: MacArthurGo
-  CGO_ENABLED: 1
-
 jobs:
-  Build:
-    name: Build binary CI
+  build:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ${{ matrix.runner }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - goos: linux
@@ -27,130 +27,96 @@ jobs:
           - goos: linux
             goarch: arm64
             runner: ubuntu-22.04-arm
-          - goos: windows
-            goarch: amd64
-            runner: windows-latest
           - goos: darwin
             goarch: amd64
             runner: macos-15-intel
           - goos: darwin
             goarch: arm64
             runner: macos-latest
-
-    runs-on: ${{ matrix.runner }}
+          - goos: windows
+            goarch: amd64
+            runner: windows-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - name: Install dependencies (Linux only)
-        if: ${{ matrix.goos == 'linux' }}
+      - name: Install Linux C++ toolchain
+        if: matrix.goos == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential
 
-      - name: Set Environment
-        run: |
-          mkdir -p bin
-          echo "SHASHORT=$(git rev-parse --short "${{ env.COMMIT_ID }}")" >> "$GITHUB_ENV"
-          echo "BUILDTIME=$(date +'%Y-%m-%dT%H:%M:%SZ' -u)" >> $GITHUB_ENV
+      - name: Install Make on Windows
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        run: choco install make --yes --no-progress
 
-      - name: Set LDFLAGS
-        run: |
-          echo "LDFLAGS=-w -s -X 'MacArthurGo/base.Version=${SHASHORT}' -X 'MacArthurGo/base.Branch=Beta/dev' -X 'MacArthurGo/base.BuildTime=${{ env.BUILDTIME }}'" >> $GITHUB_ENV
-
-      - name: Setup UPX
-        if: ${{ matrix.goos == 'linux' }}
-        run: |
-          cd ..
-          wget https://github.com/upx/upx/releases/download/v5.0.2/upx-5.0.2-amd64_linux.tar.xz
-          tar xf upx-5.0.2-amd64_linux.tar.xz
-          echo "upx=../upx-5.0.2-amd64_linux/upx" >> $GITHUB_ENV
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
-          go-version-file: 'go.mod'
-          cache-dependency-path: 'go.sum'
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
-      - name: Build
+      - name: Test
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        run: go test ./...
+
+      - name: Build and package
+        shell: bash
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-        run: |
-          go build -ldflags="${LDFLAGS}" -o bin/${{ env.NAME }}-${{ matrix.goos }}-${{ matrix.goarch }} ./
-          chmod +x bin/${{ env.NAME }}-*
+        run: make package VERSION="${GITHUB_SHA:0:7}" BRANCH=Beta/dev
 
-      - name: Rename Windows
-        if: ${{ matrix.goos == 'windows' }}
-        run: |
-          mv MacArthurGo-windows-${{ matrix.goarch }} MacArthurGo-windows-${{ matrix.goarch }}.exe
-        working-directory: bin
-
-      - name: UPX Compress
-        if: ${{ matrix.goos == 'linux' }}
-        run: |
-          if [ ${{ matrix.goos }} != "windows" ] && [ ${{ matrix.goarch }} != "arm64" ]; then ${{ env.upx }} --lzma --best bin/${{ env.NAME }}-*; fi
-
-      - name: Upload To Artifact
-        if: ${{  success() }}
-        uses: actions/upload-artifact@main
+      - uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.goos }}-${{ matrix.goarch }}-${{ env.SHASHORT }}
-          path: |
-            bin/*
+          name: ${{ matrix.goos }}-${{ matrix.goarch }}
+          path: out/MacArthurGo-${{ matrix.goos }}-${{ matrix.goarch }}.*
+          if-no-files-found: error
 
-  Upload-Prerelease:
-    permissions: write-all
-    needs: [Build]
+  upload-prerelease:
     runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
     steps:
-      - uses: actions/download-artifact@main
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
         with:
-          path: bin/
+          path: out
+          merge-multiple: true
 
-      - name: Display structure of downloaded files
-        run: ls -R
-        working-directory: bin
-
-      - name: Delete current release assets
-        uses: 8Mi-Tech/delete-release-assets-action@main
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: Prerelease-${{ github.ref_name }}
-          deleteOnlyFromDrafts: false
-
-      - name: Set Env
-        run: |
-          echo "UPLOADTIME=$(date +'%Y-%m-%dT%H:%M:%SZ' -u)" >> $GITHUB_ENV
+      - name: Prepare prerelease files
         shell: bash
+        run: |
+          upload_time="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          printf '{"version":"%s","upload_time":"%s"}\n' "$GITHUB_SHA" "$upload_time" > out/version.json
+          printf 'Release created at %s\nCommit: %s\nLatest build from %s\n' "$upload_time" "$GITHUB_SHA" "$GITHUB_REF_NAME" > release.txt
 
-      - name: Tag Repo
-        uses: richardsimko/update-tag@v1.1.6
+      - name: Update prerelease tag
+        uses: richardsimko/update-tag@v3
         with:
           tag_name: Prerelease-${{ github.ref_name }}
+          github_token: ${{ github.token }}
+
+      - name: Remove old prerelease assets
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="Prerelease-${GITHUB_REF_NAME}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            while IFS= read -r asset; do
+              gh release delete-asset "$tag" "$asset" --yes
+            done < <(gh release view "$tag" --json assets --jq '.assets[].name')
+          fi
 
-      - run: |
-          cat > release.txt << 'EOF'
-          Release created at ${{ env.UPLOADTIME }}
-          Commit: ${{ env.COMMIT_ID }}
-          Synchronize ${{ github.ref_name }} branch code updates, keeping only the latest version
-          EOF
-
-      - run: |
-          cat > version.json << 'EOF'
-          {"version": "${{ env.COMMIT_ID }}", "upload_time": "${{ env.UPLOADTIME }}"}
-          EOF
-        working-directory: bin
-
-      - name: Upload Prerelease
-        uses: softprops/action-gh-release@v2
-        if: ${{  success() }}
+      - name: Upload prerelease
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: Prerelease-${{ github.ref_name }}
-          files: |
-            bin/*
-            bin/*/*
+          files: out/*
           prerelease: true
           generate_release_notes: true
           body_path: release.txt
+          fail_on_unmatched_files: true
+          overwrite_files: true
