@@ -1,9 +1,15 @@
 package structs
 
-import "MacArthurGo/structs/cqcode"
+import (
+	"MacArthurGo/structs/cqcode"
+	"bytes"
+	"encoding/json"
+	"fmt"
+)
 
 type MessageStruct struct {
 	Time        int64  `json:"time"`
+	PostType    string `json:"post_type"`
 	MessageType string `json:"message_type"`
 	MessageId   int64  `json:"message_id"`
 	GroupId     int64  `json:"group_id"`
@@ -17,7 +23,45 @@ type MessageStruct struct {
 	Echo       string                `json:"echo"`
 
 	Command      string
-	CleanMessage *[]cqcode.ArrayMessage
+	CleanMessage []cqcode.ArrayMessage
+}
+
+func (m *MessageStruct) UnmarshalJSON(data []byte) error {
+	type Alias MessageStruct
+	aux := &struct {
+		Message json.RawMessage `json:"message"`
+		*Alias
+	}{
+		Alias: (*Alias)(m),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if len(aux.Message) == 0 || bytes.Equal(aux.Message, []byte("null")) {
+		m.Message = nil
+		return nil
+	}
+
+	var s string
+	if err := json.Unmarshal(aux.Message, &s); err == nil {
+		m.Message = []cqcode.ArrayMessage{
+			{
+				Type: "text",
+				Data: map[string]interface{}{"text": s},
+			},
+		}
+		return nil
+	}
+
+	var arr []cqcode.ArrayMessage
+	if err := json.Unmarshal(aux.Message, &arr); err == nil {
+		m.Message = arr
+		return nil
+	}
+
+	return fmt.Errorf("unsupported message format: %s", string(aux.Message))
 }
 
 type EchoMessageStruct struct {
@@ -36,6 +80,16 @@ type EchoMessageStruct struct {
 			UserId int64 `json:"user_id"`
 		}
 		Message []cqcode.ArrayMessage `json:"message"`
+
+		// NapCat stream API
+		Type           string `json:"type"`
+		Status         string `json:"status"`
+		StreamID       string `json:"stream_id"`
+		ReceivedChunks int    `json:"received_chunks"`
+		TotalChunks    int    `json:"total_chunks"`
+		FilePath       string `json:"file_path"`
+		FileSize       int64  `json:"file_size"`
+		SHA256         string `json:"sha256"`
 	} `json:"data"`
 	DataArray []struct {
 		//friendList
@@ -52,8 +106,12 @@ type EchoMessageStruct struct {
 		//groupMemberList
 		Card string `json:"card"`
 	}
-	Echo   string `json:"echo"`
-	Status string `json:"status"`
+	Echo    string `json:"echo"`
+	Status  string `json:"status"`
+	Retcode int    `json:"retcode"`
+	Message string `json:"message"`
+	Wording string `json:"wording"`
+	Stream  string `json:"stream"`
 }
 
 type EchoMessageArrayStruct struct {

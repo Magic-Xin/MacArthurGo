@@ -28,7 +28,7 @@
           "isReply": true,
           "isAt": false,
           "scene": "private"
-        },
+        }
       ]
     },
     "originPic": {
@@ -59,6 +59,16 @@
     "music": {
       "enable": false
     },
+    "jm": {
+      "enable": false,
+      "pdfPassword": "",
+      "dataDir": "data/jm",
+      "timeoutSeconds": 25,
+      "retryTimes": 1,
+      "imageWorkers": 8,
+      "chapterWorkers": 2,
+      "maxConcurrentJobs": 2
+    },
     "picSearch":{
       "enable": false,
       "args": ["/search", "/s"],
@@ -67,7 +77,46 @@
       "handleBannedHosts": true,
       "expirationTime": 86400,
       "intervalTime": 1800,
-      "sauceNAOToken": ""
+      "sauceNAOToken": "",
+      "ascii2d": {
+        "cloudflareBypassUrl": "http://127.0.0.1:8000",
+        "proxyUrl": "",
+        "timeoutSeconds": 90
+      },
+      "soutuBot": {
+        "cloudflareBypassUrl": "http://127.0.0.1:8000",
+        "proxyUrl": "",
+        "timeoutSeconds": 90,
+        "similarityThreshold": 45
+      },
+      "googleLens": {
+        "apiKey": "",
+        "timeoutSeconds": 30
+      }
+    },
+    "statics": {
+      "enable": false,
+      "chartArgsMap": {
+        "today": "/今日发言",
+        "yesterday": "/昨日发言"
+      },
+      "wordCloudArgsMap": {
+        "today": "/今日词云",
+        "yesterday": "/昨日词云"
+      },
+      "stopWords": ["的", "了", "么", "啊", "吗", "你们", "我们", "http", "https"],
+      "retentionDays": 3,
+      "dataDir": "data/statics",
+      "chart": {
+        "width": 900,
+        "height": 520
+      },
+      "wordCloud": {
+        "width": 900,
+        "height": 520,
+        "maxWords": 80,
+        "fontFile": "./NotoSansSC-Regular.ttf"
+      }
     },
     "chatAI": {
       "enable": false,
@@ -86,9 +135,9 @@
       "gemini": {
         "enable": true,
         "argsMap": {
-            "flash": "/g",
-            "think": "/gt",
-            "pro": "/gp"
+            "flash": "/gf",
+            "pro": "/gp",
+            "image": "/gi"
         },
         "apiKey": ""
       },
@@ -110,6 +159,6 @@
     "waifu": {
       "enable": false,
       "args": ["/waifu", "wife", "/w"]
-    },
+    }
   }
 }

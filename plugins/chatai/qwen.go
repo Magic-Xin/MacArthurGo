@@ -1,10 +1,10 @@
 package chatai
 
 import (
+	"MacArthurGo/plugins/essentials"
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 )
@@ -16,7 +16,7 @@ type QWen struct {
 	ApiKey  string
 }
 
-func (q *QWen) RequireAnswer(str string) *[]string {
+func (q *QWen) RequireAnswer(str string) []string {
 	var res []string
 	const api = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
 
@@ -38,50 +38,50 @@ func (q *QWen) RequireAnswer(str string) *[]string {
 	if err != nil {
 		log.Printf("QWen marshal error: %v", err)
 		res = append(res, fmt.Sprintf("QWen marshal error: %v", err))
-		return &res
+		return res
 	}
 
 	req, err := http.NewRequest("POST", api, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		log.Printf("QWen request error: %v", err)
 		res = append(res, fmt.Sprintf("QWen request error: %v", err))
-		return &res
+		return res
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", q.ApiKey))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := essentials.HTTPClient.Do(req)
 	if err != nil {
 		log.Printf("QWen response error: %v", err)
 		res = append(res, fmt.Sprintf("QWen response error: %v", err))
-		return &res
+		return res
 	}
-	defer func(Body io.ReadCloser) {
-		err = Body.Close()
-		if err != nil {
-			log.Printf("QWen close error: %v", err)
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Printf("QWen close error: %v", closeErr)
 		}
-	}(resp.Body)
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("QWen read body error: %v", err)
-		res = append(res, fmt.Sprintf("QWen read body error: %v", err))
-		return &res
+	}()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		res = append(res, fmt.Sprintf("QWen response error: %s", resp.Status))
+		return res
 	}
 
-	var i any
-	err = json.Unmarshal(body, &i)
-	if err != nil {
+	var result struct {
+		Output struct {
+			Text string `json:"text"`
+		} `json:"output"`
+		Code      string `json:"code"`
+		Message   string `json:"message"`
+		RequestID string `json:"request_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		log.Printf("QWen unmarshal error: %v", err)
 		res = append(res, fmt.Sprintf("QWen unmarshal error: %v", err))
-		return &res
+		return res
 	}
-	ctx := i.(map[string]any)
-	if ctx["output"] != nil {
-		if ctx["output"].(map[string]any)["text"] != nil {
-			res = append(res, q.Model+": "+ctx["output"].(map[string]any)["text"].(string))
-			return &res
-		}
+	if result.Output.Text != "" {
+		res = append(res, q.Model+": "+result.Output.Text)
+		return res
 	}
-	res = append(res, fmt.Sprintf("QWen response error: %v", ctx))
-	return &res
+	res = append(res, fmt.Sprintf("QWen response error: code=%s message=%s request_id=%s", result.Code, result.Message, result.RequestID))
+	return res
 }

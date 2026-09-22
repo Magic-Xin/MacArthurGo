@@ -12,24 +12,22 @@ import (
 
 type Roll struct{}
 
-func init() {
+func registerRoll() error {
 	plugin := &essentials.Plugin{
-		Name:      "随机",
-		Enabled:   base.Config.Plugins.Roll.Enable,
-		Args:      base.Config.Plugins.Roll.Args,
-		Interface: &Roll{},
+		Name:    "随机",
+		Enabled: base.Config.Plugins.Roll.Enable,
+		Args:    base.Config.Plugins.Roll.Args,
+		Handler: &Roll{},
 	}
-	essentials.PluginArray = append(essentials.PluginArray, plugin)
+	return essentials.Register(plugin)
 }
 
-func (*Roll) ReceiveAll(chan<- *[]byte) {}
-
-func (r *Roll) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if !essentials.CheckArgumentArray(messageStruct.Command, &base.Config.Plugins.Roll.Args) {
+func (r *Roll) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- []byte) {
+	if !essentials.CheckArgumentArray(messageStruct.Command, base.Config.Plugins.Roll.Args) {
 		return
 	}
 
-	words := essentials.SplitArgument(&messageStruct.Message)
+	words := essentials.SplitArgument(messageStruct.Message)
 	var result string
 	if len(words) == 1 {
 		result = r.getRoll(-1)
@@ -49,7 +47,7 @@ func (r *Roll) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- 
 	}
 }
 
-func (*Roll) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
+func (*Roll) ReceiveEcho(*structs.EchoMessageStruct, chan<- []byte) {}
 
 func (*Roll) getRoll(n int) string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))

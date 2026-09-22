@@ -18,23 +18,21 @@ type Repeat struct {
 	repeatMap         sync.Map
 }
 
-func init() {
+func registerRepeat() error {
 	repeat := Repeat{
 		Times:             base.Config.Plugins.Repeat.Times,
 		Probability:       base.Config.Plugins.Repeat.Probability,
 		CommonProbability: base.Config.Plugins.Repeat.CommonProbability,
 	}
 	plugin := &essentials.Plugin{
-		Name:      "随机复读",
-		Enabled:   base.Config.Plugins.Repeat.Enable,
-		Interface: &repeat,
+		Name:    "随机复读",
+		Enabled: base.Config.Plugins.Repeat.Enable,
+		Handler: &repeat,
 	}
-	essentials.PluginArray = append(essentials.PluginArray, plugin)
+	return essentials.Register(plugin)
 }
 
-func (*Repeat) ReceiveAll(chan<- *[]byte) {}
-
-func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
+func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- []byte) {
 	if messageStruct.MessageType != "group" || messageStruct.Message == nil ||
 		messageStruct.GroupId == 0 || len(messageStruct.Message) == 0 ||
 		messageStruct.Command != "" {
@@ -54,7 +52,7 @@ func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 	}
 
 	groupId := strconv.FormatInt(messageStruct.GroupId, 10)
-	md5 := essentials.Md5(&msg)
+	md5 := essentials.Md5(msg)
 	cache, ok := r.repeatMap.Load(groupId)
 	if !ok {
 		r.repeatMap.Store(groupId, []any{md5, 1})
@@ -64,7 +62,7 @@ func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 	if cache.([]any)[0].(string) == md5 {
 		if cache.([]any)[1].(int) >= int(r.Times) && r.getRand(false) {
 			r.repeatMap.Store(groupId, []any{md5, 1})
-			send <- essentials.SendMsg(messageStruct, "", &message, false, false, "")
+			send <- essentials.SendMsg(messageStruct, "", message, false, false, "")
 			return
 		} else {
 			r.repeatMap.Store(groupId, []any{md5, cache.([]any)[1].(int) + 1})
@@ -74,11 +72,11 @@ func (r *Repeat) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 	}
 
 	if r.getRand(true) {
-		send <- essentials.SendMsg(messageStruct, "", &message, false, false, "")
+		send <- essentials.SendMsg(messageStruct, "", message, false, false, "")
 	}
 }
 
-func (*Repeat) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
+func (*Repeat) ReceiveEcho(*structs.EchoMessageStruct, chan<- []byte) {}
 
 func (r *Repeat) getRand(common bool) bool {
 	if common {

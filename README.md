@@ -9,14 +9,41 @@
 
 If you have any comments or suggestions, you are welcome to discuss and provide feedback in the [issues](https://github.com/Magic-Xin/MacArthurGo/issues) section
 
-**Highly recommend using [Lagrange.OneBot](https://github.com/KonataDev/Lagrange.Core) as the OneBot server**
+**Highly recommend using [NapCatQQ](https://github.com/NapNeko/NapCatQQ) as the OneBot server**
 
 ## How to use
 
-- Stable version: Download the compressed package and `config.json.default` for the corresponding system and architecture from the [release](https://github.com/Magic-Xin/MacArthurGo/releases), fill in the `config.json.default` and rename to `config.json` then run the program. 
+- Stable version: Download the archive for your system and architecture from the [release](https://github.com/Magic-Xin/MacArthurGo/releases). Extract it, fill in `config.json.default`, rename it to `config.json`, and run the program from the extracted directory so it can find `jieba_dict`.
 - Dev version: Download compressed package from the newest [github actions](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/dev.yml)
 
 **Attention: Cannot guarantee the availability of the Dev version**
+
+## Architecture
+
+Startup is explicit and ordered: configuration is loaded and validated first,
+then shared infrastructure is opened, plugins are registered, background
+workers are started, and finally the OneBot WebSocket client begins running.
+Plugins no longer depend on package `init()` side effects.
+
+The WebSocket client keeps a bounded event queue, a bounded worker pool, and a
+persistent outbound queue. A disconnected OneBot server is reconnected with
+bounded exponential backoff. Plugin callbacks are serialized per plugin while
+different plugins can still run concurrently, which keeps stateful plugins safe
+without allowing unbounded goroutine growth. Shutdown cancellation is shared by
+the WebSocket client, plugin schedulers, cache cleanup, database cleanup, and
+statistics flushing.
+
+## Development
+
+CGO is required. Enable it before building or testing:
+
+```powershell
+$env:CGO_ENABLED = "1"
+go test ./...
+go build ./...
+```
+
+Integration tests live in the top-level `test/` directory. Package-level tests live alongside the code they exercise.
 
 ## Plugins
 - Essential Plugins
@@ -27,7 +54,7 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - Chat AI
   - ChatGPT
   - Alibaba QianWen
-  - Google Gemini Pro (with picture search)
+  - Google Gemini
   - Github Models
 - Music url parser
   - Netease Cloud Music
@@ -38,11 +65,27 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - Picture Search
   - SauceNao
   - Ascii2d
+  - SoutuBot
+  - Google Lens (SerpApi)
 - Poke
 - Roll
 - Repeat
 - Corpus reply
 - Daily waifu
+- JM comic downloader
+
+### CloudflareBypassForScraping
+
+Run [CloudflareBypassForScraping](https://github.com/sarperavci/CloudflareBypassForScraping) alongside MacArthurGo:
+
+```powershell
+docker run -d --name=cf-bypass -p 127.0.0.1:8000:8000 --restart unless-stopped ghcr.io/sarperavci/cloudflarebypassforscraping:latest
+```
+
+The default configuration connects to the service at `http://127.0.0.1:8000`. MacArthurGo uses it for:
+
+- **ascii2d:** loading color and feature search result pages and downloading protected thumbnails.
+- **SoutuBot:** loading the homepage state and forwarding image-search requests through mirror mode.
 
 ## TODO
 - [ ] Add more plugins
@@ -51,11 +94,13 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 - [cq-picsearcher-bot](https://github.com/Tsuk1ko/cq-picsearcher-bot)
 - [saucenao](https://saucenao.com/)
 - [ascii2d](https://ascii2d.net)
+- [SoutuBot-go](https://github.com/Miuzarte/SoutuBot-go)
 - [go-cqhttp](https://github.com/Mrs4s/go-cqhttp)
 - [Lagrange.Core](https://github.com/KonataDev/Lagrange.Core)
 - [onebot-11](https://github.com/botuniverse/onebot-11)
 - [OpenShamrock](https://github.com/whitechi73/OpenShamrock)
 - [bilibili-API-collect](https://github.com/SocialSisterYi/bilibili-API-collect)
+- [NapCatQQ](https://github.com/NapNeko/NapCatQQ)
 
 ## Special thanks
 ![JetBrains](https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.svg)

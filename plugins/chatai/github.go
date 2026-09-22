@@ -1,6 +1,7 @@
 package chatai
 
 import (
+	"MacArthurGo/plugins/essentials"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,8 @@ type Github struct {
 	ArgsMap map[string]string
 	Token   string
 }
+
+var thinkPattern = regexp.MustCompile(`<think>([\s\S]*?)</think>`)
 
 type Results struct {
 	Choices []struct {
@@ -94,35 +97,40 @@ type Results struct {
 	} `json:"usage"`
 }
 
-func (c *Github) RequireAnswer(str string, model string) *[]string {
+func (c *Github) RequireAnswer(str string, model string) []string {
 	const api = "https://models.inference.ai.azure.com/chat/completions"
 
 	var res []string
 
-	payload := fmt.Sprintf(`{
-		"messages": [
-			{
-				"role": "user",
-				"content": "%s"
-			}
-		],
-		"model": "%s"
-	}`, str, model)
+	payload, err := json.Marshal(struct {
+		Messages []map[string]string `json:"messages"`
+		Model    string              `json:"model"`
+	}{
+		Messages: []map[string]string{{"role": "user", "content": str}},
+		Model:    model,
+	})
+	if err != nil {
+		return []string{fmt.Sprintf("Marshal request error: %v", err)}
+	}
 
-	req, err := http.NewRequest("POST", api, bytes.NewBuffer([]byte(payload)))
+	req, err := http.NewRequest(http.MethodPost, api, bytes.NewReader(payload))
 	if err != nil {
 		res = append(res, fmt.Sprintf("NewRequest error: %v", err))
-		return &res
+		return res
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.Token)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := essentials.HTTPClient.Do(req)
 	if err != nil {
 		res = append(res, fmt.Sprintf("Do error: %v", err))
-		return &res
+		return res
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		res = append(res, fmt.Sprintf("GitHub Models response error: %s", resp.Status))
+		resp.Body.Close()
+		return res
 	}
 
 	defer func(Body io.ReadCloser) {
@@ -135,19 +143,19 @@ func (c *Github) RequireAnswer(str string, model string) *[]string {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		res = append(res, fmt.Sprintf("Read body error: %v", err))
-		return &res
+		return res
 	}
 
 	var result Results
 	if err := json.Unmarshal(body, &result); err != nil {
 		res = append(res, fmt.Sprintf("Unmarshal error: %v", err))
-		return &res
+		return res
 	}
 
 	if len(result.Choices) == 0 {
 		res = append(res, "No choices found")
 		res = append(res, "抵达 Rate Limit, 请稍后再试或更换模型")
-		return &res
+		return res
 	}
 
 	firstChoice := result.Choices[0]
@@ -155,7 +163,7 @@ func (c *Github) RequireAnswer(str string, model string) *[]string {
 
 	if message.Content == "" {
 		res = append(res, "Content field not found")
-		return &res
+		return res
 	}
 
 	res = append(res, fmt.Sprintf("%s response:", model))
@@ -165,12 +173,11 @@ func (c *Github) RequireAnswer(str string, model string) *[]string {
 	}
 	res = append(res, content)
 
-	return &res
+	return res
 }
 
 func splitThinkContent(content string) (string, string) {
-	re := regexp.MustCompile(`<think>([\s\S]*?)</think>`)
-	matches := re.FindStringSubmatch(content)
+	matches := thinkPattern.FindStringSubmatch(content)
 
 	if len(matches) < 2 {
 		return "", content

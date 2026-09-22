@@ -11,21 +11,19 @@ type Ban struct{}
 
 var BanList Ban
 
-func init() {
+func registerBan() error {
 	BanList = Ban{}
 	plugin := &Plugin{
-		Name:      "ban",
-		Enabled:   true,
-		Args:      []string{"/ban", "/unban", "/ban-list"},
-		Interface: &BanList,
+		Name:    "ban",
+		Enabled: true,
+		Args:    []string{"/ban", "/unban", "/ban-list"},
+		Handler: &BanList,
 	}
-	PluginArray = append(PluginArray, plugin)
+	return Register(plugin)
 }
 
-func (*Ban) ReceiveAll(chan<- *[]byte) {}
-
-func (b *Ban) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *[]byte) {
-	if messageStruct.UserId != base.Config.Admin || !CheckArgumentArray(messageStruct.Command, &[]string{"/ban", "/unban", "/ban-list"}) {
+func (b *Ban) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- []byte) {
+	if messageStruct.UserId != base.Config.Admin || !CheckArgumentArray(messageStruct.Command, []string{"/ban", "/unban", "/ban-list"}) {
 		return
 	}
 
@@ -44,7 +42,7 @@ func (b *Ban) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *
 			err    error
 		)
 
-		for _, m := range *messageStruct.CleanMessage {
+		for _, m := range messageStruct.CleanMessage {
 			if m.Type == "at" {
 				target, err = strconv.ParseInt(m.Data["qq"].(string), 10, 64)
 			}
@@ -73,7 +71,10 @@ func (b *Ban) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *
 			base.Config.Mutex.Lock()
 			base.Config.BannedList = append(base.Config.BannedList, target)
 			base.Config.Mutex.Unlock()
-			base.Config.UpdateConfig()
+			if err := base.Config.UpdateConfig(); err != nil {
+				send <- SendMsg(messageStruct, fmt.Sprintf("保存配置失败: %v", err), nil, false, true, "")
+				return
+			}
 			send <- SendMsg(messageStruct, fmt.Sprintf("已封禁用户: %v", target), nil, false, true, "")
 			return
 		}
@@ -90,13 +91,16 @@ func (b *Ban) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<- *
 				}
 			}
 			base.Config.Mutex.Unlock()
-			base.Config.UpdateConfig()
+			if err := base.Config.UpdateConfig(); err != nil {
+				send <- SendMsg(messageStruct, fmt.Sprintf("保存配置失败: %v", err), nil, false, true, "")
+				return
+			}
 			send <- SendMsg(messageStruct, fmt.Sprintf("已解封用户: %v", target), nil, false, true, "")
 		}
 	}
 }
 
-func (*Ban) ReceiveEcho(*structs.EchoMessageStruct, chan<- *[]byte) {}
+func (*Ban) ReceiveEcho(*structs.EchoMessageStruct, chan<- []byte) {}
 
 func (*Ban) IsBanned(qq int64) bool {
 	if qq == base.Config.Admin {

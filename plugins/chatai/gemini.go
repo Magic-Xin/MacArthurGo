@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"google.golang.org/genai"
 	"image/gif"
 	"image/jpeg"
 	"io"
@@ -16,6 +15,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"google.golang.org/genai"
 )
 
 type Gemini struct {
@@ -35,15 +36,15 @@ type HMap struct {
 	Time    int64
 }
 
-func (g *Gemini) RequireAnswer(message *[]cqcode.ArrayMessage, messageID int64, modelName string) (*[]string, *[]byte) {
+func (g *Gemini) RequireAnswer(message []cqcode.ArrayMessage, messageID int64, modelName string) ([]string, []byte) {
 	var parts []*genai.Part
 
-	for _, msg := range *message {
+	for _, msg := range message {
 		switch msg.Type {
 		case "image":
 			if url, ok := msg.Data["url"].(string); ok {
 				if data, imgType, err := g.ImageProcessing(essentials.GetImageData(url)); err == nil {
-					parts = append(parts, &genai.Part{InlineData: &genai.Blob{Data: *data, MIMEType: "image/" + imgType}})
+					parts = append(parts, &genai.Part{InlineData: &genai.Blob{Data: data, MIMEType: "image/" + imgType}})
 				} else {
 					log.Printf("Image processing error: %v", err)
 				}
@@ -72,14 +73,14 @@ func (g *Gemini) RequireAnswer(message *[]cqcode.ArrayMessage, messageID int64, 
 	return resp, nil
 }
 
-func (g *Gemini) RequireEchoAnswer(originMessage *[]cqcode.ArrayMessage, echoMessage *[]cqcode.ArrayMessage, modelName string) *[]string {
+func (g *Gemini) RequireEchoAnswer(originMessage, echoMessage []cqcode.ArrayMessage, modelName string) []string {
 	var parts []*genai.Part
 
-	for _, msg := range *originMessage {
+	for _, msg := range originMessage {
 		if msg.Type == "image" {
 			if url, ok := msg.Data["url"].(string); ok {
 				if data, imgType, err := g.ImageProcessing(essentials.GetImageData(url)); err == nil {
-					parts = append(parts, &genai.Part{InlineData: &genai.Blob{Data: *data, MIMEType: "image/" + imgType}})
+					parts = append(parts, &genai.Part{InlineData: &genai.Blob{Data: data, MIMEType: "image/" + imgType}})
 				} else {
 					log.Printf("Image processing error: %v", err)
 				}
@@ -91,11 +92,11 @@ func (g *Gemini) RequireEchoAnswer(originMessage *[]cqcode.ArrayMessage, echoMes
 		}
 	}
 
-	for _, msg := range *echoMessage {
+	for _, msg := range echoMessage {
 		if msg.Type == "image" {
 			if url, ok := msg.Data["url"].(string); ok {
 				if data, imgType, err := g.ImageProcessing(essentials.GetImageData(url)); err == nil {
-					parts = append(parts, &genai.Part{InlineData: &genai.Blob{Data: *data, MIMEType: "image/" + imgType}})
+					parts = append(parts, &genai.Part{InlineData: &genai.Blob{Data: data, MIMEType: "image/" + imgType}})
 				} else {
 					log.Printf("Image processing error: %v", err)
 				}
@@ -115,7 +116,7 @@ func (g *Gemini) RequireEchoAnswer(originMessage *[]cqcode.ArrayMessage, echoMes
 	return resp
 }
 
-func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) (*[]string, error) {
+func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) ([]string, error) {
 	var res []string
 
 	ctx := context.Background()
@@ -126,7 +127,7 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) (*[]string, 
 	if err != nil {
 		log.Printf("Gemini client error: %v", err)
 		res = append(res, fmt.Sprintf("Gemini client error: %v", err))
-		return &res, err
+		return res, err
 	}
 
 	contents := []*genai.Content{{Parts: parts}}
@@ -155,13 +156,9 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) (*[]string, 
 		},
 	}
 
-	if !strings.Contains(modelName, "thinking") && !strings.Contains(modelName, "image-generation") {
-		config.Tools = []*genai.Tool{
-			{GoogleSearch: &genai.GoogleSearch{}},
-		}
-	}
+	config.Tools = geminiTools(modelName)
 
-	if strings.Contains(modelName, "image-generation") {
+	if strings.Contains(modelName, "image") {
 		config.ResponseModalities = []string{"TEXT", "IMAGE"}
 	}
 
@@ -169,7 +166,7 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) (*[]string, 
 	if err != nil {
 		log.Printf("Gemini generate error: %v", err)
 		res = append(res, fmt.Sprintf("Gemini generate error: %v", err))
-		return &res, err
+		return res, err
 	}
 
 	res = append(res, modelName+" response: ")
@@ -187,21 +184,39 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) (*[]string, 
 				res = append(res, "base64://"+img)
 			}
 		}
+		if c.GroundingMetadata != nil {
+			for _, chunk := range c.GroundingMetadata.GroundingChunks {
+				if chunk != nil && chunk.Maps != nil && chunk.Maps.URI != "" {
+					res = append(res, "Google Maps: "+chunk.Maps.Title+" "+chunk.Maps.URI)
+				}
+			}
+		}
 	}
 
-	return &res, nil
+	return res, nil
 }
 
-func (*Gemini) ImageProcessing(imgData *bytes.Buffer) (*[]byte, string, error) {
+func geminiTools(modelName string) []*genai.Tool {
+	if strings.Contains(modelName, "image") {
+		return nil
+	}
+	return []*genai.Tool{
+		{GoogleSearch: &genai.GoogleSearch{}},
+		{GoogleMaps: &genai.GoogleMaps{}},
+		{URLContext: &genai.URLContext{}},
+	}
+}
+
+func (*Gemini) ImageProcessing(imgData *bytes.Buffer) ([]byte, string, error) {
 	imgBody, err := io.ReadAll(imgData)
 	if err != nil {
 		return nil, "", err
 	}
 	switch imgType := http.DetectContentType(imgBody); imgType {
 	case "image/jpeg":
-		return &imgBody, "jpeg", nil
+		return imgBody, "jpeg", nil
 	case "image/png":
-		return &imgBody, "png", nil
+		return imgBody, "png", nil
 	case "image/gif":
 		imgTemp, err := gif.Decode(bytes.NewReader(imgBody))
 		if err != nil {
@@ -214,7 +229,7 @@ func (*Gemini) ImageProcessing(imgData *bytes.Buffer) (*[]byte, string, error) {
 		}
 		imgBody = buf.Bytes()
 
-		return &imgBody, "jpeg", nil
+		return imgBody, "jpeg", nil
 	default:
 		return nil, "", fmt.Errorf("unsupported image type: %s", imgType)
 	}
