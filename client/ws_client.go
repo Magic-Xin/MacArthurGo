@@ -107,10 +107,19 @@ func (c *Client) Run(ctx context.Context) error {
 	workersDone := c.startWorkers(workerCtx)
 	defer func() {
 		cancelWorkers()
-		select {
-		case <-workersDone:
-		case <-time.After(writeTimeout):
-			log.Printf("Timed out waiting for event workers to stop")
+		timer := time.NewTimer(writeTimeout)
+		defer timer.Stop()
+		for {
+			select {
+			case <-workersDone:
+				return
+			case <-c.outbound:
+				// A callback may be sending while the WebSocket writer has stopped.
+				// Drain queued actions so it can release its plugin lock.
+			case <-timer.C:
+				log.Printf("Timed out waiting for event workers to stop")
+				return
+			}
 		}
 	}()
 

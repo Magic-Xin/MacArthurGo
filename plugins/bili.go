@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -206,65 +207,94 @@ func (*Bili) iToS(i int64) string {
 	return fmt.Sprintf("%d", i)
 }
 
-func (b *Bili) getLiveData(roomId string) *LiveData {
-	const api = "https://api.live.bilibili.com/xlive/web-room/v1/index/getInfoByRoom?room_id="
-	req, err := http.NewRequest("GET", api+roomId, nil)
+func (b *Bili) getLiveData(roomID string) *LiveData {
+	return b.getLiveDataFromAPI(roomID, "https://api.live.bilibili.com")
+}
+
+type biliAPIResponse[T any] struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Data    T      `json:"data"`
+}
+
+type biliRoomInfo struct {
+	UID            int64  `json:"uid"`
+	RoomID         int64  `json:"room_id"`
+	ShortID        int64  `json:"short_id"`
+	Title          string `json:"title"`
+	Keyframe       string `json:"keyframe"`
+	AreaName       string `json:"area_name"`
+	ParentAreaName string `json:"parent_area_name"`
+	LiveStatus     int    `json:"live_status"`
+	Online         int64  `json:"online"`
+}
+
+type biliMasterInfo struct {
+	Info struct {
+		Name string `json:"uname"`
+	} `json:"info"`
+}
+
+func fetchBiliLiveAPI[T any](endpoint string) (T, error) {
+	var result biliAPIResponse[T]
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
-		log.Printf("Live url parser request error: %v", err)
-		return nil
+		return result.Data, err
 	}
+	req.Header.Set("User-Agent", "MacArthurGo/1.0")
 	resp, err := essentials.HTTPClient.Do(req)
 	if err != nil {
-		log.Printf("Live url parser response error: %v", err)
+		return result.Data, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return result.Data, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return result.Data, err
+	}
+	if result.Code != 0 {
+		return result.Data, fmt.Errorf("Bilibili code %d: %s", result.Code, result.Message)
+	}
+	return result.Data, nil
+}
+
+func (b *Bili) getLiveDataFromAPI(roomID, apiBase string) *LiveData {
+	room, err := fetchBiliLiveAPI[biliRoomInfo](apiBase + "/room/v1/Room/get_info?room_id=" + url.QueryEscape(roomID))
+	if err != nil {
+		log.Printf("Live room parser error: %v", err)
 		return nil
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
+	if room.RoomID == 0 || room.Title == "" {
+		log.Printf("Live room parser error: incomplete room data for %s", roomID)
+		return nil
+	}
+
+	data := &LiveData{Title: room.Title, ThumbnailUrl: room.Keyframe}
+	if room.UID != 0 {
+		master, err := fetchBiliLiveAPI[biliMasterInfo](apiBase + "/live_user/v1/Master/info?uid=" + strconv.FormatInt(room.UID, 10))
 		if err != nil {
-			log.Printf("Live url parser close error: %v", err)
+			log.Printf("Live master parser error: %v", err)
+		} else {
+			data.User = master.Info.Name
 		}
-	}(resp.Body)
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("Live url parser read body error: %v", err)
-		return nil
 	}
 
-	var i any
-	err = json.Unmarshal(body, &i)
-	if err != nil {
-		log.Printf("Live url parser unmarshal error: %v", err)
-		return nil
-	}
-	ctx := i.(map[string]any)
-	if ctx["code"].(float64) != 0 {
-		return nil
-	}
-
-	data := &LiveData{
-		Title:        ctx["data"].(map[string]any)["room_info"].(map[string]any)["title"].(string),
-		User:         ctx["data"].(map[string]any)["anchor_info"].(map[string]any)["base_info"].(map[string]any)["uname"].(string),
-		ThumbnailUrl: ctx["data"].(map[string]any)["room_info"].(map[string]any)["keyframe"].(string),
-	}
-
-	if shortId := ctx["data"].(map[string]any)["room_info"].(map[string]any)["short_id"].(float64); shortId != 0 {
-		data.RoomId = fmt.Sprintf("短号: %d", int64(shortId))
-		data.Url = "https://live.bilibili.com/" + fmt.Sprintf("%d", int64(shortId))
+	if room.ShortID != 0 {
+		data.RoomId = fmt.Sprintf("短号: %d", room.ShortID)
+		data.Url = "https://live.bilibili.com/" + strconv.FormatInt(room.ShortID, 10)
 	} else {
-		data.RoomId = fmt.Sprintf("房间号: %d", int64(ctx["data"].(map[string]any)["room_info"].(map[string]any)["room_id"].(float64)))
-		data.Url = "https://live.bilibili.com/" + fmt.Sprintf("%d", int64(ctx["data"].(map[string]any)["room_info"].(map[string]any)["room_id"].(float64)))
+		data.RoomId = fmt.Sprintf("房间号: %d", room.RoomID)
+		data.Url = "https://live.bilibili.com/" + strconv.FormatInt(room.RoomID, 10)
 	}
-
-	areaName := ctx["data"].(map[string]any)["room_info"].(map[string]any)["area_name"].(string)
-	parentAreaName := ctx["data"].(map[string]any)["room_info"].(map[string]any)["parent_area_name"].(string)
-	if areaName != parentAreaName {
-		data.AreaName = parentAreaName + "-" + areaName
-	} else {
-		data.AreaName = parentAreaName
+	data.AreaName = room.AreaName
+	if room.AreaName == "" {
+		data.AreaName = room.ParentAreaName
+	} else if room.ParentAreaName != "" && room.ParentAreaName != room.AreaName {
+		data.AreaName = room.ParentAreaName + "-" + room.AreaName
 	}
-
-	if ctx["data"].(map[string]any)["room_info"].(map[string]any)["live_status"].(float64) == 1 {
-		data.Status = "直播中	" + b.iToS(int64(ctx["data"].(map[string]any)["room_info"].(map[string]any)["online"].(float64))) + "人气"
+	if room.LiveStatus == 1 {
+		data.Status = "直播中\t" + b.iToS(room.Online) + "人气"
 	} else {
 		data.Status = "未开播"
 	}
@@ -375,13 +405,33 @@ func (a *AISummarize) SaveLoginInfo() {
 		return
 	}
 
-	err = os.WriteFile("bili_info.dat", data, 0644)
+	err = saveBiliLoginInfo("bili_info.dat", data)
 	if err != nil {
 		log.Printf("Bili Save Login Info Error: %s", err)
 	}
 }
 
+func saveBiliLoginInfo(path string, data []byte) error {
+	file, err := os.CreateTemp(filepath.Dir(path), ".bili_info-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
+	if _, err := file.Write(data); err != nil {
+		file.Close()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return os.Rename(file.Name(), path)
+}
+
 func (a *AISummarize) LoadLoginInfo() {
+	if err := os.Chmod("bili_info.dat", 0600); err != nil && !os.IsNotExist(err) {
+		log.Printf("Bili Login Info Permission Error: %s", err)
+		return
+	}
 	data, err := os.ReadFile("bili_info.dat")
 	if err != nil {
 		a.loginMsg = "未找到 B 站登录信息，请先登录"
@@ -562,9 +612,13 @@ func (v *VideoData) ToArrayMessage() []cqcode.ArrayMessage {
 
 func (l *LiveData) ToArrayMessage() []cqcode.ArrayMessage {
 	var messageArray []cqcode.ArrayMessage
-	messageArray = append(messageArray, *cqcode.Image(l.ThumbnailUrl + "\n"))
+	if l.ThumbnailUrl != "" {
+		messageArray = append(messageArray, *cqcode.Image(l.ThumbnailUrl))
+	}
 	messageArray = append(messageArray, *cqcode.Text(l.Title + "\n"))
-	messageArray = append(messageArray, *cqcode.Text("主播: " + l.User + "\n"))
+	if l.User != "" {
+		messageArray = append(messageArray, *cqcode.Text("主播: " + l.User + "\n"))
+	}
 	messageArray = append(messageArray, *cqcode.Text(l.RoomId + "\n"))
 	messageArray = append(messageArray, *cqcode.Text("分区: " + l.AreaName + "\n"))
 	messageArray = append(messageArray, *cqcode.Text(l.Status + "\n"))

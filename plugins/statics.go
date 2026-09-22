@@ -52,8 +52,9 @@ type staticsStore struct {
 	root       string
 	retention  int
 	data       map[string]map[int64]*groupStats
-	dirtyDates map[string]bool
+	dirtyDates map[string]uint64
 	mu         sync.RWMutex
+	flushMu    sync.Mutex
 	flushOnce  sync.Once
 }
 
@@ -428,7 +429,7 @@ func (s *staticsStore) incrementMessage(dateKey string, groupId int64, hour int)
 	defer s.mu.Unlock()
 	stats := s.ensureGroupStats(dateKey, groupId)
 	stats.Hourly[hour]++
-	s.dirtyDates[dateKey] = true
+	s.dirtyDates[dateKey]++
 }
 
 func (s *staticsStore) addWordCounts(dateKey string, groupId int64, freq map[string]int) {
@@ -444,7 +445,7 @@ func (s *staticsStore) addWordCounts(dateKey string, groupId int64, freq map[str
 	for word, count := range freq {
 		stats.Words[word] += int64(count)
 	}
-	s.dirtyDates[dateKey] = true
+	s.dirtyDates[dateKey]++
 }
 
 func (s *staticsStore) getHourly(dateKey string, groupId int64) [24]int64 {
@@ -500,7 +501,7 @@ func newStaticsStore(dir string, retention int) (*staticsStore, error) {
 		root:       dir,
 		retention:  retention,
 		data:       make(map[string]map[int64]*groupStats),
-		dirtyDates: make(map[string]bool),
+		dirtyDates: make(map[string]uint64),
 	}
 	if err := store.loadRecent(); err != nil {
 		return nil, err
@@ -595,13 +596,15 @@ func (s *staticsStore) snapshotDirtyDates() []string {
 }
 
 func (s *staticsStore) flushDate(date string) error {
+	s.flushMu.Lock()
+	defer s.flushMu.Unlock()
+
 	s.mu.RLock()
 	groups := s.data[date]
+	version := s.dirtyDates[date]
 	if len(groups) == 0 {
 		s.mu.RUnlock()
-		s.mu.Lock()
-		delete(s.dirtyDates, date)
-		s.mu.Unlock()
+		s.clearDirtyDate(date, version)
 		return nil
 	}
 	snapshot := make(map[int64]*groupStats, len(groups))
@@ -613,9 +616,7 @@ func (s *staticsStore) flushDate(date string) error {
 	}
 	s.mu.RUnlock()
 	if len(snapshot) == 0 {
-		s.mu.Lock()
-		delete(s.dirtyDates, date)
-		s.mu.Unlock()
+		s.clearDirtyDate(date, version)
 		return nil
 	}
 	serializable := make(map[string]*groupStats, len(snapshot))
@@ -634,13 +635,22 @@ func (s *staticsStore) flushDate(date string) error {
 	if err := os.Rename(tmpPath, finalPath); err != nil {
 		return err
 	}
-	s.mu.Lock()
-	delete(s.dirtyDates, date)
-	s.mu.Unlock()
+	s.clearDirtyDate(date, version)
 	return nil
 }
 
+func (s *staticsStore) clearDirtyDate(date string, version uint64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.dirtyDates[date] == version {
+		delete(s.dirtyDates, date)
+	}
+}
+
 func (s *staticsStore) cleanupExpired() {
+	s.flushMu.Lock()
+	defer s.flushMu.Unlock()
+
 	cutoff := time.Now().AddDate(0, 0, -s.retention)
 	s.mu.Lock()
 	for date := range s.data {
