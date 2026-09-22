@@ -156,13 +156,9 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) ([]string, e
 		},
 	}
 
-	if !strings.Contains(modelName, "thinking") && !strings.Contains(modelName, "image-generation") {
-		config.Tools = []*genai.Tool{
-			{GoogleSearch: &genai.GoogleSearch{}},
-		}
-	}
+	config.Tools = geminiTools(modelName)
 
-	if strings.Contains(modelName, "image-generation") {
+	if strings.Contains(modelName, "image") {
 		config.ResponseModalities = []string{"TEXT", "IMAGE"}
 	}
 
@@ -188,9 +184,27 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) ([]string, e
 				res = append(res, "base64://"+img)
 			}
 		}
+		if c.GroundingMetadata != nil {
+			for _, chunk := range c.GroundingMetadata.GroundingChunks {
+				if chunk != nil && chunk.Maps != nil && chunk.Maps.URI != "" {
+					res = append(res, "Google Maps: "+chunk.Maps.Title+" "+chunk.Maps.URI)
+				}
+			}
+		}
 	}
 
 	return res, nil
+}
+
+func geminiTools(modelName string) []*genai.Tool {
+	if strings.Contains(modelName, "image") {
+		return nil
+	}
+	return []*genai.Tool{
+		{GoogleSearch: &genai.GoogleSearch{}},
+		{GoogleMaps: &genai.GoogleMaps{}},
+		{URLContext: &genai.URLContext{}},
+	}
 }
 
 func (*Gemini) ImageProcessing(imgData *bytes.Buffer) ([]byte, string, error) {
