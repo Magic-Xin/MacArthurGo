@@ -23,3 +23,24 @@ func TestSegmentWordsFiltersShortWordsAndParticles(t *testing.T) {
 		}
 	}
 }
+
+func TestStaticsStoreKeepsUpdatesAfterSnapshot(t *testing.T) {
+	store, err := newStaticsStore(t.TempDir(), 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const date = "2026-09-22"
+	store.incrementMessage(date, 1, 12)
+	versionAtSnapshot := store.dirtyDates[date]
+	store.addWordCounts(date, 1, map[string]int{"测试": 1})
+	store.clearDirtyDate(date, versionAtSnapshot)
+	if _, ok := store.dirtyDates[date]; !ok {
+		t.Fatal("new update was cleared by an older snapshot")
+	}
+	if err := store.flushDate(date); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := store.dirtyDates[date]; ok {
+		t.Fatal("completed flush left date dirty")
+	}
+}
