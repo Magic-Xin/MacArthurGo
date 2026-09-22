@@ -3,14 +3,11 @@ package test
 import (
 	"MacArthurGo/plugins/soutubot"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -23,9 +20,8 @@ func TestSoutuBotClientSearchUsesCloudflareBypassForScraping(t *testing.T) {
 	const (
 		proxyURL  = "http://proxy.example:8080"
 		userAgent = "test-browser-agent"
-		globalM   = int64(24680)
 	)
-	imageData := []byte("image-data")
+	imageData := []byte("\x89PNG\r\n\x1a\nimage-data")
 	var homepageCalls atomic.Int32
 	var searchCalls atomic.Int32
 
@@ -41,7 +37,7 @@ func TestSoutuBotClientSearchUsesCloudflareBypassForScraping(t *testing.T) {
 			}
 			writer.Header().Set("x-cf-bypasser-user-agent", userAgent)
 			writer.Header().Set("Content-Type", "text/html")
-			_, _ = fmt.Fprintf(writer, `<script>window.GLOBAL = {m: %d, version: 1}</script>`, globalM)
+			_, _ = writer.Write([]byte(`<html>current site has no GLOBAL.m</html>`))
 		case "/api/search":
 			searchCalls.Add(1)
 			if request.Method != http.MethodPost {
@@ -62,8 +58,8 @@ func TestSoutuBotClientSearchUsesCloudflareBypassForScraping(t *testing.T) {
 			if !strings.Contains(request.Header.Get("Content-Type"), "boundary=----WebKitFormBoundary") {
 				t.Errorf("search content type = %q", request.Header.Get("Content-Type"))
 			}
-			if !validSoutuBotAPIKey(request.Header.Get("X-Api-Key"), len(userAgent), globalM, time.Now().Unix()) {
-				t.Errorf("invalid X-Api-Key %q", request.Header.Get("X-Api-Key"))
+			if key := request.Header.Get("X-Api-Key"); key != "" {
+				t.Errorf("obsolete X-Api-Key = %q", key)
 			}
 
 			if err := request.ParseMultipartForm(1 << 20); err != nil {
@@ -78,6 +74,12 @@ func TestSoutuBotClientSearchUsesCloudflareBypassForScraping(t *testing.T) {
 				return
 			}
 			defer file.Close()
+			if got := request.MultipartForm.File["file"][0].Filename; got != "image.png" {
+				t.Errorf("image filename = %q, want image.png", got)
+			}
+			if got := request.MultipartForm.File["file"][0].Header.Get("Content-Type"); got != "image/png" {
+				t.Errorf("image content type = %q, want image/png", got)
+			}
 			gotImage, _ := io.ReadAll(file)
 			if string(gotImage) != string(imageData) {
 				t.Errorf("uploaded image = %q, want %q", gotImage, imageData)
@@ -85,15 +87,18 @@ func TestSoutuBotClientSearchUsesCloudflareBypassForScraping(t *testing.T) {
 			if got := request.FormValue("factor"); got != "1.2" {
 				t.Errorf("factor = %q, want 1.2", got)
 			}
+			if got := request.FormValue("metadata_mode"); got != "display" {
+				t.Errorf("metadata_mode = %q, want display", got)
+			}
 
 			writer.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(writer).Encode(map[string]any{
-				"id": "result-id",
-				"data": []map[string]any{
-					{"title": "Japanese lower", "similarity": 80.0, "language": "jp", "source": "nhentai", "subjectPath": "/g/100"},
-					{"title": "Chinese highest", "similarity": 88.0, "language": "cn", "source": "ehentai", "subjectPath": "/g/200/token"},
-					{"title": "Japanese\n highest", "similarity": 90.0, "language": "jp", "source": "panda", "subjectPath": "/g/300"},
-					{"title": "English overall", "similarity": 99.0, "language": "gb", "source": "ehentai", "subjectPath": "/g/400/token"},
+				"result_id": "result-id",
+				"results": []map[string]any{
+					{"score": 80.0, "path_segments": []map[string]any{{"language": "ja", "source_key": "nhentai", "source_url": "https://nhentai.net/g/100", "metadata": map[string]any{"title": map[string]any{"primary": "Japanese lower"}}}}},
+					{"score": 88.0, "path_segments": []map[string]any{{"language": "zh", "source_key": "ehentai", "source_url": "https://e-hentai.org/g/200/token", "metadata": map[string]any{"title": map[string]any{"primary": "Chinese highest"}}}}},
+					{"score": 90.0, "path_segments": []map[string]any{{"language": "ja", "source_key": "panda", "source_url": "https://panda.chaika.moe/g/300", "metadata": map[string]any{"title": map[string]any{"primary": "Japanese\n highest"}}}}},
+					{"score": 99.0, "path_segments": []map[string]any{{"language": "en", "source_key": "ehentai", "source_url": "https://e-hentai.org/g/400/token", "metadata": map[string]any{"title": map[string]any{"primary": "English overall"}}}}},
 				},
 			})
 		default:
@@ -183,7 +188,7 @@ func TestSoutuBotClientSearchRefreshesCredentialsAfterForbidden(t *testing.T) {
 		case "/html":
 			call := homepageCalls.Add(1)
 			writer.Header().Set("x-cf-bypasser-user-agent", fmt.Sprintf("agent-%d", call))
-			_, _ = fmt.Fprintf(writer, `<script>const GLOBAL = {m: %d, value: 1}</script>`, 100+call)
+			_, _ = writer.Write([]byte(`<html>no global m</html>`))
 		case "/api/search":
 			call := searchCalls.Add(1)
 			if call == 1 {
@@ -197,7 +202,7 @@ func TestSoutuBotClientSearchRefreshesCredentialsAfterForbidden(t *testing.T) {
 				t.Errorf("retry user agent = %q", got)
 			}
 			writer.Header().Set("Content-Type", "application/json")
-			_, _ = writer.Write([]byte(`{"data":[]}`))
+			_, _ = writer.Write([]byte(`{"results":[]}`))
 		default:
 			http.Error(writer, "unexpected path", http.StatusNotFound)
 		}
@@ -229,29 +234,4 @@ func TestSoutuBotClientRejectsInvalidConfigurationAndImage(t *testing.T) {
 	if _, err = client.Search(context.Background(), nil); err == nil {
 		t.Fatal("Search accepted empty image data")
 	}
-}
-
-func validSoutuBotAPIKey(key string, userAgentLength int, globalM int64, now int64) bool {
-	encoded := []byte(key)
-	for left, right := 0, len(encoded)-1; left < right; left, right = left+1, right-1 {
-		encoded[left], encoded[right] = encoded[right], encoded[left]
-	}
-	for len(encoded)%4 != 0 {
-		encoded = append(encoded, '=')
-	}
-	decoded, err := base64.StdEncoding.DecodeString(string(encoded))
-	if err != nil {
-		return false
-	}
-	value, err := strconv.ParseFloat(string(decoded), 64)
-	if err != nil {
-		return false
-	}
-	for timestamp := now - 2; timestamp <= now+2; timestamp++ {
-		expected := math.Pow(float64(timestamp), 2) + math.Pow(float64(userAgentLength), 2) + float64(globalM)
-		if math.Abs(value-expected) <= 4096 {
-			return true
-		}
-	}
-	return false
 }

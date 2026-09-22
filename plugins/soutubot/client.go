@@ -9,13 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
 	"net/url"
-	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -33,8 +30,6 @@ const (
 	boundarySuffixLen = 16
 )
 
-var globalMPattern = regexp.MustCompile(`\bm\s*:\s*([0-9]+)\s*,`)
-
 type Config struct {
 	CloudflareBypassURL string
 	ProxyURL            string
@@ -49,7 +44,6 @@ type Client struct {
 
 	mu        sync.Mutex
 	userAgent string
-	globalM   int64
 }
 
 type Response struct {
@@ -70,6 +64,7 @@ type Item struct {
 	SubjectPath     string   `json:"subjectPath"`
 	PreviewImageURL string   `json:"previewImageUrl"`
 	Similarity      float64  `json:"similarity"`
+	URL             string   `json:"-"`
 }
 
 type Source string
@@ -102,6 +97,9 @@ func (l Language) Emoji() string {
 }
 
 func (i Item) SourceURL() string {
+	if i.URL != "" {
+		return i.URL
+	}
 	baseURL, knownSource := sourceBaseURLs[i.Source]
 	if !knownSource {
 		parsed, err := url.Parse(strings.TrimSpace(string(i.Source)))
@@ -150,8 +148,9 @@ func SelectBestMatches(items []Item, threshold float64) ([]Item, float64) {
 			found bool
 		)
 		for _, item := range items {
-			if item.Language == language && (!found || item.Similarity > best.Similarity) {
+			if canonicalLanguage(item.Language) == language && (!found || item.Similarity > best.Similarity) {
 				best = item
+				best.Language = language
 				found = true
 			}
 		}
@@ -170,8 +169,9 @@ func FormatMatches(matches []Item) string {
 			found bool
 		)
 		for _, candidate := range matches {
-			if candidate.Language == language && (!found || candidate.Similarity > match.Similarity) {
+			if canonicalLanguage(candidate.Language) == language && (!found || candidate.Similarity > match.Similarity) {
 				match = candidate
+				match.Language = language
 				found = true
 			}
 		}
@@ -204,6 +204,19 @@ func FormatMatches(matches []Item) string {
 		))
 	}
 	return "SoutuBot\n\n" + strings.Join(lines, "\n\n")
+}
+
+func canonicalLanguage(language Language) Language {
+	switch language {
+	case "ja":
+		return LanguageJapanese
+	case "zh":
+		return LanguageChinese
+	case "en":
+		return LanguageEnglish
+	default:
+		return language
+	}
 }
 
 func IsFormattedMatches(value string) bool {
@@ -268,11 +281,11 @@ func (c *Client) Search(ctx context.Context, imageData []byte) (*Response, error
 	defer cancel()
 
 	// CloudflareBypassForScraping caches clearance state by host. Keep the
-	// homepage-derived m value and user agent paired with the upload request.
+	// homepage user agent paired with the upload request.
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.userAgent == "" || c.globalM <= 0 {
+	if c.userAgent == "" {
 		if err := c.refreshCredentials(ctx); err != nil {
 			return nil, err
 		}
@@ -312,7 +325,7 @@ func (c *Client) refreshCredentials(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
-	body, err := readLimited(resp.Body, maxResponseSize)
+	_, err = readLimited(resp.Body, maxResponseSize)
 	if err != nil {
 		return fmt.Errorf("read CloudflareBypassForScraping SoutuBot homepage: %w", err)
 	}
@@ -324,12 +337,7 @@ func (c *Client) refreshCredentials(ctx context.Context) error {
 	if userAgent == "" {
 		return errors.New("CloudflareBypassForScraping SoutuBot homepage did not return a user agent")
 	}
-	globalM, err := parseGlobalM(body)
-	if err != nil {
-		return err
-	}
 	c.userAgent = userAgent
-	c.globalM = globalM
 	return nil
 }
 
@@ -351,7 +359,6 @@ func (c *Client) search(ctx context.Context, imageData []byte, forceBypass bool)
 	req.Header.Set("DNT", "1")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req.Header.Set("User-Agent", c.userAgent)
-	req.Header.Set("X-Api-Key", calculateAPIKey(len(c.userAgent), c.globalM, time.Now().Unix()))
 	req.Header.Set("x-hostname", target.Host)
 	if c.proxyURL != "" {
 		req.Header.Set("x-proxy", c.proxyURL)
@@ -374,23 +381,58 @@ func (c *Client) search(ctx context.Context, imageData []byte, forceBypass bool)
 		return nil, &httpStatusError{StatusCode: resp.StatusCode, Operation: "SoutuBot search"}
 	}
 
-	var result Response
-	if err = json.Unmarshal(responseBody, &result); err != nil {
+	var payload struct {
+		ResultID string `json:"result_id"`
+		Results  []struct {
+			Score        float64 `json:"score"`
+			PathSegments []struct {
+				SourceKey      string   `json:"source_key"`
+				ExternalID     string   `json:"external_id"`
+				Language       Language `json:"language"`
+				RawPathSegment string   `json:"raw_path_segment"`
+				SourceURL      string   `json:"source_url"`
+				PageURL        string   `json:"page_url"`
+				Metadata       *struct {
+					Title *struct {
+						Primary string `json:"primary"`
+					} `json:"title"`
+					Source *struct {
+						Name string `json:"name"`
+						ID   string `json:"id"`
+					} `json:"source"`
+				} `json:"metadata"`
+			} `json:"path_segments"`
+		} `json:"results"`
+	}
+	if err = json.Unmarshal(responseBody, &payload); err != nil {
 		return nil, fmt.Errorf("decode SoutuBot response: %w", err)
 	}
-	return &result, nil
-}
-
-func parseGlobalM(body []byte) (int64, error) {
-	match := globalMPattern.FindSubmatch(body)
-	if len(match) != 2 {
-		return 0, errors.New("could not find SoutuBot global m value")
+	result := &Response{ID: payload.ResultID}
+	for _, hit := range payload.Results {
+		for _, segment := range hit.PathSegments {
+			title := ""
+			if segment.Metadata != nil {
+				if segment.Metadata.Title != nil {
+					title = segment.Metadata.Title.Primary
+				}
+				if title == "" && segment.Metadata.Source != nil {
+					title = strings.TrimSpace(segment.Metadata.Source.Name + " #" + segment.Metadata.Source.ID)
+				}
+			}
+			if title == "" {
+				title = strings.TrimSpace(segment.SourceKey + " #" + segment.ExternalID)
+			}
+			if title == "#" {
+				title = segment.RawPathSegment
+			}
+			link := segment.SourceURL
+			if link == "" {
+				link = segment.PageURL
+			}
+			result.Data = append(result.Data, Item{Title: title, Similarity: hit.Score, Language: canonicalLanguage(segment.Language), Source: Source(segment.SourceKey), URL: link})
+		}
 	}
-	value, err := strconv.ParseInt(string(match[1]), 10, 64)
-	if err != nil || value <= 0 {
-		return 0, errors.New("invalid SoutuBot global m value")
-	}
-	return value, nil
+	return result, nil
 }
 
 func buildMultipartBody(imageData []byte) (*bytes.Buffer, string, error) {
@@ -406,8 +448,9 @@ func buildMultipartBody(imageData []byte) (*bytes.Buffer, string, error) {
 	}
 
 	header := textproto.MIMEHeader{}
-	header.Set("Content-Disposition", `form-data; name="file"; filename="image"`)
-	header.Set("Content-Type", "application/octet-stream")
+	filename, contentType := imageFileInfo(imageData)
+	header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename="%s"`, filename))
+	header.Set("Content-Type", contentType)
 	part, err := writer.CreatePart(header)
 	if err != nil {
 		return nil, "", err
@@ -418,20 +461,29 @@ func buildMultipartBody(imageData []byte) (*bytes.Buffer, string, error) {
 	if err = writer.WriteField("factor", "1.2"); err != nil {
 		return nil, "", err
 	}
+	if err = writer.WriteField("metadata_mode", "display"); err != nil {
+		return nil, "", err
+	}
 	if err = writer.Close(); err != nil {
 		return nil, "", err
 	}
 	return body, writer.FormDataContentType(), nil
 }
 
-func calculateAPIKey(userAgentLength int, globalM int64, timestamp int64) string {
-	timeValue := float64(timestamp)
-	value := math.Pow(timeValue, 2) + math.Pow(float64(userAgentLength), 2) + float64(globalM)
-	encoded := []byte(base64.StdEncoding.EncodeToString([]byte(strconv.FormatFloat(value, 'g', -1, 64))))
-	for left, right := 0, len(encoded)-1; left < right; left, right = left+1, right-1 {
-		encoded[left], encoded[right] = encoded[right], encoded[left]
+func imageFileInfo(image []byte) (string, string) {
+	contentType := http.DetectContentType(image)
+	switch contentType {
+	case "image/jpeg":
+		return "image.jpg", contentType
+	case "image/png":
+		return "image.png", contentType
+	case "image/gif":
+		return "image.gif", contentType
+	case "image/webp":
+		return "image.webp", contentType
+	default:
+		return "image.bin", "application/octet-stream"
 	}
-	return strings.ReplaceAll(string(encoded), "=", "")
 }
 
 func readLimited(reader io.Reader, limit int64) ([]byte, error) {
