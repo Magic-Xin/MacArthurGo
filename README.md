@@ -13,7 +13,7 @@ If you have any comments or suggestions, you are welcome to discuss and provide 
 
 ## How to use
 
-- Stable version: Download the compressed package and `config.json.default` for the corresponding system and architecture from the [release](https://github.com/Magic-Xin/MacArthurGo/releases), fill in the `config.json.default` and rename to `config.json` then run the program. 
+- Stable version: Download the archive for your system and architecture from the [release](https://github.com/Magic-Xin/MacArthurGo/releases). Extract it, fill in `config.json.default`, rename it to `config.json`, and run the program from the extracted directory so it can find `jieba_dict`.
 - Dev version: Download compressed package from the newest [github actions](https://github.com/Magic-Xin/MacArthurGo/actions/workflows/dev.yml)
 
 **Attention: Cannot guarantee the availability of the Dev version**
@@ -43,7 +43,7 @@ go test ./...
 go build ./...
 ```
 
-All tests live in the top-level `test/` directory and exercise packages through their public behavior. Keep new test fixtures and helpers there rather than alongside production files.
+Integration tests live in the top-level `test/` directory. Package-level tests live alongside the code they exercise.
 
 ## Plugins
 - Essential Plugins
