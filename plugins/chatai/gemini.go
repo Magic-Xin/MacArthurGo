@@ -77,7 +77,8 @@ func (g *Gemini) RequireEchoAnswer(originMessage, echoMessage []cqcode.ArrayMess
 	var parts []*genai.Part
 
 	for _, msg := range originMessage {
-		if msg.Type == "image" {
+		switch msg.Type {
+		case "image":
 			if url, ok := msg.Data["url"].(string); ok {
 				if data, imgType, err := g.ImageProcessing(essentials.GetImageData(url)); err == nil {
 					parts = append(parts, &genai.Part{InlineData: &genai.Blob{Data: data, MIMEType: "image/" + imgType}})
@@ -85,7 +86,7 @@ func (g *Gemini) RequireEchoAnswer(originMessage, echoMessage []cqcode.ArrayMess
 					log.Printf("Image processing error: %v", err)
 				}
 			}
-		} else if msg.Type == "text" {
+		case "text":
 			if text, ok := msg.Data["text"].(string); ok && text != "" {
 				parts = append(parts, &genai.Part{Text: text})
 			}
@@ -93,7 +94,8 @@ func (g *Gemini) RequireEchoAnswer(originMessage, echoMessage []cqcode.ArrayMess
 	}
 
 	for _, msg := range echoMessage {
-		if msg.Type == "image" {
+		switch msg.Type {
+		case "image":
 			if url, ok := msg.Data["url"].(string); ok {
 				if data, imgType, err := g.ImageProcessing(essentials.GetImageData(url)); err == nil {
 					parts = append(parts, &genai.Part{InlineData: &genai.Blob{Data: data, MIMEType: "image/" + imgType}})
@@ -101,7 +103,7 @@ func (g *Gemini) RequireEchoAnswer(originMessage, echoMessage []cqcode.ArrayMess
 					log.Printf("Image processing error: %v", err)
 				}
 			}
-		} else if msg.Type == "text" {
+		case "text":
 			if text, ok := msg.Data["text"].(string); ok {
 				parts = append(parts, &genai.Part{Text: text})
 			}
@@ -149,14 +151,14 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) ([]string, e
 				Category:  genai.HarmCategorySexuallyExplicit,
 				Threshold: genai.HarmBlockThresholdBlockNone,
 			},
-			{
-				Category:  genai.HarmCategoryCivicIntegrity,
-				Threshold: genai.HarmBlockThresholdBlockNone,
-			},
 		},
 	}
 
-	config.Tools = geminiTools(modelName)
+	config.Tools = geminiRequestTools(modelName)
+	if len(config.Tools) > 1 {
+		includeToolInvocations := true
+		config.ToolConfig = &genai.ToolConfig{IncludeServerSideToolInvocations: &includeToolInvocations}
+	}
 
 	if strings.Contains(modelName, "image") {
 		config.ResponseModalities = []string{"TEXT", "IMAGE"}
@@ -205,6 +207,22 @@ func geminiTools(modelName string) []*genai.Tool {
 		{GoogleMaps: &genai.GoogleMaps{}},
 		{URLContext: &genai.URLContext{}},
 	}
+}
+
+func geminiRequestTools(modelName string) []*genai.Tool {
+	tools := geminiTools(modelName)
+	if modelName != "gemini-3.1-pro-preview" {
+		return tools
+	}
+
+	// Gemini 3.1 Pro rejects Google Maps combined with Search or URL Context.
+	compatible := make([]*genai.Tool, 0, len(tools))
+	for _, tool := range tools {
+		if tool.GoogleMaps == nil {
+			compatible = append(compatible, tool)
+		}
+	}
+	return compatible
 }
 
 func (*Gemini) ImageProcessing(imgData *bytes.Buffer) ([]byte, string, error) {
