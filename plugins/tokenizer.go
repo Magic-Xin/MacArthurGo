@@ -7,7 +7,7 @@ import (
 )
 
 type wordTokenizer interface {
-	CutForSearch(string, bool) []string
+	Cut(string, bool) []string
 	Free()
 }
 

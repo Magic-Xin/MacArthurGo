@@ -236,7 +236,7 @@ func (s *Statics) segmentWords(plain string) map[string]int {
 		return nil
 	}
 	s.tokenizerMu.Lock()
-	words := s.tokenizer.CutForSearch(plain, true)
+	words := s.tokenizer.Cut(plain, true)
 	s.tokenizerMu.Unlock()
 	if len(words) == 0 {
 		return nil
@@ -244,7 +244,7 @@ func (s *Statics) segmentWords(plain string) map[string]int {
 	freq := make(map[string]int)
 	for _, word := range words {
 		normalized := normalizeWord(word)
-		if normalized == "" {
+		if !validWord(normalized) {
 			continue
 		}
 		if _, blocked := s.stopWords[normalized]; blocked {
@@ -358,7 +358,7 @@ func (s *Statics) renderWordCloud(freq map[string]int64) ([]byte, error) {
 			continue
 		}
 		normalized := normalizeWord(word)
-		if normalized == "" || len(normalized) < 2 {
+		if !validWord(normalized) {
 			continue
 		}
 		if _, blocked := s.stopWords[normalized]; blocked {
@@ -719,8 +719,17 @@ func normalizeWord(word string) string {
 	return res
 }
 
+func validWord(word string) bool {
+	return len([]rune(word)) >= 2
+}
+
 func buildStopWords(custom []string) map[string]struct{} {
 	combined := append([]string{}, defaultStopWords...)
+	if data, err := os.ReadFile("./jieba_dict/stop_words.utf8"); err == nil {
+		combined = append(combined, strings.Split(string(data), "\n")...)
+	} else {
+		log.Printf("statics stop words load error: %v", err)
+	}
 	combined = append(combined, custom...)
 	set := make(map[string]struct{}, len(combined))
 	for _, word := range combined {
