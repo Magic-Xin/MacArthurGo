@@ -38,6 +38,7 @@ log/
 *.db
 img_cache/*
 data/jm/
+data/group_summary/
 TODO.md
 .DS_Store
 *.ttf

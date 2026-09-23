@@ -21,6 +21,7 @@ func RegisterAll() error {
 		{name: "chatAI", fn: registerChatAI},
 		{name: "corpus", fn: registerCorpus},
 		{name: "dailyWaifu", fn: registerDailyWaifu},
+		{name: "groupSummary", fn: registerGroupSummary},
 		{name: "jm", fn: registerJM},
 		{name: "music", fn: registerMusic},
 		{name: "originPic", fn: registerOriginPic},

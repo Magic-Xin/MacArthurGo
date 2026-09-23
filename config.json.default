@@ -118,6 +118,10 @@
         "fontFile": "./NotoSansSC-Regular.ttf"
       }
     },
+    "groupSummary": {
+      "model": "gemini-3.8-flash",
+      "dataDir": "data/group_summary"
+    },
     "chatAI": {
       "enable": false,
       "chatGPT": {

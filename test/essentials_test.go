@@ -170,11 +170,12 @@ func TestRegisterAll_ExplicitStartup(t *testing.T) {
 	const helperEnv = "MACARTHURGO_REGISTER_ALL_HELPER"
 	if os.Getenv(helperEnv) == "1" {
 		base.Config = &base.Configuration{}
+		base.Config.Plugins.GroupSummary.DataDir = t.TempDir()
 		if err := plugins.RegisterAll(); err != nil {
 			t.Fatalf("RegisterAll() error = %v", err)
 		}
-		if got := essentials.PluginCount(); got != 15 {
-			t.Fatalf("PluginCount() = %d, want 15", got)
+		if got := essentials.PluginCount(); got != 16 {
+			t.Fatalf("PluginCount() = %d, want 16", got)
 		}
 		return
 	}

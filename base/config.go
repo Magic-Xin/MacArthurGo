@@ -127,6 +127,10 @@ type Configuration struct {
 				FontFile string `json:"fontFile"`
 			} `json:"wordCloud"`
 		} `json:"statics"`
+		GroupSummary struct {
+			Model   string `json:"model"`
+			DataDir string `json:"dataDir"`
+		} `json:"groupSummary"`
 		ChatAI struct {
 			Enable  bool `json:"enable"`
 			ChatGPT struct {

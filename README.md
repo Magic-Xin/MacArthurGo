@@ -62,6 +62,7 @@ Integration tests live in the top-level `test/` directory. Package-level tests l
 - BiliBili
   - Url parser (video, live)
   - AI Summarize
+- Group chat summary
 - Picture Search
   - SauceNao
   - Ascii2d
