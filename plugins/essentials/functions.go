@@ -284,23 +284,23 @@ func constructMessage(messageStruct *structs.MessageStruct, message []cqcode.Arr
 }
 
 func RemoveMarkdown(input string) string {
-	replacements := map[string]string{
-		`(?m)^#{1,6}\s*`:          "",   // Headers
-		`\*\*([^*]+)\*\*`:         "$1", // Bold
-		`\*([^*]+)\*`:             "$1", // Italic
-		`\[([^\]]+)\]\([^)]+\)`:   "$1", // Links
-		"`([^`]+)`":               "$1", // Inline code
-		`~~([^~]+)~~`:             "$1", // Strikethrough
-		`!\[([^\]]*)\]\([^)]+\)`:  "$1", // Images
-		`(?m)^>\s*`:               "",   // Blockquotes
-		`(?m)^(\s*[-*+]\s+)`:      "",   // Unordered lists
-		`(?m)^\d+\.\s+`:           "",   // Ordered lists
-		`(?m)^(\s*[-*_]{3,}\s*)$`: "",   // Horizontal rules
+	replacements := [][2]string{
+		{`(?m)^#{1,6}\s*`, ""},           // Headers
+		{`!\[([^\]]*)\]\([^)]+\)`, "$1"}, // Images, before links
+		{`\[([^\]]+)\]\([^)]+\)`, "$1"},  // Links
+		{`\*\*([^*]+)\*\*`, "$1"},        // Bold, before italic
+		{`\*([^*]+)\*`, "$1"},            // Italic
+		{"`([^`]+)`", "$1"},              // Inline code
+		{`~~([^~]+)~~`, "$1"},            // Strikethrough
+		{`(?m)^>\s*`, ""},                // Blockquotes
+		{`(?m)^(\s*[-*+]\s+)`, ""},       // Unordered lists
+		{`(?m)^\d+\.\s+`, ""},            // Ordered lists
+		{`(?m)^(\s*[-*_]{3,}\s*)$`, ""},  // Horizontal rules
 	}
 
-	for pattern, replacement := range replacements {
-		re := regexp.MustCompile(pattern)
-		input = re.ReplaceAllString(input, replacement)
+	for _, replacement := range replacements {
+		re := regexp.MustCompile(replacement[0])
+		input = re.ReplaceAllString(input, replacement[1])
 	}
 
 	return input
