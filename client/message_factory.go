@@ -73,7 +73,14 @@ func dispatchPlugins(plugins []*essentials.Plugin, handle func(*essentials.Plugi
 
 func decodeEcho(msg []byte) (*structs.EchoMessageStruct, error) {
 	var echo structs.EchoMessageStruct
+	var envelope struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(msg, &envelope); err != nil {
+		return nil, fmt.Errorf("decode OneBot echo: %w", err)
+	}
 	if err := json.Unmarshal(msg, &echo); err == nil {
+		echo.RawData = envelope.Data
 		return &echo, nil
 	}
 
@@ -84,6 +91,7 @@ func decodeEcho(msg []byte) (*structs.EchoMessageStruct, error) {
 	echo.DataArray = array.Data
 	echo.Echo = array.Echo
 	echo.Status = array.Status
+	echo.RawData = envelope.Data
 	return &echo, nil
 }
 

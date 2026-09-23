@@ -17,6 +17,7 @@ type MessageStruct struct {
 	Sender      struct {
 		UserId   int64  `json:"user_id"`
 		Nickname string `json:"nickname"`
+		Card     string `json:"card"`
 	} `json:"sender"`
 	Message    []cqcode.ArrayMessage `json:"message"`
 	RawMessage string                `json:"raw_message"`
@@ -65,7 +66,8 @@ func (m *MessageStruct) UnmarshalJSON(data []byte) error {
 }
 
 type EchoMessageStruct struct {
-	Data struct {
+	RawData json.RawMessage `json:"-"`
+	Data    struct {
 		// Info only
 		Nickname string `json:"nickname"`
 		UserId   int64  `json:"user_id"`
