@@ -13,16 +13,26 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"google.golang.org/genai"
 )
 
+const (
+	GeminiFlashModel = "gemini-3.8-flash"
+	GeminiProModel   = "gemini-4-argon"
+	GeminiImageModel = "gemini-3-pro-image-preview"
+)
+
+var geminiThinkingArgument = regexp.MustCompile(`(?i)^\s*(low|mid|medium|high)(?:\s+|$)`)
+
 type Gemini struct {
-	Enabled bool
-	ArgsMap map[string]string
-	ApiKey  string
+	Enabled     bool
+	ArgsMap     map[string]string
+	ApiKey      string
+	httpOptions genai.HTTPOptions
 }
 
 type RMap struct {
@@ -37,6 +47,7 @@ type HMap struct {
 }
 
 func (g *Gemini) RequireAnswer(message []cqcode.ArrayMessage, messageID int64, modelName string) ([]string, []byte) {
+	message, thinkingLevel := parseGeminiThinking(message, modelName)
 	var parts []*genai.Part
 
 	for _, msg := range message {
@@ -65,7 +76,7 @@ func (g *Gemini) RequireAnswer(message []cqcode.ArrayMessage, messageID int64, m
 		}
 	}
 
-	resp, err := g.GetResponse(parts, modelName)
+	resp, err := g.GetResponse(parts, modelName, thinkingLevel)
 	if err != nil {
 		log.Printf("Get response error: %v", err)
 	}
@@ -74,6 +85,7 @@ func (g *Gemini) RequireAnswer(message []cqcode.ArrayMessage, messageID int64, m
 }
 
 func (g *Gemini) RequireEchoAnswer(originMessage, echoMessage []cqcode.ArrayMessage, modelName string) []string {
+	originMessage, thinkingLevel := parseGeminiThinking(originMessage, modelName)
 	var parts []*genai.Part
 
 	for _, msg := range originMessage {
@@ -110,7 +122,7 @@ func (g *Gemini) RequireEchoAnswer(originMessage, echoMessage []cqcode.ArrayMess
 		}
 	}
 
-	resp, err := g.GetResponse(parts, modelName)
+	resp, err := g.GetResponse(parts, modelName, thinkingLevel)
 	if err != nil {
 		log.Printf("Get response error: %v", err)
 	}
@@ -118,18 +130,16 @@ func (g *Gemini) RequireEchoAnswer(originMessage, echoMessage []cqcode.ArrayMess
 	return resp
 }
 
-func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) ([]string, error) {
-	var res []string
-
+func (g *Gemini) GetResponse(parts []*genai.Part, modelName string, thinkingLevel genai.ThinkingLevel) ([]string, error) {
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:  g.ApiKey,
-		Backend: genai.BackendGeminiAPI,
+		APIKey:      g.ApiKey,
+		Backend:     genai.BackendGeminiAPI,
+		HTTPOptions: g.httpOptions,
 	})
 	if err != nil {
 		log.Printf("Gemini client error: %v", err)
-		res = append(res, fmt.Sprintf("Gemini client error: %v", err))
-		return res, err
+		return geminiErrorResponse(modelName, fmt.Sprintf("Gemini client error: %v", err)), err
 	}
 
 	contents := []*genai.Content{{Parts: parts}}
@@ -154,7 +164,8 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) ([]string, e
 		},
 	}
 
-	config.Tools = geminiRequestTools(modelName)
+	config.ThinkingConfig = geminiThinkingConfig(modelName, thinkingLevel)
+	config.Tools = geminiTools(modelName)
 	if len(config.Tools) > 1 {
 		includeToolInvocations := true
 		config.ToolConfig = &genai.ToolConfig{IncludeServerSideToolInvocations: &includeToolInvocations}
@@ -167,35 +178,129 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string) ([]string, e
 	resp, err := client.Models.GenerateContent(ctx, modelName, contents, config)
 	if err != nil {
 		log.Printf("Gemini generate error: %v", err)
-		res = append(res, fmt.Sprintf("Gemini generate error: %v", err))
-		return res, err
+		return geminiErrorResponse(modelName, fmt.Sprintf("Gemini generate error: %v", err)), err
 	}
 
-	res = append(res, modelName+" response: ")
+	return formatGeminiResponse(resp, modelName), nil
+}
 
-	for _, c := range resp.Candidates {
-		if c.Content == nil {
+func IsGeminiTextModel(modelName string) bool {
+	return modelName == GeminiFlashModel || modelName == GeminiProModel
+}
+
+// Only the first text argument after the command selects a thinking level.
+// Copy the changed segment so quote handling can reuse the original request.
+func parseGeminiThinking(message []cqcode.ArrayMessage, modelName string) ([]cqcode.ArrayMessage, genai.ThinkingLevel) {
+	if !IsGeminiTextModel(modelName) {
+		return message, ""
+	}
+	for i, segment := range message {
+		text, ok := segment.Data["text"].(string)
+		if segment.Type != "text" || !ok || strings.TrimSpace(text) == "" {
 			continue
 		}
-		for _, part := range c.Content.Parts {
-			if part.Text != "" {
-				res = append(res, essentials.RemoveMarkdown(part.Text))
-			}
-			if part.InlineData != nil {
-				img := base64.StdEncoding.EncodeToString(part.InlineData.Data)
-				res = append(res, "base64://"+img)
-			}
+		match := geminiThinkingArgument.FindStringSubmatch(text)
+		if match == nil {
+			break
 		}
-		if c.GroundingMetadata != nil {
-			for _, chunk := range c.GroundingMetadata.GroundingChunks {
-				if chunk != nil && chunk.Maps != nil && chunk.Maps.URI != "" {
-					res = append(res, "Google Maps: "+chunk.Maps.Title+" "+chunk.Maps.URI)
+		level := genai.ThinkingLevel(strings.ToUpper(match[1]))
+		if level == "MID" {
+			level = genai.ThinkingLevelMedium
+		}
+		cleaned := append([]cqcode.ArrayMessage(nil), message...)
+		data := make(map[string]any, len(segment.Data))
+		for key, value := range segment.Data {
+			data[key] = value
+		}
+		data["text"] = text[len(match[0]):]
+		cleaned[i].Data = data
+		return cleaned, level
+	}
+	return message, ""
+}
+
+func geminiThinkingConfig(modelName string, requested genai.ThinkingLevel) *genai.ThinkingConfig {
+	if !IsGeminiTextModel(modelName) {
+		return nil
+	}
+	// These models cannot turn internal reasoning off. Default to their lowest
+	// level and always request a thought summary alongside the answer.
+	level := requested
+	if level == "" {
+		level = genai.ThinkingLevelLow
+	}
+	return &genai.ThinkingConfig{ThinkingLevel: level, IncludeThoughts: true}
+}
+
+func geminiErrorResponse(modelName, message string) []string {
+	if IsGeminiTextModel(modelName) {
+		return []string{
+			fmt.Sprintf("[%s] thinking:\n请求失败，未获取 thinking 摘要", modelName),
+			fmt.Sprintf("[%s] answer:\n%s", modelName, message),
+		}
+	}
+	return []string{message}
+}
+
+func formatGeminiResponse(resp *genai.GenerateContentResponse, modelName string) []string {
+	var thoughts, answer strings.Builder
+	var images, mapLinks []string
+
+	if resp != nil {
+		for _, c := range resp.Candidates {
+			if c == nil || c.Content == nil {
+				continue
+			}
+			for _, part := range c.Content.Parts {
+				if part == nil {
+					continue
+				}
+				if part.Thought {
+					thoughts.WriteString(part.Text)
+					continue
+				}
+				if part.Text != "" {
+					answer.WriteString(part.Text)
+				}
+				if part.InlineData != nil {
+					img := base64.StdEncoding.EncodeToString(part.InlineData.Data)
+					images = append(images, "base64://"+img)
 				}
 			}
+			if c.GroundingMetadata != nil {
+				for _, chunk := range c.GroundingMetadata.GroundingChunks {
+					if chunk != nil && chunk.Maps != nil && chunk.Maps.URI != "" {
+						mapLinks = append(mapLinks, "Google Maps: "+chunk.Maps.Title+" "+chunk.Maps.URI)
+					}
+				}
+			}
+			// Candidates are alternatives, not consecutive pieces of one answer.
+			break
 		}
 	}
 
-	return res, nil
+	answerText := strings.TrimSpace(essentials.RemoveMarkdown(answer.String()))
+	if len(mapLinks) > 0 {
+		answerText = strings.TrimSpace(answerText + "\n" + strings.Join(mapLinks, "\n"))
+	}
+	if !IsGeminiTextModel(modelName) {
+		res := []string{modelName + " response: "}
+		if answerText != "" {
+			res = append(res, answerText)
+		}
+		return append(res, images...)
+	}
+	thinkingText := strings.TrimSpace(essentials.RemoveMarkdown(thoughts.String()))
+	if thinkingText == "" {
+		thinkingText = "模型未返回 thinking 摘要"
+	}
+	if answerText == "" {
+		answerText = "模型未返回回答"
+	}
+	return []string{
+		fmt.Sprintf("[%s] thinking:\n%s", modelName, thinkingText),
+		fmt.Sprintf("[%s] answer:\n%s", modelName, answerText),
+	}
 }
 
 func geminiTools(modelName string) []*genai.Tool {
@@ -207,22 +312,6 @@ func geminiTools(modelName string) []*genai.Tool {
 		{GoogleMaps: &genai.GoogleMaps{}},
 		{URLContext: &genai.URLContext{}},
 	}
-}
-
-func geminiRequestTools(modelName string) []*genai.Tool {
-	tools := geminiTools(modelName)
-	if modelName != "gemini-3.1-pro-preview" {
-		return tools
-	}
-
-	// Gemini 3.1 Pro rejects Google Maps combined with Search or URL Context.
-	compatible := make([]*genai.Tool, 0, len(tools))
-	for _, tool := range tools {
-		if tool.GoogleMaps == nil {
-			compatible = append(compatible, tool)
-		}
-	}
-	return compatible
 }
 
 func (*Gemini) ImageProcessing(imgData *bytes.Buffer) ([]byte, string, error) {

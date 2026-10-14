@@ -129,11 +129,11 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		messageID := messageStruct.MessageId
 		switch key {
 		case "flash":
-			res, action = c.Gemini.RequireAnswer(message, messageID, "gemini-3.8-flash")
+			res, action = c.Gemini.RequireAnswer(message, messageID, chatai.GeminiFlashModel)
 		case "pro":
-			res, action = c.Gemini.RequireAnswer(message, messageID, "gemini-3.1-pro-preview")
+			res, action = c.Gemini.RequireAnswer(message, messageID, chatai.GeminiProModel)
 		case "image":
-			res, action = c.Gemini.RequireAnswer(message, messageID, "gemini-3-pro-image-preview")
+			res, action = c.Gemini.RequireAnswer(message, messageID, chatai.GeminiImageModel)
 		}
 		if action != nil {
 			value := essentials.EchoCache{Value: *messageStruct, Time: time.Now().Unix()}
@@ -142,6 +142,10 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 			return
 		}
 		echo = "geminisend|" + strconv.FormatInt(messageID, 10)
+		if key == "flash" || key == "pro" {
+			c.sendGeminiTextResponse(messageStruct, res, echo, send)
+			return
+		}
 	} else if key, ok := essentials.CheckArgumentMap(messageStruct.Command, c.Github.ArgsMap); ok && c.Github.Enabled {
 		switch key {
 		case "4o":
@@ -168,8 +172,8 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 			text += fmt.Sprintf("QWen:\n%s: %s\n\n", c.QWen.Model, c.QWen.Args)
 		}
 		if c.Gemini.Enabled {
-			text += fmt.Sprintf("Gemini:\nGemini-3.8-flash: %s\nGemini-3.0-pro image-generation: %s\nGemini-3.1-pro: %s\n\n",
-				c.Gemini.ArgsMap["flash"], c.Gemini.ArgsMap["image"], c.Gemini.ArgsMap["pro"])
+			text += fmt.Sprintf("Gemini:\n%s: %s\n%s: %s\n%s: %s\nThinking: %s/%s 后可选 low、mid/medium、high，默认 low；分别显示 thinking 和 answer。\n\n",
+				chatai.GeminiFlashModel, c.Gemini.ArgsMap["flash"], chatai.GeminiImageModel, c.Gemini.ArgsMap["image"], chatai.GeminiProModel, c.Gemini.ArgsMap["pro"], c.Gemini.ArgsMap["pro"], c.Gemini.ArgsMap["flash"])
 		}
 		if c.Github.Enabled {
 			text += fmt.Sprintf("Github:\nChatGPT 4o: %s\nChatGPT o1-preview: %s\nChatGPT o3-mini: %s\nLlama-3.1-405B: %s\nPhi-4: %s\nDeepSeek-R1: %s\n",
@@ -233,6 +237,29 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 	}
 }
 
+func (c *ChatAI) sendGeminiTextResponse(message *structs.MessageStruct, responses []string, echo string, send chan<- []byte) {
+	if len(responses) == 0 {
+		return
+	}
+	texts := make([]string, len(responses))
+	for i, response := range responses {
+		texts[i] = response
+		if c.panGu {
+			texts[i] = pangu.SpacingText(response)
+		}
+	}
+	if message.MessageType == "group" && c.groupForward {
+		botID, botName := essentials.Info.Account()
+		nodes := make([]structs.ForwardNode, 0, len(texts))
+		for _, text := range texts {
+			nodes = append(nodes, *essentials.ConstructForwardNode(botID, botName, []cqcode.ArrayMessage{*cqcode.Text(text)}))
+		}
+		send <- essentials.SendGroupForward(message, nodes, echo)
+		return
+	}
+	send <- essentials.SendMsg(message, strings.Join(texts, "\n\n"), nil, false, false, echo)
+}
+
 func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- []byte) {
 	split := strings.Split(echoMessageStruct.Echo, "|")
 	if len(split) < 3 || split[0] != "gemini" {
@@ -256,6 +283,10 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send 
 		res = c.Gemini.RequireEchoAnswer(originMessage.CleanMessage, message, split[2])
 
 		if res == nil {
+			return
+		}
+		if chatai.IsGeminiTextModel(split[2]) {
+			c.sendGeminiTextResponse(&originMessage, res, "", send)
 			return
 		}
 
