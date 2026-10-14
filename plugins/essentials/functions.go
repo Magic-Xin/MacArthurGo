@@ -118,9 +118,38 @@ func SendGroupForward(messageStruct *structs.MessageStruct, data []structs.Forwa
 	params := structs.GroupForward{
 		GroupId:  messageStruct.GroupId,
 		Messages: data,
+		News:     forwardPreviews(data),
 	}
 
 	return SendAction("send_group_forward_msg", params, echo)
+}
+
+func forwardPreviews(nodes []structs.ForwardNode) []structs.ForwardPreview {
+	// NapCat's packet mode otherwise copies every node's full text into the
+	// outer card. Keep previews short without truncating the forwarded content.
+	const maxEntries, maxRunes = 4, 50
+	previews := make([]structs.ForwardPreview, 0, min(len(nodes), maxEntries))
+	for _, node := range nodes[:min(len(nodes), maxEntries)] {
+		var preview strings.Builder
+		preview.WriteString(node.Data.Name)
+		preview.WriteString(": ")
+		for _, segment := range node.Data.Content {
+			if segment.Type == "text" {
+				text, _ := segment.Data["text"].(string)
+				preview.WriteString(text)
+			} else if segment.Type == "image" {
+				preview.WriteString("[图片]")
+			} else {
+				preview.WriteString("[消息]")
+			}
+		}
+		text := []rune(strings.Join(strings.Fields(preview.String()), " "))
+		if len(text) > maxRunes {
+			text = append(text[:maxRunes-1], '…')
+		}
+		previews = append(previews, structs.ForwardPreview{Text: string(text)})
+	}
+	return previews
 }
 
 func ConstructForwardNode(uin string, name string, data []cqcode.ArrayMessage) *structs.ForwardNode {
