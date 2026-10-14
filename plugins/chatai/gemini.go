@@ -166,10 +166,6 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string, thinkingLeve
 
 	config.ThinkingConfig = geminiThinkingConfig(modelName, thinkingLevel)
 	config.Tools = geminiTools(modelName)
-	if len(config.Tools) > 1 {
-		includeToolInvocations := true
-		config.ToolConfig = &genai.ToolConfig{IncludeServerSideToolInvocations: &includeToolInvocations}
-	}
 
 	if strings.Contains(modelName, "image") {
 		config.ResponseModalities = []string{"TEXT", "IMAGE"}
@@ -244,7 +240,7 @@ func geminiErrorResponse(modelName, message string) []string {
 
 func formatGeminiResponse(resp *genai.GenerateContentResponse, modelName string) []string {
 	var thoughts, answer strings.Builder
-	var images, mapLinks []string
+	var images []string
 
 	if resp != nil {
 		for _, c := range resp.Candidates {
@@ -267,22 +263,12 @@ func formatGeminiResponse(resp *genai.GenerateContentResponse, modelName string)
 					images = append(images, "base64://"+img)
 				}
 			}
-			if c.GroundingMetadata != nil {
-				for _, chunk := range c.GroundingMetadata.GroundingChunks {
-					if chunk != nil && chunk.Maps != nil && chunk.Maps.URI != "" {
-						mapLinks = append(mapLinks, "Google Maps: "+chunk.Maps.Title+" "+chunk.Maps.URI)
-					}
-				}
-			}
 			// Candidates are alternatives, not consecutive pieces of one answer.
 			break
 		}
 	}
 
 	answerText := strings.TrimSpace(essentials.RemoveMarkdown(answer.String()))
-	if len(mapLinks) > 0 {
-		answerText = strings.TrimSpace(answerText + "\n" + strings.Join(mapLinks, "\n"))
-	}
 	if !IsGeminiTextModel(modelName) {
 		res := []string{modelName + " response: "}
 		if answerText != "" {
@@ -309,8 +295,6 @@ func geminiTools(modelName string) []*genai.Tool {
 	}
 	return []*genai.Tool{
 		{GoogleSearch: &genai.GoogleSearch{}},
-		{GoogleMaps: &genai.GoogleMaps{}},
-		{URLContext: &genai.URLContext{}},
 	}
 }
 

@@ -16,7 +16,7 @@ import (
 func TestGeminiToolsForTextModels(t *testing.T) {
 	for _, model := range []string{GeminiFlashModel, GeminiProModel} {
 		tools := geminiTools(model)
-		if len(tools) != 3 || tools[0].GoogleSearch == nil || tools[1].GoogleMaps == nil || tools[2].URLContext == nil {
+		if len(tools) != 1 || tools[0].GoogleSearch == nil || tools[0].GoogleMaps != nil || tools[0].URLContext != nil {
 			t.Errorf("%s tools = %#v", model, tools)
 		}
 	}
@@ -81,9 +81,10 @@ func TestGeminiRequestsAndResponseBlocks(t *testing.T) {
 					t.Errorf("request path = %q", r.URL.Path)
 				}
 				var request struct {
-					Contents []*genai.Content `json:"contents"`
-					Tools    []*genai.Tool    `json:"tools"`
-					Config   struct {
+					Contents   []*genai.Content  `json:"contents"`
+					Tools      []*genai.Tool     `json:"tools"`
+					ToolConfig *genai.ToolConfig `json:"toolConfig"`
+					Config     struct {
 						Thinking *genai.ThinkingConfig `json:"thinkingConfig"`
 					} `json:"generationConfig"`
 				}
@@ -109,11 +110,14 @@ func TestGeminiRequestsAndResponseBlocks(t *testing.T) {
 				if !reflect.DeepEqual(texts, wantTexts) {
 					t.Errorf("sent texts = %#v, want %#v", texts, wantTexts)
 				}
-				if len(request.Tools) != 3 || request.Tools[0].GoogleSearch == nil || request.Tools[1].GoogleMaps == nil || request.Tools[2].URLContext == nil {
+				if len(request.Tools) != 1 || request.Tools[0].GoogleSearch == nil || request.Tools[0].GoogleMaps != nil || request.Tools[0].URLContext != nil {
 					t.Errorf("tools = %#v", request.Tools)
 				}
+				if request.ToolConfig != nil {
+					t.Errorf("unexpected tool config = %#v", request.ToolConfig)
+				}
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"first ","thought":true},{"text":"thought","thought":true},{"text":"First "},{"text":"**answer**","thoughtSignature":"c2lnbmF0dXJl"}]},"groundingMetadata":{"groundingChunks":[{"maps":{"title":"Place","uri":"https://maps.google.com/example"}}]}}]}`))
+				_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"first ","thought":true},{"text":"thought","thought":true},{"text":"First "},{"text":"**answer**","thoughtSignature":"c2lnbmF0dXJl"}]},"groundingMetadata":{"groundingChunks":[{"web":{"title":"Search result","uri":"https://example.com/result"}}]}}]}`))
 			}))
 			defer server.Close()
 			gemini := &Gemini{ApiKey: "test-key", httpOptions: genai.HTTPOptions{BaseURL: server.URL}}
@@ -138,7 +142,7 @@ func TestGeminiRequestsAndResponseBlocks(t *testing.T) {
 			}
 			want := []string{
 				"[" + test.model + "] thinking:\nfirst thought",
-				"[" + test.model + "] answer:\nFirst answer\nGoogle Maps: Place https://maps.google.com/example",
+				"[" + test.model + "] answer:\nFirst answer",
 			}
 			if !reflect.DeepEqual(responses, want) || calls.Load() != 1 {
 				t.Fatalf("responses = %#v, want %#v; API calls = %d", responses, want, calls.Load())
