@@ -7,6 +7,7 @@ import (
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -183,7 +184,7 @@ func TestJMBuildEncryptedPDF(t *testing.T) {
 	if _, err := os.Stat(output + ".plain.pdf"); !os.IsNotExist(err) {
 		t.Fatalf("unencrypted intermediate still exists: %v", err)
 	}
-	if err := api.ValidateFile(output, model.NewDefaultConfiguration()); err == nil {
+	if err := api.ValidateFile(context.Background(), output, model.NewDefaultConfiguration(), nil); err == nil {
 		t.Fatal("encrypted PDF validated without a password")
 	}
 
@@ -194,7 +195,7 @@ func TestJMBuildEncryptedPDF(t *testing.T) {
 	defer file.Close()
 	conf := model.NewDefaultConfiguration()
 	conf.UserPW = password
-	pageCount, err := api.PageCount(file, conf)
+	pageCount, err := api.PageCount(context.Background(), file, conf)
 	if err != nil {
 		t.Fatalf("read encrypted PDF with password: %v", err)
 	}

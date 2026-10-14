@@ -317,6 +317,10 @@ func FormatDownloadProgress(album *jmapi.AlbumDetail) string {
 }
 
 func BuildEncryptedPDF(imagePaths []string, outputPath, password string) error {
+	return buildEncryptedPDF(context.Background(), imagePaths, outputPath, password)
+}
+
+func buildEncryptedPDF(ctx context.Context, imagePaths []string, outputPath, password string) error {
 	if len(imagePaths) == 0 {
 		return errors.New("cannot build PDF without images")
 	}
@@ -336,7 +340,7 @@ func BuildEncryptedPDF(imagePaths []string, outputPath, password string) error {
 			return fmt.Errorf("inspect PDF path %q: %w", path, err)
 		}
 	}
-	if err := api.ImportImagesFile(imagePaths, plainPath, nil, nil); err != nil {
+	if err := api.ImportImagesFile(ctx, imagePaths, plainPath, nil, nil); err != nil {
 		_ = os.Remove(plainPath)
 		return fmt.Errorf("create PDF from images: %w", err)
 	}
@@ -348,7 +352,7 @@ func BuildEncryptedPDF(imagePaths []string, outputPath, password string) error {
 	}
 	conf := model.NewAESConfiguration(password, ownerPassword, 256)
 	conf.Permissions = model.PermissionsAll
-	if err := api.EncryptFile(plainPath, outputPath, conf); err != nil {
+	if err := api.EncryptFile(ctx, plainPath, outputPath, conf); err != nil {
 		_ = os.Remove(plainPath)
 		_ = os.Remove(outputPath)
 		return fmt.Errorf("encrypt PDF: %w", err)
@@ -360,7 +364,7 @@ func BuildEncryptedPDF(imagePaths []string, outputPath, password string) error {
 
 	validation := model.NewDefaultConfiguration()
 	validation.UserPW = password
-	if err := api.ValidateFile(outputPath, validation); err != nil {
+	if err := api.ValidateFile(ctx, outputPath, validation, nil); err != nil {
 		_ = os.Remove(outputPath)
 		return fmt.Errorf("validate encrypted PDF: %w", err)
 	}
@@ -406,7 +410,7 @@ func (s *Service) download(ctx context.Context, album *jmapi.AlbumDetail, photoI
 		fileStem += fmt.Sprintf("-chapter-%d", sequence)
 	}
 	pdfPath := filepath.Join(workDir, fileStem+".pdf")
-	if err := BuildEncryptedPDF(imagePaths, pdfPath, password); err != nil {
+	if err := buildEncryptedPDF(ctx, imagePaths, pdfPath, password); err != nil {
 		return nil, err
 	}
 	if err := os.RemoveAll(imageRoot); err != nil {
