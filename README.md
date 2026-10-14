@@ -80,12 +80,15 @@ Integration tests live in the top-level `test/` directory. Package-level tests l
 - `/gp question` uses `gemini-4-argon`; `/gf question` uses `gemini-3.8-flash`.
 - Add `low`, `mid`/`medium`, or `high` as a separate word immediately after the
   command to choose a thinking level, for example `/gp high question` or `/gf mid question`.
-- Group forward replies always contain separate `[model] thinking:` and
-  `[model] answer:` nodes.
+- Group forward replies preserve the sender and command-stripped prompt,
+  followed by separate `[model] thinking:` and `[model] answer:` nodes.
+  Quoted messages also appear with their original sender before the prompt.
   The same options work when replying to an earlier message.
 - Without a level, reasoning defaults to `low` and both nodes are returned.
   These models cannot fully disable internal thinking; returned thinking text is
   an API-provided summary. See [Google's thinking documentation](https://ai.google.dev/gemini-api/docs/generate-content/thinking).
+- If OneBot explicitly reports a failed forward, the bot only replies to the
+  request with a failure notice.
 
 ### CloudflareBypassForScraping
 

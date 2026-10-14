@@ -79,7 +79,9 @@ type EchoMessageStruct struct {
 		MessageType string `json:"message_type"`
 		MessageId   int64  `json:"message_id"`
 		Sender      struct {
-			UserId int64 `json:"user_id"`
+			UserId   int64  `json:"user_id"`
+			Nickname string `json:"nickname"`
+			Card     string `json:"card"`
 		}
 		Message []cqcode.ArrayMessage `json:"message"`
 
