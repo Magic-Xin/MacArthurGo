@@ -81,15 +81,13 @@ Integration tests live in the top-level `test/` directory. Package-level tests l
 - Add `low`, `mid`/`medium`, or `high` as a separate word immediately after the
   command to choose a thinking level, for example `/gp high question` or `/gf mid question`.
 - Group forward replies preserve the sender and command-stripped prompt,
-  followed by separate `[model] [effort] thinking:` and `[model] [effort] answer:`
-  nodes, for example `[gemini-4-argon] [medium] answer:`.
+  followed by one `[model] [effort] answer:` node,
+  for example `[gemini-4-argon] [medium] answer:`.
   Quoted messages also appear with their original sender before the prompt.
   The same options work when replying to an earlier message.
 - Without a level, reasoning defaults to `medium`, matching the official default
-  for both models, and both nodes are returned. `mid` is displayed as `medium`.
-  These models cannot fully disable internal thinking; returned thinking text is
-  an API-provided summary enabled with `IncludeThoughts: true`. Summaries can
-  still be long: thinking effort controls internal reasoning, not summary length.
+  for both models. `mid` is displayed as `medium`.
+  Thinking remains enabled; thought summaries are not requested or included in replies.
   See [Google's thinking documentation](https://ai.google.dev/gemini-api/docs/generate-content/thinking).
 
 ### CloudflareBypassForScraping

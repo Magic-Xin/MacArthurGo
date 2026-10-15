@@ -7,16 +7,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 )
 
-func TestChatAIGeminiForwardBlocks(t *testing.T) {
+func TestChatAIGeminiForwardKeepsPromptAndAnswer(t *testing.T) {
 	for _, model := range []string{chatai.GeminiProModel, chatai.GeminiFlashModel} {
 		t.Run(model, func(t *testing.T) {
 			plugin := &ChatAI{groupForward: true}
 			responses := []string{
-				"[" + model + "] [medium] thinking:\nthought summary",
 				"[" + model + "] [medium] answer:\nanswer",
 			}
 			send := make(chan []byte, 1)
@@ -47,10 +45,10 @@ func TestChatAIGeminiForwardBlocks(t *testing.T) {
 	}
 }
 
-func TestChatAIGeminiPrivateBlocksStaySeparated(t *testing.T) {
+func TestChatAIGeminiPrivateAnswer(t *testing.T) {
 	plugin := &ChatAI{groupForward: true}
 	send := make(chan []byte, 1)
-	responses := []string{"[gemini-4-argon] [medium] thinking:\nthought summary", "[gemini-4-argon] [medium] answer:\nanswer"}
+	responses := []string{"[gemini-4-argon] [medium] answer:\nanswer"}
 	plugin.sendGeminiTextResponse(&structs.MessageStruct{MessageType: "private", UserId: 42}, responses, "", send)
 	var action struct {
 		Action string
@@ -59,7 +57,7 @@ func TestChatAIGeminiPrivateBlocksStaySeparated(t *testing.T) {
 	if err := json.Unmarshal(<-send, &action); err != nil {
 		t.Fatal(err)
 	}
-	if action.Action != "send_msg" || len(action.Params.Message) != 1 || action.Params.Message[0].Data["text"] != strings.Join(responses, "\n\n") {
+	if action.Action != "send_msg" || len(action.Params.Message) != 1 || action.Params.Message[0].Data["text"] != responses[0] {
 		t.Fatalf("private reply = %#v", action)
 	}
 }
@@ -74,7 +72,7 @@ func TestChatAIGeminiForwardKeepsQuotedSource(t *testing.T) {
 	origin.Sender.Nickname = "request nickname"
 	plugin := &ChatAI{groupForward: true}
 	send := make(chan []byte, 1)
-	plugin.sendGeminiTextResponse(origin, []string{"thinking", "answer"}, "", send, geminiQuotedSource(&sourceEcho))
+	plugin.sendGeminiTextResponse(origin, []string{"[gemini-4-argon] [high] answer:\nanswer"}, "", send, geminiQuotedSource(&sourceEcho))
 	var action struct {
 		Echo   string
 		Params structs.GroupForward
@@ -82,7 +80,7 @@ func TestChatAIGeminiForwardKeepsQuotedSource(t *testing.T) {
 	if err := json.Unmarshal(<-send, &action); err != nil {
 		t.Fatal(err)
 	}
-	if len(action.Params.Messages) != 4 {
+	if len(action.Params.Messages) != 3 {
 		t.Fatalf("quoted forward nodes = %#v", action.Params.Messages)
 	}
 	quoted, prompt := action.Params.Messages[0], action.Params.Messages[1]

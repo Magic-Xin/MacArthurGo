@@ -219,8 +219,8 @@ func geminiThinkingConfig(modelName string, requested genai.ThinkingLevel) *gena
 	if !IsGeminiTextModel(modelName) {
 		return nil
 	}
-	// Match the official model default and request the API's thought summary.
-	return &genai.ThinkingConfig{ThinkingLevel: effectiveGeminiThinkingLevel(requested), IncludeThoughts: true}
+	// Keep reasoning enabled without requesting a thought summary.
+	return &genai.ThinkingConfig{ThinkingLevel: effectiveGeminiThinkingLevel(requested)}
 }
 
 func effectiveGeminiThinkingLevel(requested genai.ThinkingLevel) genai.ThinkingLevel {
@@ -230,24 +230,21 @@ func effectiveGeminiThinkingLevel(requested genai.ThinkingLevel) genai.ThinkingL
 	return requested
 }
 
-func geminiTextResponse(modelName string, thinkingLevel genai.ThinkingLevel, thoughts, answer string) []string {
+func geminiTextResponse(modelName string, thinkingLevel genai.ThinkingLevel, answer string) []string {
 	level := strings.ToLower(string(effectiveGeminiThinkingLevel(thinkingLevel)))
 	prefix := fmt.Sprintf("[%s] [%s]", modelName, level)
-	return []string{
-		prefix + " thinking:\n" + thoughts,
-		prefix + " answer:\n" + answer,
-	}
+	return []string{prefix + " answer:\n" + answer}
 }
 
 func geminiErrorResponse(modelName string, thinkingLevel genai.ThinkingLevel, message string) []string {
 	if IsGeminiTextModel(modelName) {
-		return geminiTextResponse(modelName, thinkingLevel, "请求失败，未获取 thinking 摘要", message)
+		return geminiTextResponse(modelName, thinkingLevel, message)
 	}
 	return []string{message}
 }
 
 func formatGeminiResponse(resp *genai.GenerateContentResponse, modelName string, thinkingLevel genai.ThinkingLevel) []string {
-	var thoughts, answer strings.Builder
+	var answer strings.Builder
 	var images []string
 
 	if resp != nil {
@@ -260,7 +257,6 @@ func formatGeminiResponse(resp *genai.GenerateContentResponse, modelName string,
 					continue
 				}
 				if part.Thought {
-					thoughts.WriteString(part.Text)
 					continue
 				}
 				if part.Text != "" {
@@ -284,14 +280,10 @@ func formatGeminiResponse(resp *genai.GenerateContentResponse, modelName string,
 		}
 		return append(res, images...)
 	}
-	thinkingText := strings.TrimSpace(essentials.RemoveMarkdown(thoughts.String()))
-	if thinkingText == "" {
-		thinkingText = "模型未返回 thinking 摘要"
-	}
 	if answerText == "" {
 		answerText = "模型未返回回答"
 	}
-	return geminiTextResponse(modelName, thinkingLevel, thinkingText, answerText)
+	return geminiTextResponse(modelName, thinkingLevel, answerText)
 }
 
 func geminiTools(modelName string) []*genai.Tool {

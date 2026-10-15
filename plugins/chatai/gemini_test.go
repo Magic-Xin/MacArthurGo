@@ -59,7 +59,7 @@ func TestParseGeminiThinking(t *testing.T) {
 	}
 }
 
-func TestGeminiRequestsAndResponseBlocks(t *testing.T) {
+func TestGeminiRequestsAndAnswerOnlyResponse(t *testing.T) {
 	for _, test := range []struct {
 		name, model, prompt, wantPrompt string
 		level                           genai.ThinkingLevel
@@ -97,7 +97,7 @@ func TestGeminiRequestsAndResponseBlocks(t *testing.T) {
 					return
 				}
 				thinking := request.Config.Thinking
-				if thinking == nil || thinking.ThinkingLevel != test.level || !thinking.IncludeThoughts || thinking.ThinkingBudget != nil {
+				if thinking == nil || thinking.ThinkingLevel != test.level || thinking.IncludeThoughts || thinking.ThinkingBudget != nil {
 					t.Errorf("thinking config = %#v", thinking)
 				}
 				var texts []string
@@ -145,7 +145,6 @@ func TestGeminiRequestsAndResponseBlocks(t *testing.T) {
 			}
 			prefix := "[" + test.model + "] [" + strings.ToLower(string(test.level)) + "]"
 			want := []string{
-				prefix + " thinking:\nfirst thought",
 				prefix + " answer:\nFirst answer",
 			}
 			if !reflect.DeepEqual(responses, want) || calls.Load() != 1 {
@@ -155,10 +154,10 @@ func TestGeminiRequestsAndResponseBlocks(t *testing.T) {
 	}
 }
 
-func TestGeminiMissingThinkingSummary(t *testing.T) {
+func TestGeminiAnswerWithoutThinkingSummary(t *testing.T) {
 	resp := &genai.GenerateContentResponse{Candidates: []*genai.Candidate{nil, {Content: &genai.Content{Parts: []*genai.Part{nil, {Text: "answer"}}}}}}
 	got := formatGeminiResponse(resp, GeminiProModel, genai.ThinkingLevelHigh)
-	want := []string{"[gemini-4-argon] [high] thinking:\n模型未返回 thinking 摘要", "[gemini-4-argon] [high] answer:\nanswer"}
+	want := []string{"[gemini-4-argon] [high] answer:\nanswer"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("response = %#v, want %#v", got, want)
 	}
@@ -183,11 +182,11 @@ func TestGeminiFailedRequestIncludesThinkingLevel(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			responses, err := gemini.GetResponse([]*genai.Part{{Text: "explain"}}, test.model, test.level)
-			if err == nil || len(responses) != 2 {
+			if err == nil || len(responses) != 1 {
 				t.Fatalf("responses = %#v, error = %v", responses, err)
 			}
 			prefix := "[" + test.model + "] [" + test.effort + "]"
-			if responses[0] != prefix+" thinking:\n请求失败，未获取 thinking 摘要" || !strings.HasPrefix(responses[1], prefix+" answer:\nGemini generate error:") || !strings.Contains(responses[1], "test failure") {
+			if !strings.HasPrefix(responses[0], prefix+" answer:\nGemini generate error:") || !strings.Contains(responses[0], "test failure") {
 				t.Fatalf("error response lost its model, effort, or reason: %#v", responses)
 			}
 		})
