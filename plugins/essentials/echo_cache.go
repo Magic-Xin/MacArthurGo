@@ -27,15 +27,6 @@ func GetCache(key string) (EchoCache, bool) {
 	return entry, ok
 }
 
-func TakeCache(key string) (EchoCache, bool) {
-	value, ok := cache.LoadAndDelete(key)
-	if !ok {
-		return EchoCache{}, false
-	}
-	entry, ok := value.(EchoCache)
-	return entry, ok
-}
-
 func StartCacheJanitor(ctx context.Context, expiration, interval time.Duration) {
 	if expiration <= 0 {
 		expiration = time.Hour

@@ -143,7 +143,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 		}
 		echo = "geminisend|" + strconv.FormatInt(messageID, 10)
 		if key == "flash" || key == "pro" {
-			c.sendGeminiTextResponse(messageStruct, res, send)
+			c.sendGeminiTextResponse(messageStruct, res, echo, send)
 			return
 		}
 	} else if key, ok := essentials.CheckArgumentMap(messageStruct.Command, c.Github.ArgsMap); ok && c.Github.Enabled {
@@ -237,7 +237,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 	}
 }
 
-func (c *ChatAI) sendGeminiTextResponse(message *structs.MessageStruct, responses []string, send chan<- []byte, quoted ...*structs.MessageStruct) {
+func (c *ChatAI) sendGeminiTextResponse(message *structs.MessageStruct, responses []string, echo string, send chan<- []byte, quoted ...*structs.MessageStruct) {
 	if len(responses) == 0 {
 		return
 	}
@@ -272,15 +272,10 @@ func (c *ChatAI) sendGeminiTextResponse(message *structs.MessageStruct, response
 		for _, text := range texts {
 			nodes = append(nodes, *essentials.ConstructForwardNode(botID, botName, []cqcode.ArrayMessage{*cqcode.Text(text)}))
 		}
-		echo := fmt.Sprintf("geminisend|%d|%d", message.MessageId, time.Now().UnixNano())
-		essentials.SetCache(echo, essentials.EchoCache{
-			Value: structs.MessageStruct{MessageType: message.MessageType, GroupId: message.GroupId, UserId: message.UserId, MessageId: message.MessageId},
-			Time:  time.Now().Unix(),
-		})
 		send <- essentials.SendGroupForward(message, nodes, echo)
 		return
 	}
-	send <- essentials.SendMsg(message, strings.Join(texts, "\n\n"), nil, false, false, "")
+	send <- essentials.SendMsg(message, strings.Join(texts, "\n\n"), nil, false, false, echo)
 }
 
 func geminiForwardSourceContent(message []cqcode.ArrayMessage) []cqcode.ArrayMessage {
@@ -325,27 +320,7 @@ func geminiQuotedSource(echo *structs.EchoMessageStruct) *structs.MessageStruct 
 	return message
 }
 
-func (c *ChatAI) receiveGeminiForwardEcho(echo *structs.EchoMessageStruct, send chan<- []byte) {
-	entry, ok := essentials.TakeCache(echo.Echo)
-	if !ok || (echo.Status != "failed" && echo.Retcode == 0) {
-		return
-	}
-	reason := echo.Message
-	if reason == "" {
-		reason = echo.Wording
-	}
-	log.Printf("Gemini group forward failed: group=%d message=%d retcode=%d reason=%s", entry.Value.GroupId, entry.Value.MessageId, echo.Retcode, reason)
-	send <- essentials.SendMsg(&entry.Value, "合并转发发送失败", nil, false, true, "")
-}
-
 func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send chan<- []byte) {
-	if echoMessageStruct == nil {
-		return
-	}
-	if strings.HasPrefix(echoMessageStruct.Echo, "geminisend|") {
-		c.receiveGeminiForwardEcho(echoMessageStruct, send)
-		return
-	}
 	split := strings.Split(echoMessageStruct.Echo, "|")
 	if len(split) < 3 || split[0] != "gemini" {
 		return
@@ -371,7 +346,7 @@ func (c *ChatAI) ReceiveEcho(echoMessageStruct *structs.EchoMessageStruct, send 
 			return
 		}
 		if chatai.IsGeminiTextModel(split[2]) {
-			c.sendGeminiTextResponse(&originMessage, res, send, geminiQuotedSource(echoMessageStruct))
+			c.sendGeminiTextResponse(&originMessage, res, "", send, geminiQuotedSource(echoMessageStruct))
 			return
 		}
 

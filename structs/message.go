@@ -168,13 +168,8 @@ type GroupMessage struct {
 }
 
 type GroupForward struct {
-	GroupId  int64            `json:"group_id"`
-	Messages []ForwardNode    `json:"messages"`
-	News     []ForwardPreview `json:"news,omitempty"`
-}
-
-type ForwardPreview struct {
-	Text string `json:"text"`
+	GroupId  int64         `json:"group_id"`
+	Messages []ForwardNode `json:"messages"`
 }
 
 type PrivateForward struct {

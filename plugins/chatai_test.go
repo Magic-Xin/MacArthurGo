@@ -2,7 +2,6 @@ package plugins
 
 import (
 	"MacArthurGo/plugins/chatai"
-	"MacArthurGo/plugins/essentials"
 	"MacArthurGo/structs"
 	"MacArthurGo/structs/cqcode"
 	"encoding/json"
@@ -24,7 +23,7 @@ func TestChatAIGeminiForwardBlocks(t *testing.T) {
 			origin := &structs.MessageStruct{MessageType: "group", MessageId: 88, GroupId: 123, UserId: 456, CleanMessage: []cqcode.ArrayMessage{*cqcode.Text("original prompt")}}
 			origin.Sender.Nickname = "nickname"
 			origin.Sender.Card = "群名片"
-			plugin.sendGeminiTextResponse(origin, responses, send)
+			plugin.sendGeminiTextResponse(origin, responses, "response-echo", send)
 			var action struct {
 				Action, Echo string
 				Params       structs.GroupForward
@@ -32,8 +31,7 @@ func TestChatAIGeminiForwardBlocks(t *testing.T) {
 			if err := json.Unmarshal(<-send, &action); err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { essentials.TakeCache(action.Echo) })
-			if action.Action != "send_group_forward_msg" || !strings.HasPrefix(action.Echo, "geminisend|88|") || action.Params.GroupId != 123 || len(action.Params.Messages) != len(responses)+1 {
+			if action.Action != "send_group_forward_msg" || action.Echo != "response-echo" || action.Params.GroupId != 123 || len(action.Params.Messages) != len(responses)+1 {
 				t.Fatalf("forward = %#v", action)
 			}
 			prompt := action.Params.Messages[0]
@@ -53,7 +51,7 @@ func TestChatAIGeminiPrivateBlocksStaySeparated(t *testing.T) {
 	plugin := &ChatAI{groupForward: true}
 	send := make(chan []byte, 1)
 	responses := []string{"[gemini-4-argon] thinking:\nthought summary", "[gemini-4-argon] answer:\nanswer"}
-	plugin.sendGeminiTextResponse(&structs.MessageStruct{MessageType: "private", UserId: 42}, responses, send)
+	plugin.sendGeminiTextResponse(&structs.MessageStruct{MessageType: "private", UserId: 42}, responses, "", send)
 	var action struct {
 		Action string
 		Params structs.Message
@@ -76,7 +74,7 @@ func TestChatAIGeminiForwardKeepsQuotedSource(t *testing.T) {
 	origin.Sender.Nickname = "request nickname"
 	plugin := &ChatAI{groupForward: true}
 	send := make(chan []byte, 1)
-	plugin.sendGeminiTextResponse(origin, []string{"thinking", "answer"}, send, geminiQuotedSource(&sourceEcho))
+	plugin.sendGeminiTextResponse(origin, []string{"thinking", "answer"}, "", send, geminiQuotedSource(&sourceEcho))
 	var action struct {
 		Echo   string
 		Params structs.GroupForward
@@ -84,7 +82,6 @@ func TestChatAIGeminiForwardKeepsQuotedSource(t *testing.T) {
 	if err := json.Unmarshal(<-send, &action); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { essentials.TakeCache(action.Echo) })
 	if len(action.Params.Messages) != 4 {
 		t.Fatalf("quoted forward nodes = %#v", action.Params.Messages)
 	}
@@ -109,56 +106,6 @@ func TestChatAIGeminiForwardSourceImageDoesNotMutateOriginal(t *testing.T) {
 	prepared := geminiForwardSourceContent(original)
 	if len(prepared) != 1 || prepared[0].Data["file"] != "base64://aW1hZ2U=" || original[0].Data["file"] != "original.jpg" {
 		t.Fatalf("prepared = %#v, original = %#v", prepared, original)
-	}
-}
-
-func TestChatAIGeminiForwardFailureOnlyNotifiesOnce(t *testing.T) {
-	plugin := &ChatAI{groupForward: true}
-	origin := &structs.MessageStruct{MessageType: "group", MessageId: 88, GroupId: 123, UserId: 456,
-		CleanMessage: []cqcode.ArrayMessage{*cqcode.Text("original prompt")}}
-	responses := []string{"[gemini-4-argon] thinking:\n" + strings.Repeat("中", 2100), "[gemini-4-argon] answer:\nanswer"}
-	send := make(chan []byte, 8)
-	plugin.sendGeminiTextResponse(origin, responses, send)
-	var forward struct{ Echo string }
-	if err := json.Unmarshal(<-send, &forward); err != nil {
-		t.Fatal(err)
-	}
-	failure := &structs.EchoMessageStruct{Echo: forward.Echo, Status: "failed", Retcode: 1200, Message: "发送转发消息失败"}
-	plugin.ReceiveEcho(failure, send)
-	var action struct {
-		Action, Echo string
-		Params       structs.Message
-	}
-	select {
-	case payload := <-send:
-		if err := json.Unmarshal(payload, &action); err != nil {
-			t.Fatal(err)
-		}
-	default:
-		t.Fatal("missing failure notification")
-	}
-	if action.Action != "send_msg" || action.Echo != "" || action.Params.GroupId != origin.GroupId || len(action.Params.Message) != 2 || action.Params.Message[0].Type != "reply" || action.Params.Message[0].Data["id"] != "88" || action.Params.Message[1].Data["text"] != "合并转发发送失败" {
-		t.Fatalf("failure notification = %#v", action)
-	}
-	plugin.ReceiveEcho(failure, send)
-	select {
-	case payload := <-send:
-		t.Fatalf("failure sent an extra message: %s", payload)
-	default:
-	}
-}
-
-func TestChatAIGeminiForwardSuccessReleasesCache(t *testing.T) {
-	plugin := &ChatAI{groupForward: true}
-	send := make(chan []byte, 1)
-	plugin.sendGeminiTextResponse(&structs.MessageStruct{MessageType: "group", MessageId: 77, GroupId: 123}, []string{"thinking", "answer"}, send)
-	var action struct{ Echo string }
-	if err := json.Unmarshal(<-send, &action); err != nil {
-		t.Fatal(err)
-	}
-	plugin.ReceiveEcho(&structs.EchoMessageStruct{Echo: action.Echo, Status: "ok"}, send)
-	if _, exists := essentials.GetCache(action.Echo); exists || len(send) != 0 {
-		t.Fatal("successful forward retained its request or sent a failure notification")
 	}
 }
 

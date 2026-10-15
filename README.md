@@ -87,8 +87,6 @@ Integration tests live in the top-level `test/` directory. Package-level tests l
 - Without a level, reasoning defaults to `low` and both nodes are returned.
   These models cannot fully disable internal thinking; returned thinking text is
   an API-provided summary. See [Google's thinking documentation](https://ai.google.dev/gemini-api/docs/generate-content/thinking).
-- If OneBot explicitly reports a failed forward, the bot only replies to the
-  request with a failure notice.
 
 ### CloudflareBypassForScraping
 
