@@ -172,7 +172,7 @@ func (c *ChatAI) ReceiveMessage(messageStruct *structs.MessageStruct, send chan<
 			text += fmt.Sprintf("QWen:\n%s: %s\n\n", c.QWen.Model, c.QWen.Args)
 		}
 		if c.Gemini.Enabled {
-			text += fmt.Sprintf("Gemini:\n%s: %s\n%s: %s\n%s: %s\nThinking: %s/%s 后可选 low、mid/medium、high，默认 low；分别显示 thinking 和 answer。\n\n",
+			text += fmt.Sprintf("Gemini:\n%s: %s\n%s: %s\n%s: %s\nThinking: %s/%s 后可选 low、mid/medium、high，默认 medium；分别显示 thinking 摘要和 answer，并标注思考等级。\n\n",
 				chatai.GeminiFlashModel, c.Gemini.ArgsMap["flash"], chatai.GeminiImageModel, c.Gemini.ArgsMap["image"], chatai.GeminiProModel, c.Gemini.ArgsMap["pro"], c.Gemini.ArgsMap["pro"], c.Gemini.ArgsMap["flash"])
 		}
 		if c.Github.Enabled {

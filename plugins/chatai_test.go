@@ -16,8 +16,8 @@ func TestChatAIGeminiForwardBlocks(t *testing.T) {
 		t.Run(model, func(t *testing.T) {
 			plugin := &ChatAI{groupForward: true}
 			responses := []string{
-				"[" + model + "] thinking:\nthought summary",
-				"[" + model + "] answer:\nanswer",
+				"[" + model + "] [medium] thinking:\nthought summary",
+				"[" + model + "] [medium] answer:\nanswer",
 			}
 			send := make(chan []byte, 1)
 			origin := &structs.MessageStruct{MessageType: "group", MessageId: 88, GroupId: 123, UserId: 456, CleanMessage: []cqcode.ArrayMessage{*cqcode.Text("original prompt")}}
@@ -50,7 +50,7 @@ func TestChatAIGeminiForwardBlocks(t *testing.T) {
 func TestChatAIGeminiPrivateBlocksStaySeparated(t *testing.T) {
 	plugin := &ChatAI{groupForward: true}
 	send := make(chan []byte, 1)
-	responses := []string{"[gemini-4-argon] thinking:\nthought summary", "[gemini-4-argon] answer:\nanswer"}
+	responses := []string{"[gemini-4-argon] [medium] thinking:\nthought summary", "[gemini-4-argon] [medium] answer:\nanswer"}
 	plugin.sendGeminiTextResponse(&structs.MessageStruct{MessageType: "private", UserId: 42}, responses, "", send)
 	var action struct {
 		Action string

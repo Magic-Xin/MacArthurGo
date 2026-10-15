@@ -65,13 +65,16 @@ func TestGeminiRequestsAndResponseBlocks(t *testing.T) {
 		level                           genai.ThinkingLevel
 		quoted                          bool
 	}{
-		{"pro default", GeminiProModel, "explain", "explain", genai.ThinkingLevelLow, false},
+		{"pro default", GeminiProModel, "explain", "explain", genai.ThinkingLevelMedium, false},
 		{"pro high", GeminiProModel, "high explain", "explain", genai.ThinkingLevelHigh, false},
+		{"flash default", GeminiFlashModel, "explain", "explain", genai.ThinkingLevelMedium, false},
 		{"flash low", GeminiFlashModel, "low explain", "explain", genai.ThinkingLevelLow, false},
+		{"flash mid", GeminiFlashModel, "mid explain", "explain", genai.ThinkingLevelMedium, false},
+		{"flash medium", GeminiFlashModel, "medium explain", "explain", genai.ThinkingLevelMedium, false},
 		{"quoted mid", GeminiProModel, "mid explain", "explain", genai.ThinkingLevelMedium, true},
-		{"quoted default", GeminiFlashModel, "explain", "explain", genai.ThinkingLevelLow, true},
+		{"quoted default", GeminiFlashModel, "explain", "explain", genai.ThinkingLevelMedium, true},
 		{"flash high separate", GeminiFlashModel, "high 为什么", "为什么", genai.ThinkingLevelHigh, false},
-		{"flash high joined", GeminiFlashModel, "high为什么", "high为什么", genai.ThinkingLevelLow, false},
+		{"flash high joined", GeminiFlashModel, "high为什么", "high为什么", genai.ThinkingLevelMedium, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var calls atomic.Int32
@@ -140,9 +143,10 @@ func TestGeminiRequestsAndResponseBlocks(t *testing.T) {
 					t.Fatalf("unexpected quote request: %s", action)
 				}
 			}
+			prefix := "[" + test.model + "] [" + strings.ToLower(string(test.level)) + "]"
 			want := []string{
-				"[" + test.model + "] thinking:\nfirst thought",
-				"[" + test.model + "] answer:\nFirst answer",
+				prefix + " thinking:\nfirst thought",
+				prefix + " answer:\nFirst answer",
 			}
 			if !reflect.DeepEqual(responses, want) || calls.Load() != 1 {
 				t.Fatalf("responses = %#v, want %#v; API calls = %d", responses, want, calls.Load())
@@ -153,10 +157,40 @@ func TestGeminiRequestsAndResponseBlocks(t *testing.T) {
 
 func TestGeminiMissingThinkingSummary(t *testing.T) {
 	resp := &genai.GenerateContentResponse{Candidates: []*genai.Candidate{nil, {Content: &genai.Content{Parts: []*genai.Part{nil, {Text: "answer"}}}}}}
-	got := formatGeminiResponse(resp, GeminiProModel)
-	want := []string{"[gemini-4-argon] thinking:\n模型未返回 thinking 摘要", "[gemini-4-argon] answer:\nanswer"}
+	got := formatGeminiResponse(resp, GeminiProModel, genai.ThinkingLevelHigh)
+	want := []string{"[gemini-4-argon] [high] thinking:\n模型未返回 thinking 摘要", "[gemini-4-argon] [high] answer:\nanswer"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("response = %#v, want %#v", got, want)
+	}
+}
+
+func TestGeminiFailedRequestIncludesThinkingLevel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"code":400,"message":"test failure","status":"INVALID_ARGUMENT"}}`))
+	}))
+	defer server.Close()
+	gemini := &Gemini{ApiKey: "test-key", httpOptions: genai.HTTPOptions{BaseURL: server.URL}}
+	for _, test := range []struct {
+		name, model, effort string
+		level               genai.ThinkingLevel
+	}{
+		{"pro default", GeminiProModel, "medium", ""},
+		{"flash default", GeminiFlashModel, "medium", ""},
+		{"pro high", GeminiProModel, "high", genai.ThinkingLevelHigh},
+		{"flash low", GeminiFlashModel, "low", genai.ThinkingLevelLow},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			responses, err := gemini.GetResponse([]*genai.Part{{Text: "explain"}}, test.model, test.level)
+			if err == nil || len(responses) != 2 {
+				t.Fatalf("responses = %#v, error = %v", responses, err)
+			}
+			prefix := "[" + test.model + "] [" + test.effort + "]"
+			if responses[0] != prefix+" thinking:\n请求失败，未获取 thinking 摘要" || !strings.HasPrefix(responses[1], prefix+" answer:\nGemini generate error:") || !strings.Contains(responses[1], "test failure") {
+				t.Fatalf("error response lost its model, effort, or reason: %#v", responses)
+			}
+		})
 	}
 }
 
@@ -166,7 +200,7 @@ func TestGeminiImageResponsePreservesImages(t *testing.T) {
 		{Text: "generated image"},
 		{InlineData: &genai.Blob{Data: []byte("image"), MIMEType: "image/png"}},
 	}}}}}
-	got := formatGeminiResponse(resp, GeminiImageModel)
+	got := formatGeminiResponse(resp, GeminiImageModel, "")
 	want := []string{GeminiImageModel + " response: ", "generated image", "base64://aW1hZ2U="}
 	if !reflect.DeepEqual(got, want) || geminiThinkingConfig(GeminiImageModel, "") != nil {
 		t.Fatalf("image response = %#v, want %#v", got, want)

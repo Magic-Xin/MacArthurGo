@@ -139,7 +139,7 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string, thinkingLeve
 	})
 	if err != nil {
 		log.Printf("Gemini client error: %v", err)
-		return geminiErrorResponse(modelName, fmt.Sprintf("Gemini client error: %v", err)), err
+		return geminiErrorResponse(modelName, thinkingLevel, fmt.Sprintf("Gemini client error: %v", err)), err
 	}
 
 	contents := []*genai.Content{{Parts: parts}}
@@ -174,10 +174,10 @@ func (g *Gemini) GetResponse(parts []*genai.Part, modelName string, thinkingLeve
 	resp, err := client.Models.GenerateContent(ctx, modelName, contents, config)
 	if err != nil {
 		log.Printf("Gemini generate error: %v", err)
-		return geminiErrorResponse(modelName, fmt.Sprintf("Gemini generate error: %v", err)), err
+		return geminiErrorResponse(modelName, thinkingLevel, fmt.Sprintf("Gemini generate error: %v", err)), err
 	}
 
-	return formatGeminiResponse(resp, modelName), nil
+	return formatGeminiResponse(resp, modelName, thinkingLevel), nil
 }
 
 func IsGeminiTextModel(modelName string) bool {
@@ -219,26 +219,34 @@ func geminiThinkingConfig(modelName string, requested genai.ThinkingLevel) *gena
 	if !IsGeminiTextModel(modelName) {
 		return nil
 	}
-	// These models cannot turn internal reasoning off. Default to their lowest
-	// level and always request a thought summary alongside the answer.
-	level := requested
-	if level == "" {
-		level = genai.ThinkingLevelLow
-	}
-	return &genai.ThinkingConfig{ThinkingLevel: level, IncludeThoughts: true}
+	// Match the official model default and request the API's thought summary.
+	return &genai.ThinkingConfig{ThinkingLevel: effectiveGeminiThinkingLevel(requested), IncludeThoughts: true}
 }
 
-func geminiErrorResponse(modelName, message string) []string {
+func effectiveGeminiThinkingLevel(requested genai.ThinkingLevel) genai.ThinkingLevel {
+	if requested == "" {
+		return genai.ThinkingLevelMedium
+	}
+	return requested
+}
+
+func geminiTextResponse(modelName string, thinkingLevel genai.ThinkingLevel, thoughts, answer string) []string {
+	level := strings.ToLower(string(effectiveGeminiThinkingLevel(thinkingLevel)))
+	prefix := fmt.Sprintf("[%s] [%s]", modelName, level)
+	return []string{
+		prefix + " thinking:\n" + thoughts,
+		prefix + " answer:\n" + answer,
+	}
+}
+
+func geminiErrorResponse(modelName string, thinkingLevel genai.ThinkingLevel, message string) []string {
 	if IsGeminiTextModel(modelName) {
-		return []string{
-			fmt.Sprintf("[%s] thinking:\n请求失败，未获取 thinking 摘要", modelName),
-			fmt.Sprintf("[%s] answer:\n%s", modelName, message),
-		}
+		return geminiTextResponse(modelName, thinkingLevel, "请求失败，未获取 thinking 摘要", message)
 	}
 	return []string{message}
 }
 
-func formatGeminiResponse(resp *genai.GenerateContentResponse, modelName string) []string {
+func formatGeminiResponse(resp *genai.GenerateContentResponse, modelName string, thinkingLevel genai.ThinkingLevel) []string {
 	var thoughts, answer strings.Builder
 	var images []string
 
@@ -283,10 +291,7 @@ func formatGeminiResponse(resp *genai.GenerateContentResponse, modelName string)
 	if answerText == "" {
 		answerText = "模型未返回回答"
 	}
-	return []string{
-		fmt.Sprintf("[%s] thinking:\n%s", modelName, thinkingText),
-		fmt.Sprintf("[%s] answer:\n%s", modelName, answerText),
-	}
+	return geminiTextResponse(modelName, thinkingLevel, thinkingText, answerText)
 }
 
 func geminiTools(modelName string) []*genai.Tool {
